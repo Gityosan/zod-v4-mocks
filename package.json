@@ -1,7 +1,24 @@
 {
   "name": "zod-v4-mocks",
   "version": "1.0.0",
+  "license": "MIT",
+  "private": false,
   "description": "Mock generator for zod v4",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gityosan/zod-v4-mocks"
+  },
+  "author": {
+    "name": "IIHARA議長",
+    "url": "https://x.com/iihara_gityo"
+  },
+  "keywords": [
+    "zod",
+    "faker",
+    "randexp",
+    "mock",
+    "generator"
+  ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -13,15 +30,6 @@
   },
   "files": [
     "dist"
-  ],
-  "author": "Gityosan",
-  "license": "MIT",
-  "keywords": [
-    "zod",
-    "faker",
-    "randexp",
-    "mock",
-    "generator"
   ],
   "packageManager": "pnpm@10.7.1",
   "dependencies": {
