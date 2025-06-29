@@ -1,0 +1,38 @@
+{
+  "name": "zod-v4-mocks",
+  "version": "1.0.0",
+  "description": "Mock generator for zod v4",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "prepare": "pnpm run build"
+  },
+  "files": [
+    "dist"
+  ],
+  "author": "Gityosan",
+  "license": "MIT",
+  "keywords": [
+    "zod",
+    "faker",
+    "randexp",
+    "mock",
+    "generator"
+  ],
+  "packageManager": "pnpm@10.7.1",
+  "dependencies": {
+    "@faker-js/faker": "9.8.0",
+    "randexp": "0.5.3",
+    "zod": "3.25.67"
+  },
+  "devDependencies": {
+    "@types/node": "24.0.7",
+    "prettier": "3.6.1",
+    "typescript": "5.8.3",
+    "vitest": "3.2.4"
+  }
+}
