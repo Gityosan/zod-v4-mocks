@@ -6,10 +6,20 @@ export interface MockConfig {
   locale?: LocaleType | LocaleType[];
   randomizer?: Randomizer;
   seed?: number;
+  minArrayLength?: number;
+  maxArrayLength?: number;
+  optionalProbability?: number;
+  nullableProbability?: number;
+  customGenerator?: (faker: Faker, schema: z.core.$ZodType) => unknown;
 }
 
 export class ZodMockGenerator {
   private faker: Faker;
+  private minArrayLength: number;
+  private maxArrayLength: number;
+  private optionalProbability: number;
+  private nullableProbability: number;
+  private customGenerator?: (faker: Faker, schema: z.core.$ZodType) => unknown;
 
   constructor(config: MockConfig) {
     this.faker = new Faker({
@@ -17,6 +27,11 @@ export class ZodMockGenerator {
       randomizer: config.randomizer,
       seed: config.seed,
     });
+    this.minArrayLength = config.minArrayLength ?? 1;
+    this.maxArrayLength = config.maxArrayLength ?? 3;
+    this.optionalProbability = config.optionalProbability ?? 0.5;
+    this.nullableProbability = config.nullableProbability ?? 0.5;
+    this.customGenerator = config.customGenerator;
   }
 
   generate(schema: z.core.$ZodType): unknown {
@@ -24,6 +39,10 @@ export class ZodMockGenerator {
   }
 
   private generateFromSchema(schema: z.core.$ZodType): unknown {
+    if (this.customGenerator) {
+      return this.customGenerator(this.faker, schema);
+    }
+
     if (schema instanceof z.ZodEmail) return generators.email(this.faker);
     if (schema instanceof z.ZodURL) return generators.url(this.faker);
     if (schema instanceof z.ZodJWT) return generators.jwt(this.faker);
@@ -81,7 +100,10 @@ export class ZodMockGenerator {
     if (schema instanceof z.ZodFile) return generators.file();
 
     if (schema instanceof z.ZodArray) {
-      const length = this.faker.number.int({ min: 1, max: 3 });
+      const length = this.faker.number.int({
+        min: this.minArrayLength,
+        max: this.maxArrayLength,
+      });
       return Array.from({ length }, () =>
         this.generateFromSchema(schema.element),
       );
@@ -98,12 +120,18 @@ export class ZodMockGenerator {
     }
 
     if (schema instanceof z.ZodOptional) {
-      if (this.faker.datatype.boolean()) return undefined;
+      if (
+        this.faker.datatype.boolean({ probability: this.optionalProbability })
+      )
+        return undefined;
       return this.generateFromSchema(schema.unwrap());
     }
 
     if (schema instanceof z.ZodNullable) {
-      if (this.faker.datatype.boolean()) return null;
+      if (
+        this.faker.datatype.boolean({ probability: this.nullableProbability })
+      )
+        return null;
       return this.generateFromSchema(schema.unwrap());
     }
 
