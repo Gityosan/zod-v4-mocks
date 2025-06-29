@@ -20,6 +20,55 @@ describe('ZodMockGenerator', () => {
       expect(typeof result).toBe('number');
     });
 
+    it('intを生成できる(v3)', () => {
+      const schema = z.number().int();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+    });
+
+    it('intを生成できる', () => {
+      const schema = z.int();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+    });
+
+    it('int32を生成できる', () => {
+      const schema = z.int32();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+    });
+
+    it('int64を生成できる', () => {
+      const schema = z.int64();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('bigint');
+    });
+
+    it('uint64を生成できる', () => {
+      const schema = z.uint64();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('bigint');
+    });
+
+    it('float32を生成できる', () => {
+      const schema = z.float32();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+    });
+
+    it('float64を生成できる', () => {
+      const schema = z.float64();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+    });
+
     it('ブール値を生成できる', () => {
       const schema = z.boolean();
       const result = generator.generate(schema);
@@ -581,7 +630,7 @@ describe('ZodMockGenerator', () => {
   });
 
   describe('数値の範囲制限', () => {
-    it('最小値・最大値を持つx', () => {
+    it('最小値・最大値を持つ数値を生成できる', () => {
       const schema = z.number().min(10).max(100);
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
@@ -590,11 +639,77 @@ describe('ZodMockGenerator', () => {
       expect(result).toBeLessThanOrEqual(100);
     });
 
+    it('negativeを持つ数値を生成できる', () => {
+      const schema = z.number().negative();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+      expect(result).toBeLessThan(0);
+    });
+
+    it('positiveを持つ数値を生成できる', () => {
+      const schema = z.number().positive();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it('nonnegativeを持つ数値を生成できる', () => {
+      const schema = z.number().nonnegative();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+      expect(result).toBeGreaterThanOrEqual(0);
+    });
+
+    it('nonpositiveを持つ数値を生成できる', () => {
+      const schema = z.number().nonpositive();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+      expect(result).toBeLessThanOrEqual(0);
+    });
+
+    it('greaterThanを持つ数値を生成できる', () => {
+      const schema = z.number().gt(10);
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+      expect(result).toBeGreaterThan(10);
+    });
+
+    it('lessThanを持つ数値を生成できる', () => {
+      const schema = z.number().lt(10);
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+      expect(result).toBeLessThan(10);
+    });
+
+    it('greaterThanOrEqualを持つ数値を生成できる', () => {
+      const schema = z.number().gte(10);
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+      expect(result).toBeGreaterThanOrEqual(10);
+    });
+
+    it('lessThanOrEqualを持つ数値を生成できる', () => {
+      const schema = z.number().lte(10);
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+      expect(result).toBeLessThanOrEqual(10);
+    });
+
     it('最小値・最大値を持つBigIntを生成できる', () => {
       const schema = z.bigint().min(BigInt(10)).max(BigInt(100));
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('bigint');
+      expect(result).toBeGreaterThanOrEqual(BigInt(10));
+      expect(result).toBeLessThanOrEqual(BigInt(100));
     });
   });
 
@@ -603,6 +718,11 @@ describe('ZodMockGenerator', () => {
       const schema = z.never();
       const result = generator.generate(schema);
       expect(result).toBeNull();
+    });
+
+    it('数値範囲が適切でない', () => {
+      const schema = z.number().min(100).max(10);
+      expect(() => generator.generate(schema)).toThrow();
     });
   });
 

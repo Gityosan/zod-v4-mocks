@@ -71,15 +71,33 @@ export const generators = {
   },
   int: (faker: Faker, schema: z.ZodNumber) => {
     const { minValue, maxValue } = schema;
-    return faker.number.int(calcMinMaxInt(minValue, maxValue));
+    const { min, max } = calcMinMaxInt(minValue, maxValue);
+    if (min !== undefined && max !== undefined) {
+      if (min > max) {
+        throw new Error('Min value should be less than max value');
+      }
+    }
+    return faker.number.int({ min, max });
   },
   bigInt: (faker: Faker, schema: z.ZodBigInt) => {
     const { minValue, maxValue } = schema;
-    return faker.number.bigInt(calcMinMaxBigInt(minValue, maxValue));
+    const { min, max } = calcMinMaxBigInt(minValue, maxValue);
+    if (min !== undefined && max !== undefined) {
+      if (min > max) {
+        throw new Error('Min value should be less than max value');
+      }
+    }
+    return faker.number.bigInt({ min, max });
   },
   float: (faker: Faker, schema: z.ZodFloat32 | z.ZodFloat64) => {
     const { minValue, maxValue } = schema;
-    return faker.number.float(calcMinMaxFloat(minValue, maxValue));
+    const { min, max } = calcMinMaxFloat(minValue, maxValue);
+    if (min !== undefined && max !== undefined) {
+      if (min > max) {
+        throw new Error('Min value should be less than max value');
+      }
+    }
+    return faker.number.float({ min, max });
   },
   file: () => new File([], 'test.txt'),
 };

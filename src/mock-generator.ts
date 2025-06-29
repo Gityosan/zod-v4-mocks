@@ -81,21 +81,17 @@ export class ZodMockGenerator {
 
       return this.faker.lorem.word();
     }
-
-    if (schema instanceof z.ZodNumberFormat) {
-      const { format } = schema;
-      if (format === 'float32') return generators.float(this.faker, schema);
-      if (format === 'float64') return generators.float(this.faker, schema);
-      return generators.int(this.faker, schema);
-    }
     if (schema instanceof z.ZodBigInt)
       return generators.bigInt(this.faker, schema);
 
-    if (schema instanceof z.ZodBigIntFormat)
-      return generators.bigInt(this.faker, schema);
-
-    if (schema instanceof z.ZodNumber)
+    if (schema instanceof z.ZodNumber) {
+      if (schema instanceof z.ZodNumberFormat) {
+        const { format } = schema;
+        if (format === 'float32') return generators.float(this.faker, schema);
+        if (format === 'float64') return generators.float(this.faker, schema);
+      }
       return generators.int(this.faker, schema);
+    }
 
     if (schema instanceof z.ZodFile) return generators.file();
 
