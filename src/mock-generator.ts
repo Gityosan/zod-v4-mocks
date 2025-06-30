@@ -78,8 +78,7 @@ export class ZodMockGenerator {
       if (regexCheck instanceof z.core.$ZodCheckStringFormat) {
         return generators.regex(this.faker, regexCheck);
       }
-
-      return this.faker.lorem.word();
+      return generators.string(this.faker, schema);
     }
     if (schema instanceof z.ZodBigInt)
       return generators.bigInt(this.faker, schema);
@@ -105,6 +104,19 @@ export class ZodMockGenerator {
       );
     }
 
+    if (schema instanceof z.ZodTuple) {
+      const length = this.faker.number.int({
+        min: this.minArrayLength,
+        max: this.maxArrayLength,
+      });
+      return Array.from({ length }, () => {
+        const randomOption = this.faker.helpers.arrayElement<z.core.$ZodType>(
+          schema.def.items,
+        );
+        return this.generateFromSchema(randomOption);
+      });
+    }
+
     if (schema instanceof z.ZodObject) {
       const { shape } = schema;
       const result: { [key: string]: unknown } = {};
@@ -113,6 +125,12 @@ export class ZodMockGenerator {
         result[key] = this.generateFromSchema(value);
       }
       return result;
+    }
+
+    if (schema instanceof z.ZodIntersection) {
+      return generators.intersection(this.faker, schema, (schema) =>
+        this.generateFromSchema(schema),
+      );
     }
 
     if (schema instanceof z.ZodOptional) {
@@ -137,6 +155,21 @@ export class ZodMockGenerator {
         this.faker.helpers.arrayElement<z.core.$ZodType>(options);
       return this.generateFromSchema(randomOption);
     }
+    if (schema instanceof z.ZodRecord) {
+      return generators.record(schema, (schema) =>
+        this.generateFromSchema(schema),
+      );
+    }
+    if (schema instanceof z.ZodMap) {
+      return generators.map(schema, (schema) =>
+        this.generateFromSchema(schema),
+      );
+    }
+    if (schema instanceof z.ZodSet) {
+      return generators.set(schema, (schema) =>
+        this.generateFromSchema(schema),
+      );
+    }
 
     if (schema instanceof z.ZodNaN) return NaN;
     if (schema instanceof z.ZodBoolean) return this.faker.datatype.boolean();
@@ -153,7 +186,24 @@ export class ZodMockGenerator {
     if (schema instanceof z.ZodVoid) return undefined;
     if (schema instanceof z.ZodSymbol) return Symbol(this.faker.lorem.word());
     if (schema instanceof z.ZodDefault) {
+      return this.generateFromSchema(schema.unwrap());
+    }
+    if (schema instanceof z.ZodPrefault) {
+      return this.generateFromSchema(schema.unwrap());
+    }
+    if (schema instanceof z.ZodReadonly) {
       return this.generateFromSchema(schema.def.innerType);
+    }
+    if (schema instanceof z.ZodLazy) {
+      return this.generateFromSchema(schema.unwrap());
+    }
+    if (schema instanceof z.ZodPipe) {
+      return generators.pipe(schema, (schema) =>
+        this.generateFromSchema(schema),
+      );
+    }
+    if (schema instanceof z.ZodTransform) {
+      return generators.transform(schema);
     }
 
     if (schema instanceof z.ZodNever) {

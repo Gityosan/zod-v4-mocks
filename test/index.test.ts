@@ -3,7 +3,7 @@ import { z } from 'zod/v4';
 import { ZodMockGenerator, type MockConfig } from '../src/mock-generator';
 
 describe('ZodMockGenerator', () => {
-  const generator = new ZodMockGenerator({});
+  const generator = new ZodMockGenerator({ seed: 1 });
 
   describe('基本的な型', () => {
     it('文字列を生成できる', () => {
@@ -564,6 +564,12 @@ describe('ZodMockGenerator', () => {
       expect(() => schema.parse(result)).not.toThrow();
     });
 
+    it('union(or)を生成できる', () => {
+      const schema = z.string().or(z.number()).or(z.boolean());
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+    });
+
     it('enumを生成できる', () => {
       const schema = z.enum(['red', 'green', 'blue']);
       const result = generator.generate(schema);
@@ -590,6 +596,292 @@ describe('ZodMockGenerator', () => {
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
+    });
+  });
+
+  describe('交差型', () => {
+    describe('オブジェクト交差', () => {
+      it('基本的なオブジェクト交差を生成できる', () => {
+        const schema1 = z.object({ a: z.string(), b: z.number() });
+        const schema2 = z.object({ b: z.number(), c: z.boolean() });
+        const intersection = schema1.and(schema2);
+        const result = generator.generate(intersection);
+
+        expect(() => intersection.parse(result)).not.toThrow();
+        expect(typeof result).toBe('object');
+        expect(result).toHaveProperty('a');
+        expect(result).toHaveProperty('b');
+        expect(result).toHaveProperty('c');
+        expect(typeof (result as any).a).toBe('string');
+        expect(typeof (result as any).b).toBe('number');
+        expect(typeof (result as any).c).toBe('boolean');
+      });
+
+      it('複雑なオブジェクト交差を生成できる', () => {
+        const schema1 = z.object({
+          user: z.object({ name: z.string() }),
+          data: z.array(z.string()),
+        });
+        const schema2 = z.object({
+          user: z.object({ email: z.email() }),
+          meta: z.boolean(),
+        });
+        const intersection = schema1.and(schema2);
+        const result = generator.generate(intersection);
+
+        expect(() => intersection.parse(result)).not.toThrow();
+        expect(result).toHaveProperty('user');
+        expect(result).toHaveProperty('data');
+        expect(result).toHaveProperty('meta');
+      });
+    });
+
+    describe('プリミティブ型制約マージ', () => {
+      it('数値制約をマージできる', () => {
+        const schema1 = z.number().min(10).max(50);
+        const schema2 = z.number().min(20).max(30);
+        const intersection = schema1.and(schema2);
+
+        const results = Array.from({ length: 10 }, () =>
+          generator.generate(intersection),
+        );
+
+        results.forEach((result) => {
+          expect(() => intersection.parse(result)).not.toThrow();
+          expect(typeof result).toBe('number');
+          expect(result).toBeGreaterThanOrEqual(20);
+          expect(result).toBeLessThanOrEqual(30);
+        });
+      });
+
+      it('文字列制約をマージできる', () => {
+        const schema1 = z.string().min(5).max(15);
+        const schema2 = z.string().min(8).max(12);
+        const intersection = schema1.and(schema2);
+
+        const results = Array.from({ length: 5 }, () =>
+          generator.generate(intersection),
+        );
+
+        results.forEach((result) => {
+          expect(() => intersection.parse(result)).not.toThrow();
+          expect(typeof result).toBe('string');
+          expect((result as string).length).toBeGreaterThanOrEqual(8);
+          expect((result as string).length).toBeLessThanOrEqual(12);
+        });
+      });
+
+      it('BigInt制約をマージできる', () => {
+        const schema1 = z.bigint().min(BigInt(10)).max(BigInt(50));
+        const schema2 = z.bigint().min(BigInt(20)).max(BigInt(30));
+        const intersection = schema1.and(schema2);
+
+        const results = Array.from({ length: 5 }, () =>
+          generator.generate(intersection),
+        );
+
+        results.forEach((result) => {
+          expect(() => intersection.parse(result)).not.toThrow();
+          expect(typeof result).toBe('bigint');
+          expect(result).toBeGreaterThanOrEqual(BigInt(20));
+          expect(result).toBeLessThanOrEqual(BigInt(30));
+        });
+      });
+    });
+
+    describe('Enum交差', () => {
+      it('共通値を持つEnum交差を生成できる', () => {
+        const schema1 = z.enum(['a', 'b', 'c', 'd']);
+        const schema2 = z.enum(['b', 'c', 'd', 'e']);
+        const intersection = schema1.and(schema2);
+
+        const results = Array.from({ length: 10 }, () =>
+          generator.generate(intersection),
+        );
+
+        results.forEach((result) => {
+          expect(() => intersection.parse(result)).not.toThrow();
+          expect(['b', 'c', 'd']).toContain(result);
+        });
+      });
+
+      it('共通値がないEnum交差はエラーになる', () => {
+        const schema1 = z.enum(['a', 'b']);
+        const schema2 = z.enum(['c', 'd']);
+        const intersection = schema1.and(schema2);
+
+        expect(() => generator.generate(intersection)).toThrow();
+      });
+    });
+
+    describe('リテラル交差', () => {
+      it('同じリテラル交差を生成できる', () => {
+        const schema1 = z.literal('test');
+        const schema2 = z.literal('test');
+        const intersection = schema1.and(schema2);
+        const result = generator.generate(intersection);
+
+        expect(() => intersection.parse(result)).not.toThrow();
+        expect(result).toBe('test');
+      });
+
+      it('異なるリテラル交差はエラーになる', () => {
+        const schema1 = z.literal('test1');
+        const schema2 = z.literal('test2');
+        const intersection = schema1.and(schema2);
+
+        expect(() => generator.generate(intersection)).toThrow();
+      });
+    });
+
+    describe('Union交差', () => {
+      it('共通型を持つUnion交差を生成できる', () => {
+        const schema1 = z.union([z.string(), z.number(), z.boolean()]);
+        const schema2 = z.union([z.string(), z.number(), z.date()]);
+        const intersection = schema1.and(schema2);
+
+        const results = Array.from({ length: 10 }, () =>
+          generator.generate(intersection),
+        );
+
+        results.forEach((result) => {
+          expect(() => intersection.parse(result)).not.toThrow();
+          expect(['string', 'number']).toContain(typeof result);
+        });
+      });
+    });
+
+    describe('ラッパー型交差', () => {
+      it('Optional型交差を生成できる', () => {
+        const schema1 = z.string().optional();
+        const schema2 = z.string().min(3).optional();
+        const intersection = schema1.and(schema2);
+
+        const results = Array.from({ length: 10 }, () =>
+          generator.generate(intersection),
+        );
+
+        results.forEach((result) => {
+          expect(() => intersection.parse(result)).not.toThrow();
+          if (result !== undefined) {
+            expect(typeof result).toBe('string');
+            expect((result as string).length).toBeGreaterThanOrEqual(3);
+          }
+        });
+      });
+
+      it('Nullable型交差を生成できる', () => {
+        const schema1 = z.number().nullable();
+        const schema2 = z.number().max(100).nullable();
+        const intersection = schema1.and(schema2);
+
+        const results = Array.from({ length: 10 }, () =>
+          generator.generate(intersection),
+        );
+
+        results.forEach((result) => {
+          expect(() => intersection.parse(result)).not.toThrow();
+          if (result !== null) {
+            expect(typeof result).toBe('number');
+            expect(result).toBeLessThanOrEqual(100);
+          }
+        });
+      });
+
+      it('Default型交差を生成できる', () => {
+        const schema1 = z.string().default('default1');
+        const schema2 = z.string().min(5).default('default2');
+        const intersection = schema1.and(schema2);
+        const result = generator.generate(intersection);
+
+        expect(() => intersection.parse(result)).not.toThrow();
+        expect(typeof result).toBe('string');
+        expect((result as string).length).toBeGreaterThanOrEqual(5);
+      });
+    });
+
+    describe('特殊型優先処理', () => {
+      it('any型との交差で相手型を優先する', () => {
+        const anySchema = z.any();
+        const stringSchema = z.string().min(5);
+        const intersection = anySchema.and(stringSchema);
+
+        const results = Array.from({ length: 5 }, () =>
+          generator.generate(intersection),
+        );
+
+        results.forEach((result) => {
+          expect(() => intersection.parse(result)).not.toThrow();
+          expect(typeof result).toBe('string');
+          expect((result as string).length).toBeGreaterThanOrEqual(5);
+        });
+      });
+
+      it('unknown型との交差で相手型を優先する', () => {
+        const unknownSchema = z.unknown();
+        const numberSchema = z.number().max(10);
+        const intersection = numberSchema.and(unknownSchema);
+
+        const results = Array.from({ length: 5 }, () =>
+          generator.generate(intersection),
+        );
+
+        results.forEach((result) => {
+          expect(() => intersection.parse(result)).not.toThrow();
+          expect(typeof result).toBe('number');
+          expect(result).toBeLessThanOrEqual(10);
+        });
+      });
+    });
+
+    describe('Map/Set交差', () => {
+      it('Map交差を生成できる', () => {
+        const schema1 = z.map(z.string(), z.number());
+        const schema2 = z.map(z.string(), z.number());
+        const intersection = schema1.and(schema2);
+        const result = generator.generate(intersection);
+
+        expect(() => schema1.parse(result)).not.toThrow();
+        expect(() => schema2.parse(result)).not.toThrow();
+        expect(result).toBeInstanceOf(Map);
+      });
+
+      it('Set交差を生成できる', () => {
+        const schema1 = z.set(z.string());
+        const schema2 = z.set(z.string());
+        const intersection = schema1.and(schema2);
+        const result = generator.generate(intersection);
+
+        expect(() => schema1.parse(result)).not.toThrow();
+        expect(() => schema2.parse(result)).not.toThrow();
+        expect(result).toBeInstanceOf(Set);
+      });
+
+      it('互換性のないMap交差はエラーになる', () => {
+        const schema1 = z.map(z.string(), z.number());
+        const schema2 = z.map(z.number(), z.string());
+        const intersection = schema1.and(schema2);
+
+        expect(() => generator.generate(intersection)).toThrow();
+      });
+    });
+
+    describe('エラーケース', () => {
+      it('互換性のない型の交差はエラーになる', () => {
+        const stringSchema = z.string();
+        const numberSchema = z.number();
+        const intersection = stringSchema.and(numberSchema);
+
+        expect(() => generator.generate(intersection)).toThrow();
+      });
+
+      it('空の制約範囲はエラーになる', () => {
+        const schema1 = z.number().min(50).max(100);
+        const schema2 = z.number().min(10).max(30);
+        const intersection = schema1.and(schema2);
+
+        expect(() => generator.generate(intersection)).toThrow();
+      });
     });
   });
 
@@ -722,6 +1014,13 @@ describe('ZodMockGenerator', () => {
 
     it('数値範囲が適切でない', () => {
       const schema = z.number().min(100).max(10);
+      expect(() => generator.generate(schema)).toThrow();
+    });
+
+    it('交差した値が適切でない', () => {
+      const left = z.object({ value: z.string() });
+      const right = z.string();
+      const schema = left.and(right);
       expect(() => generator.generate(schema)).toThrow();
     });
   });
