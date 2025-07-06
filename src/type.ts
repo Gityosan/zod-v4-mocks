@@ -6,12 +6,18 @@ import { z } from 'zod/v4';
  */
 export type LocaleType = keyof typeof allLocales;
 
+export type GeneraterOptions = {
+  faker: Faker;
+  config: MockConfig;
+  registry: z.core.$ZodRegistry<z.core.GlobalMeta> | null;
+};
+
 /**
  * @package
  */
 export type CustomGeneratorType = (
-  faker: Faker,
   schema: z.core.$ZodType,
+  options: GeneraterOptions,
 ) => unknown;
 
 /**
@@ -26,4 +32,5 @@ export interface MockConfig {
   optionalProbability?: number;
   nullableProbability?: number;
   customGenerator?: CustomGeneratorType;
+  consistentName?: string; // meta's attribute name which is used to generate consistent property value
 }

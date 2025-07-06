@@ -8,11 +8,21 @@ import { generators } from './util';
  */
 export function generateFromSchema(
   schema: z.core.$ZodType,
-  faker: Faker,
-  config: MockConfig,
+  options: {
+    faker: Faker;
+    config: MockConfig;
+    registry: z.core.$ZodRegistry<z.core.GlobalMeta> | null;
+  },
 ): unknown {
+  const { faker, config, registry } = options;
+  if (registry?.has(schema)) {
+    const meta = registry.get(schema);
+    if (!meta?.consistentName) {
+      // return generators.string(faker, schema);
+    }
+  }
   if (config.customGenerator) {
-    return config.customGenerator(faker, schema);
+    return config.customGenerator(schema, options);
   }
 
   if (schema instanceof z.ZodEmail) return generators.email(faker);
@@ -69,7 +79,7 @@ export function generateFromSchema(
       max: config.maxArrayLength,
     });
     return Array.from({ length }, () =>
-      generateFromSchema(schema.element, faker, config),
+      generateFromSchema(schema.element, options),
     );
   }
 
@@ -82,7 +92,7 @@ export function generateFromSchema(
       const randomOption = faker.helpers.arrayElement<z.core.$ZodType>(
         schema.def.items,
       );
-      return generateFromSchema(randomOption, faker, config);
+      return generateFromSchema(randomOption, options);
     });
   }
 
@@ -91,47 +101,47 @@ export function generateFromSchema(
     const result: { [key: string]: unknown } = {};
 
     for (const [key, value] of Object.entries(shape)) {
-      result[key] = generateFromSchema(value, faker, config);
+      result[key] = generateFromSchema(value, options);
     }
     return result;
   }
 
   if (schema instanceof z.ZodIntersection) {
     return generators.intersection(faker, schema, (schema) =>
-      generateFromSchema(schema, faker, config),
+      generateFromSchema(schema, options),
     );
   }
 
   if (schema instanceof z.ZodOptional) {
     if (faker.datatype.boolean({ probability: config.optionalProbability }))
       return undefined;
-    return generateFromSchema(schema.unwrap(), faker, config);
+    return generateFromSchema(schema.unwrap(), options);
   }
 
   if (schema instanceof z.ZodNullable) {
     if (faker.datatype.boolean({ probability: config.nullableProbability }))
       return null;
-    return generateFromSchema(schema.unwrap(), faker, config);
+    return generateFromSchema(schema.unwrap(), options);
   }
 
   if (schema instanceof z.ZodUnion) {
-    const { options } = schema;
-    const randomOption = faker.helpers.arrayElement<z.core.$ZodType>(options);
-    return generateFromSchema(randomOption, faker, config);
+    const { options: items } = schema;
+    const randomOption = faker.helpers.arrayElement<z.core.$ZodType>(items);
+    return generateFromSchema(randomOption, options);
   }
   if (schema instanceof z.ZodRecord) {
     return generators.record(schema, (schema) =>
-      generateFromSchema(schema, faker, config),
+      generateFromSchema(schema, options),
     );
   }
   if (schema instanceof z.ZodMap) {
     return generators.map(schema, (schema) =>
-      generateFromSchema(schema, faker, config),
+      generateFromSchema(schema, options),
     );
   }
   if (schema instanceof z.ZodSet) {
     return generators.set(schema, (schema) =>
-      generateFromSchema(schema, faker, config),
+      generateFromSchema(schema, options),
     );
   }
 
@@ -150,20 +160,20 @@ export function generateFromSchema(
   if (schema instanceof z.ZodVoid) return undefined;
   if (schema instanceof z.ZodSymbol) return Symbol(faker.lorem.word());
   if (schema instanceof z.ZodDefault) {
-    return generateFromSchema(schema.unwrap(), faker, config);
+    return generateFromSchema(schema.unwrap(), options);
   }
   if (schema instanceof z.ZodPrefault) {
-    return generateFromSchema(schema.unwrap(), faker, config);
+    return generateFromSchema(schema.unwrap(), options);
   }
   if (schema instanceof z.ZodReadonly) {
-    return generateFromSchema(schema.def.innerType, faker, config);
+    return generateFromSchema(schema.def.innerType, options);
   }
   if (schema instanceof z.ZodLazy) {
-    return generateFromSchema(schema.unwrap(), faker, config);
+    return generateFromSchema(schema.unwrap(), options);
   }
   if (schema instanceof z.ZodPipe) {
     return generators.pipe(schema, (schema) =>
-      generateFromSchema(schema, faker, config),
+      generateFromSchema(schema, options),
     );
   }
   if (schema instanceof z.ZodTransform) {

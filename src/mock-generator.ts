@@ -5,22 +5,44 @@ import type { CustomGeneratorType, MockConfig } from './type';
 import { getLocales } from './util';
 
 export function createMockConfig(config?: Partial<MockConfig>): MockConfig {
+  const {
+    minArrayLength = 1,
+    maxArrayLength = 3,
+    optionalProbability = 0.5,
+    nullableProbability = 0.5,
+    consistentName = 'name',
+    ...rest
+  } = config || {};
   return {
-    minArrayLength: 1,
-    maxArrayLength: 3,
-    optionalProbability: 0.5,
-    nullableProbability: 0.5,
-    ...config,
+    minArrayLength,
+    maxArrayLength,
+    optionalProbability,
+    nullableProbability,
+    consistentName,
+    ...rest,
   };
 }
 
 class MockGenerator {
   private schema: z.ZodType;
   private config: MockConfig;
+  private registry: z.core.$ZodRegistry<z.core.GlobalMeta> | null;
+  private faker: Faker;
 
   constructor(schema: z.ZodType, config?: MockConfig) {
+    const mergedConfig = createMockConfig(config);
     this.schema = schema;
-    this.config = createMockConfig(config);
+    this.config = mergedConfig;
+    if (mergedConfig.consistentName) {
+      this.registry = z.registry<{ [mergedConfig.consistentName]: string }>();
+    } else {
+      this.registry = null;
+    }
+    this.faker = new Faker({
+      locale: getLocales(this.config.locale),
+      randomizer: this.config.randomizer,
+      seed: this.config.seed,
+    });
   }
 
   override(customGenerator: CustomGeneratorType): MockGenerator {
@@ -28,14 +50,23 @@ class MockGenerator {
     return this;
   }
 
-  generate() {
-    const faker = new Faker({
-      locale: getLocales(this.config.locale),
-      randomizer: this.config.randomizer,
-      seed: this.config.seed,
-    });
+  register(schemas: z.ZodType[]) {
+    for (const schema of schemas) {
+      const meta = schema.meta();
+      if (!meta || !this.config.consistentName) continue;
+      const consistentName = meta[this.config.consistentName];
+      if (!consistentName) continue;
+      this.registry?.add(schema, { consistentName });
+    }
+    return this;
+  }
 
-    return generateFromSchema(this.schema, faker, this.config);
+  generate() {
+    return generateFromSchema(this.schema, {
+      faker: this.faker,
+      config: this.config,
+      registry: this.registry,
+    });
   }
 
   [Symbol.toPrimitive]() {
