@@ -8,18 +8,22 @@ Mock generator for zod v4
 npm install zod-v4-mocks
 ```
 
-## Usage
+## Basic Usage
 
 ```ts
-import { ZodMockGenerator } from 'zod-v4-mocks';
+import { initGenerator } from 'zod-v4-mocks';
 import { z } from 'zod/v4';
 
 const schema = z.string();
 
-const generator = new ZodMockGenerator({ seed: 1 });
+const generator = initGenerator({ seed: 1 });
 const res = generator.generate(schema);
 console.log(schema.parse(res));
 ```
+
+## Usage Details
+
+Please see [examples](./examples/function-based-usage.ts)
 
 ## Unsupported Schemas
 
