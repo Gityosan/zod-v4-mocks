@@ -1,9 +1,6 @@
 import { allLocales, Faker, type Randomizer } from '@faker-js/faker';
 import { z } from 'zod/v4';
 
-/**
- * @package
- */
 export type LocaleType = keyof typeof allLocales;
 
 export type GeneraterOptions = {
@@ -12,17 +9,11 @@ export type GeneraterOptions = {
   registry: z.core.$ZodRegistry<z.core.GlobalMeta> | null;
 };
 
-/**
- * @package
- */
 export type CustomGeneratorType = (
   schema: z.core.$ZodType,
   options: GeneraterOptions,
 ) => unknown;
 
-/**
- * @package
- */
 export interface MockConfig {
   locale?: LocaleType | LocaleType[];
   randomizer?: Randomizer;

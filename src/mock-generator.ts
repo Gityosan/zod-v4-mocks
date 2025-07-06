@@ -4,7 +4,7 @@ import { generateFromSchema } from './generate-from-schema';
 import type { CustomGeneratorType, MockConfig } from './type';
 import { getLocales } from './util';
 
-export function createMockConfig(config?: Partial<MockConfig>): MockConfig {
+function createMockConfig(config?: Partial<MockConfig>): MockConfig {
   const {
     minArrayLength = 1,
     maxArrayLength = 3,
