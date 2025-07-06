@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto';
 import { intersection as intersectionES, merge } from 'es-toolkit';
 import RandExp from 'randexp';
 import { z } from 'zod/v4';
+import { LocaleType } from './type';
 
 function calcMinMaxString(minLength: number | null, maxLength: number | null) {
   if (typeof minLength === 'number') {
@@ -337,11 +338,6 @@ export const generators = {
   },
   transform: (schema: z.ZodTransform) => schema.def.transform,
 };
-
-/**
- * @package
- */
-export type LocaleType = keyof typeof allLocales;
 
 /**
  * @package

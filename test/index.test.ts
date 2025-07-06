@@ -1,8 +1,146 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod/v4';
-import { ZodMockGenerator, type MockConfig } from '../src/mock-generator';
+import { generateMock, ZodMockGenerator } from '../src/mock-generator';
+import type { MockConfig } from '../src/type';
 
-describe('ZodMockGenerator', () => {
+describe('generateMock (関数ベースAPI)', () => {
+  const mockConfig: MockConfig = { seed: 1 };
+
+  describe('基本的な型', () => {
+    it('文字列を生成できる', () => {
+      const schema = z.string();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+
+    it('数値を生成できる', () => {
+      const schema = z.number();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+    });
+
+    it('intを生成できる(v3)', () => {
+      const schema = z.number().int();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+    });
+
+    it('intを生成できる', () => {
+      const schema = z.int();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+    });
+
+    it('int32を生成できる', () => {
+      const schema = z.int32();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+    });
+
+    it('int64を生成できる', () => {
+      const schema = z.int64();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('bigint');
+    });
+
+    it('uint64を生成できる', () => {
+      const schema = z.uint64();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('bigint');
+    });
+
+    it('float32を生成できる', () => {
+      const schema = z.float32();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+    });
+
+    it('float64を生成できる', () => {
+      const schema = z.float64();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+    });
+
+    it('ブール値を生成できる', () => {
+      const schema = z.boolean();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('boolean');
+    });
+
+    it('BigIntを生成できる', () => {
+      const schema = z.bigint();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('bigint');
+    });
+
+    it('Dateを生成できる', () => {
+      const schema = z.date();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(result).toBeInstanceOf(Date);
+    });
+
+    it('Fileを生成できる', () => {
+      const schema = z.file();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(result).toBeInstanceOf(File);
+    });
+
+    it('nullを生成できる', () => {
+      const schema = z.null();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(result).toBeNull();
+    });
+
+    it('undefinedを生成できる', () => {
+      const schema = z.undefined();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(result).toBeUndefined();
+    });
+
+    it('voidを生成できる', () => {
+      const schema = z.void();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(result).toBeUndefined();
+    });
+
+    it('anyを生成できる', () => {
+      const schema = z.any();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+    });
+
+    it('unknownを生成できる', () => {
+      const schema = z.unknown();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+    });
+
+    it('symbolを生成できる', () => {
+      const schema = z.symbol();
+      const result = generateMock(schema, mockConfig).generate();
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('symbol');
+    });
+  });
+});
+
+describe('ZodMockGenerator (後方互換)', () => {
   const generator = new ZodMockGenerator({ seed: 1 });
 
   describe('基本的な型', () => {
