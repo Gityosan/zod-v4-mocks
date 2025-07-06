@@ -1,274 +1,353 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod/v4';
-import { generateMock, ZodMockGenerator } from '../src/mock-generator';
-import type { MockConfig } from '../src/type';
+import {
+  type CustomGeneratorType,
+  initGenerator,
+  type MockConfig,
+  ZodMockGenerator,
+} from '../src';
 
-describe('generateMock (関数ベースAPI)', () => {
-  const mockConfig: MockConfig = { seed: 1 };
-
-  describe('基本的な型', () => {
-    it('文字列を生成できる', () => {
+describe('initGenerator (functional base API)', () => {
+  describe('basic types', () => {
+    const generator = initGenerator();
+    it('string', () => {
       const schema = z.string();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('数値を生成できる', () => {
+    it('number', () => {
       const schema = z.number();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('number');
     });
 
-    it('intを生成できる(v3)', () => {
+    it('int (v3)', () => {
       const schema = z.number().int();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('number');
     });
 
-    it('intを生成できる', () => {
+    it('int', () => {
       const schema = z.int();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('number');
     });
 
-    it('int32を生成できる', () => {
+    it('int32', () => {
       const schema = z.int32();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('number');
     });
 
-    it('int64を生成できる', () => {
+    it('int64', () => {
       const schema = z.int64();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('bigint');
     });
 
-    it('uint64を生成できる', () => {
+    it('uint64', () => {
       const schema = z.uint64();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('bigint');
     });
 
-    it('float32を生成できる', () => {
+    it('float32', () => {
       const schema = z.float32();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('number');
     });
 
-    it('float64を生成できる', () => {
+    it('float64', () => {
       const schema = z.float64();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('number');
     });
 
-    it('ブール値を生成できる', () => {
+    it('boolean', () => {
       const schema = z.boolean();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('boolean');
     });
 
-    it('BigIntを生成できる', () => {
+    it('BigInt', () => {
       const schema = z.bigint();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('bigint');
     });
 
-    it('Dateを生成できる', () => {
+    it('Date', () => {
       const schema = z.date();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(result).toBeInstanceOf(Date);
     });
 
-    it('Fileを生成できる', () => {
+    it('File', () => {
       const schema = z.file();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(result).toBeInstanceOf(File);
     });
 
-    it('nullを生成できる', () => {
+    it('null', () => {
       const schema = z.null();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(result).toBeNull();
     });
 
-    it('undefinedを生成できる', () => {
+    it('undefined', () => {
       const schema = z.undefined();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(result).toBeUndefined();
     });
 
-    it('voidを生成できる', () => {
+    it('void', () => {
       const schema = z.void();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(result).toBeUndefined();
     });
 
-    it('anyを生成できる', () => {
+    it('any', () => {
       const schema = z.any();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
     });
 
-    it('unknownを生成できる', () => {
+    it('unknown', () => {
       const schema = z.unknown();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
     });
 
-    it('symbolを生成できる', () => {
+    it('symbol', () => {
       const schema = z.symbol();
-      const result = generateMock(schema, mockConfig).generate();
+      const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('symbol');
+    });
+  });
+  describe('options', () => {
+    it('seed', () => {
+      const config: MockConfig = { seed: 12345 };
+      const generator1 = initGenerator(config);
+      const generator2 = initGenerator(config);
+
+      const schema = z.string();
+      const result1 = generator1.generate(schema);
+      const result2 = generator2.generate(schema);
+
+      expect(result1).toBe(result2);
+    });
+
+    it('locale', () => {
+      const config: MockConfig = { locale: 'en' };
+      const generator = initGenerator(config);
+
+      const schema = z.string();
+      const result = generator.generate(schema);
+
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+
+    it('locale array', () => {
+      const config: MockConfig = { locale: ['ja', 'en'] };
+      const generator = initGenerator(config);
+
+      const schema = z.string();
+      const result = generator.generate(schema);
+
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+  });
+  describe('override', () => {
+    it('custom generator', () => {
+      const generator = initGenerator();
+      const customGenerator: CustomGeneratorType = () => 'test';
+      generator.override(customGenerator);
+
+      const schema = z.string();
+      const result = generator.generate(schema);
+
+      expect(result).toBe('test');
+    });
+  });
+  describe('register', () => {
+    it('consistent generator', () => {
+      const generator = initGenerator({ consistentKey: 'name' });
+      const UserId = z.uuid().meta({ name: 'UserId' });
+      const userSchema = z.object({
+        id: UserId,
+        name: z.string(),
+      });
+      const schema = z.array(
+        z.object({
+          userId: UserId,
+          user: userSchema,
+        }),
+      );
+      const result = generator.register([UserId]).generate(schema);
+
+      expect(Array.isArray(result)).toBe(true);
+      // @ts-ignore
+      expect(result.length).toBeGreaterThan(0);
+
+      // @ts-ignore
+      result.forEach((item) => {
+        expect(item).toHaveProperty('userId');
+        expect(item).toHaveProperty('user');
+        expect(item.user).toHaveProperty('id');
+        expect(item.userId).toBe(item.user.id);
+      });
     });
   });
 });
 
-describe('ZodMockGenerator (後方互換)', () => {
+describe('ZodMockGenerator (backward compatibility)', () => {
   const generator = new ZodMockGenerator({ seed: 1 });
 
-  describe('基本的な型', () => {
-    it('文字列を生成できる', () => {
+  describe('basic types', () => {
+    it('string', () => {
       const schema = z.string();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('数値を生成できる', () => {
+    it('number', () => {
       const schema = z.number();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('number');
     });
 
-    it('intを生成できる(v3)', () => {
+    it('int (v3)', () => {
       const schema = z.number().int();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('number');
     });
 
-    it('intを生成できる', () => {
+    it('int', () => {
       const schema = z.int();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('number');
     });
 
-    it('int32を生成できる', () => {
+    it('int32', () => {
       const schema = z.int32();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('number');
     });
 
-    it('int64を生成できる', () => {
+    it('int64', () => {
       const schema = z.int64();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('bigint');
     });
 
-    it('uint64を生成できる', () => {
+    it('uint64', () => {
       const schema = z.uint64();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('bigint');
     });
 
-    it('float32を生成できる', () => {
+    it('float32', () => {
       const schema = z.float32();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('number');
     });
 
-    it('float64を生成できる', () => {
+    it('float64', () => {
       const schema = z.float64();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('number');
     });
 
-    it('ブール値を生成できる', () => {
+    it('boolean', () => {
       const schema = z.boolean();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('boolean');
     });
 
-    it('BigIntを生成できる', () => {
+    it('BigInt', () => {
       const schema = z.bigint();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('bigint');
     });
 
-    it('Dateを生成できる', () => {
+    it('Date', () => {
       const schema = z.date();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(result).toBeInstanceOf(Date);
     });
 
-    it('Fileを生成できる', () => {
+    it('File', () => {
       const schema = z.file();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(result).toBeInstanceOf(File);
     });
 
-    it('nullを生成できる', () => {
+    it('null', () => {
       const schema = z.null();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(result).toBeNull();
     });
 
-    it('undefinedを生成できる', () => {
+    it('undefined', () => {
       const schema = z.undefined();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(result).toBeUndefined();
     });
 
-    it('voidを生成できる', () => {
+    it('void', () => {
       const schema = z.void();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(result).toBeUndefined();
     });
 
-    it('anyを生成できる', () => {
+    it('any', () => {
       const schema = z.any();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
     });
 
-    it('unknownを生成できる', () => {
+    it('unknown', () => {
       const schema = z.unknown();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
     });
 
-    it('symbolを生成できる', () => {
+    it('symbol', () => {
       const schema = z.symbol();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
@@ -276,181 +355,181 @@ describe('ZodMockGenerator (後方互換)', () => {
     });
   });
 
-  describe('特殊な文字列フォーマット(v3)', () => {
-    it('emailを生成できる', () => {
+  describe('Special string format(v3)', () => {
+    it('email', () => {
       const schema = z.string().email();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('URLを生成できる', () => {
+    it('URL', () => {
       const schema = z.string().url();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('JWTを生成できる', () => {
+    it('JWT', () => {
       const schema = z.string().jwt();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('emojiを生成できる', () => {
+    it('emoji', () => {
       const schema = z.string().emoji();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('guidを生成できる', () => {
+    it('guid', () => {
       const schema = z.string().guid();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('uuidを生成できる', () => {
+    it('uuid', () => {
       const schema = z.string().uuid();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('uuidv4を生成できる', () => {
+    it('uuidv4', () => {
       const schema = z.string().uuidv4();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('uuidv6を生成できる', () => {
+    it('uuidv6', () => {
       const schema = z.string().uuidv6();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('uuidv7を生成できる', () => {
+    it('uuidv7', () => {
       const schema = z.string().uuidv7();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('nanoidを生成できる', () => {
+    it('nanoid', () => {
       const schema = z.string().nanoid();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('cuidを生成できる', () => {
+    it('cuid', () => {
       const schema = z.string().cuid();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('cuid2を生成できる', () => {
+    it('cuid2', () => {
       const schema = z.string().cuid2();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('ulidを生成できる', () => {
+    it('ulid', () => {
       const schema = z.string().ulid();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('xidを生成できる', () => {
+    it('xid', () => {
       const schema = z.string().xid();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('ksuidを生成できる', () => {
+    it('ksuid', () => {
       const schema = z.string().ksuid();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('cidrv4を生成できる', () => {
+    it('cidrv4', () => {
       const schema = z.string().cidrv4();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('cidrv6を生成できる', () => {
+    it('cidrv6', () => {
       const schema = z.string().cidrv6();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('e164を生成できる', () => {
+    it('e164', () => {
       const schema = z.string().e164();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('IPv4を生成できる', () => {
+    it('IPv4', () => {
       const schema = z.string().ipv4();
       const result = generator.generate(schema);
       expect(typeof result).toBe('string');
     });
 
-    it('IPv6を生成できる', () => {
+    it('IPv6', () => {
       const schema = z.string().ipv6();
       const result = generator.generate(schema);
       expect(typeof result).toBe('string');
     });
 
-    it('datetimeを生成できる', () => {
+    it('datetime', () => {
       const schema = z.string().datetime();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('dateを生成できる', () => {
+    it('date', () => {
       const schema = z.string().date();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('timeを生成できる', () => {
+    it('time', () => {
       const schema = z.string().time();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('durationを生成できる', () => {
+    it('duration', () => {
       const schema = z.string().duration();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('base64を生成できる', () => {
+    it('base64', () => {
       const schema = z.string().base64();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('base64urlを生成できる', () => {
+    it('base64url', () => {
       const schema = z.string().base64url();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
@@ -458,181 +537,181 @@ describe('ZodMockGenerator (後方互換)', () => {
     });
   });
 
-  describe('特殊な文字列フォーマット(v4)', () => {
-    it('emailを生成できる', () => {
+  describe('Special string format(v4)', () => {
+    it('email', () => {
       const schema = z.email();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('URLを生成できる', () => {
+    it('URL', () => {
       const schema = z.url();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('JWTを生成できる', () => {
+    it('JWT', () => {
       const schema = z.jwt();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('emojiを生成できる', () => {
+    it('emoji', () => {
       const schema = z.emoji();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('guidを生成できる', () => {
+    it('guid', () => {
       const schema = z.guid();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('uuidを生成できる', () => {
+    it('uuid', () => {
       const schema = z.uuid();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('uuidv4を生成できる', () => {
+    it('uuidv4', () => {
       const schema = z.uuidv4();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('uuidv6を生成できる', () => {
+    it('uuidv6', () => {
       const schema = z.uuidv6();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('uuidv7を生成できる', () => {
+    it('uuidv7', () => {
       const schema = z.uuidv7();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('nanoidを生成できる', () => {
+    it('nanoid', () => {
       const schema = z.nanoid();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('cuidを生成できる', () => {
+    it('cuid', () => {
       const schema = z.cuid();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('cuid2を生成できる', () => {
+    it('cuid2', () => {
       const schema = z.cuid2();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('ulidを生成できる', () => {
+    it('ulid', () => {
       const schema = z.ulid();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('xidを生成できる', () => {
+    it('xid', () => {
       const schema = z.xid();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('ksuidを生成できる', () => {
+    it('ksuid', () => {
       const schema = z.ksuid();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('cidrv4を生成できる', () => {
+    it('cidrv4', () => {
       const schema = z.cidrv4();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('cidrv6を生成できる', () => {
+    it('cidrv6', () => {
       const schema = z.cidrv6();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('e164を生成できる', () => {
+    it('e164', () => {
       const schema = z.e164();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('IPv4を生成できる', () => {
+    it('IPv4', () => {
       const schema = z.ipv4();
       const result = generator.generate(schema);
       expect(typeof result).toBe('string');
     });
 
-    it('IPv6を生成できる', () => {
+    it('IPv6', () => {
       const schema = z.ipv6();
       const result = generator.generate(schema);
       expect(typeof result).toBe('string');
     });
 
-    it('iso datetimeを生成できる', () => {
+    it('iso datetime', () => {
       const schema = z.iso.datetime();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('iso dateを生成できる', () => {
+    it('iso date', () => {
       const schema = z.iso.date();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('iso timeを生成できる', () => {
+    it('iso time', () => {
       const schema = z.iso.time();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('iso durationを生成できる', () => {
+    it('iso duration', () => {
       const schema = z.iso.duration();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('base64を生成できる', () => {
+    it('base64', () => {
       const schema = z.base64();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
     });
 
-    it('base64urlを生成できる', () => {
+    it('base64url', () => {
       const schema = z.base64url();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
@@ -640,15 +719,15 @@ describe('ZodMockGenerator (後方互換)', () => {
     });
   });
 
-  describe('複合型', () => {
-    it('配列を生成できる', () => {
+  describe('Composite type', () => {
+    it('array', () => {
       const schema = z.array(z.string());
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(Array.isArray(result)).toBe(true);
     });
 
-    it('オブジェクトを生成できる', () => {
+    it('object', () => {
       const schema = z.object({
         name: z.string(),
         age: z.number(),
@@ -660,7 +739,7 @@ describe('ZodMockGenerator (後方互換)', () => {
       expect(result).not.toBeNull();
     });
 
-    it('ネストしたオブジェクトを生成できる', () => {
+    it('nested object', () => {
       const schema = z.object({
         user: z.object({
           profile: z.object({
@@ -678,7 +757,7 @@ describe('ZodMockGenerator (後方互換)', () => {
       expect(() => schema.parse(result)).not.toThrow();
     });
 
-    it('optionalを生成できる', () => {
+    it('optional', () => {
       const schema = z.object({
         required: z.string(),
         optional: z.string().optional(),
@@ -687,7 +766,7 @@ describe('ZodMockGenerator (後方互換)', () => {
       expect(() => schema.parse(result)).not.toThrow();
     });
 
-    it('nullableを生成できる', () => {
+    it('nullable', () => {
       const schema = z.object({
         required: z.string(),
         nullable: z.string().nullable(),
@@ -696,40 +775,40 @@ describe('ZodMockGenerator (後方互換)', () => {
       expect(() => schema.parse(result)).not.toThrow();
     });
 
-    it('unionを生成できる', () => {
+    it('union', () => {
       const schema = z.union([z.string(), z.number(), z.boolean()]);
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
     });
 
-    it('union(or)を生成できる', () => {
+    it('union(or)', () => {
       const schema = z.string().or(z.number()).or(z.boolean());
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
     });
 
-    it('enumを生成できる', () => {
+    it('enum', () => {
       const schema = z.enum(['red', 'green', 'blue']);
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(['red', 'green', 'blue']).toContain(result);
     });
 
-    it('literalを生成できる', () => {
+    it('literal', () => {
       const schema = z.literal('hello');
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(result).toBe('hello');
     });
 
-    it('literalsを生成できる', () => {
+    it('literals', () => {
       const schema = z.literal(['hello', 'world']);
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(['hello', 'world']).toContain(result);
     });
 
-    it('defaultを生成できる', () => {
+    it('default', () => {
       const schema = z.string().default('default value');
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
@@ -737,9 +816,9 @@ describe('ZodMockGenerator (後方互換)', () => {
     });
   });
 
-  describe('交差型', () => {
-    describe('オブジェクト交差', () => {
-      it('基本的なオブジェクト交差を生成できる', () => {
+  describe('intersection', () => {
+    describe('object intersection', () => {
+      it('basic object intersection', () => {
         const schema1 = z.object({ a: z.string(), b: z.number() });
         const schema2 = z.object({ b: z.number(), c: z.boolean() });
         const intersection = schema1.and(schema2);
@@ -755,7 +834,7 @@ describe('ZodMockGenerator (後方互換)', () => {
         expect(typeof (result as any).c).toBe('boolean');
       });
 
-      it('複雑なオブジェクト交差を生成できる', () => {
+      it('complex object intersection', () => {
         const schema1 = z.object({
           user: z.object({ name: z.string() }),
           data: z.array(z.string()),
@@ -774,8 +853,8 @@ describe('ZodMockGenerator (後方互換)', () => {
       });
     });
 
-    describe('プリミティブ型制約マージ', () => {
-      it('数値制約をマージできる', () => {
+    describe('primitive type constraint merge', () => {
+      it('number constraint merge', () => {
         const schema1 = z.number().min(10).max(50);
         const schema2 = z.number().min(20).max(30);
         const intersection = schema1.and(schema2);
@@ -792,7 +871,7 @@ describe('ZodMockGenerator (後方互換)', () => {
         });
       });
 
-      it('文字列制約をマージできる', () => {
+      it('string constraint merge', () => {
         const schema1 = z.string().min(5).max(15);
         const schema2 = z.string().min(8).max(12);
         const intersection = schema1.and(schema2);
@@ -809,7 +888,7 @@ describe('ZodMockGenerator (後方互換)', () => {
         });
       });
 
-      it('BigInt制約をマージできる', () => {
+      it('BigInt constraint merge', () => {
         const schema1 = z.bigint().min(BigInt(10)).max(BigInt(50));
         const schema2 = z.bigint().min(BigInt(20)).max(BigInt(30));
         const intersection = schema1.and(schema2);
@@ -827,8 +906,8 @@ describe('ZodMockGenerator (後方互換)', () => {
       });
     });
 
-    describe('Enum交差', () => {
-      it('共通値を持つEnum交差を生成できる', () => {
+    describe('Enum intersection', () => {
+      it('Common value Enum intersection', () => {
         const schema1 = z.enum(['a', 'b', 'c', 'd']);
         const schema2 = z.enum(['b', 'c', 'd', 'e']);
         const intersection = schema1.and(schema2);
@@ -843,7 +922,7 @@ describe('ZodMockGenerator (後方互換)', () => {
         });
       });
 
-      it('共通値がないEnum交差はエラーになる', () => {
+      it('no common value Enum intersection', () => {
         const schema1 = z.enum(['a', 'b']);
         const schema2 = z.enum(['c', 'd']);
         const intersection = schema1.and(schema2);
@@ -852,8 +931,8 @@ describe('ZodMockGenerator (後方互換)', () => {
       });
     });
 
-    describe('リテラル交差', () => {
-      it('同じリテラル交差を生成できる', () => {
+    describe('Literal intersection', () => {
+      it('same Literal intersection', () => {
         const schema1 = z.literal('test');
         const schema2 = z.literal('test');
         const intersection = schema1.and(schema2);
@@ -863,7 +942,7 @@ describe('ZodMockGenerator (後方互換)', () => {
         expect(result).toBe('test');
       });
 
-      it('異なるリテラル交差はエラーになる', () => {
+      it('different Literal intersection', () => {
         const schema1 = z.literal('test1');
         const schema2 = z.literal('test2');
         const intersection = schema1.and(schema2);
@@ -872,8 +951,8 @@ describe('ZodMockGenerator (後方互換)', () => {
       });
     });
 
-    describe('Union交差', () => {
-      it('共通型を持つUnion交差を生成できる', () => {
+    describe('Union intersection', () => {
+      it('Common type Union intersection', () => {
         const schema1 = z.union([z.string(), z.number(), z.boolean()]);
         const schema2 = z.union([z.string(), z.number(), z.date()]);
         const intersection = schema1.and(schema2);
@@ -889,8 +968,8 @@ describe('ZodMockGenerator (後方互換)', () => {
       });
     });
 
-    describe('ラッパー型交差', () => {
-      it('Optional型交差を生成できる', () => {
+    describe('Wrapper type intersection', () => {
+      it('Optional type intersection', () => {
         const schema1 = z.string().optional();
         const schema2 = z.string().min(3).optional();
         const intersection = schema1.and(schema2);
@@ -908,7 +987,7 @@ describe('ZodMockGenerator (後方互換)', () => {
         });
       });
 
-      it('Nullable型交差を生成できる', () => {
+      it('Nullable type intersection', () => {
         const schema1 = z.number().nullable();
         const schema2 = z.number().max(100).nullable();
         const intersection = schema1.and(schema2);
@@ -926,7 +1005,7 @@ describe('ZodMockGenerator (後方互換)', () => {
         });
       });
 
-      it('Default型交差を生成できる', () => {
+      it('Default type intersection', () => {
         const schema1 = z.string().default('default1');
         const schema2 = z.string().min(5).default('default2');
         const intersection = schema1.and(schema2);
@@ -938,8 +1017,8 @@ describe('ZodMockGenerator (後方互換)', () => {
       });
     });
 
-    describe('特殊型優先処理', () => {
-      it('any型との交差で相手型を優先する', () => {
+    describe('special type priority processing', () => {
+      it('any type intersection', () => {
         const anySchema = z.any();
         const stringSchema = z.string().min(5);
         const intersection = anySchema.and(stringSchema);
@@ -955,7 +1034,7 @@ describe('ZodMockGenerator (後方互換)', () => {
         });
       });
 
-      it('unknown型との交差で相手型を優先する', () => {
+      it('unknown type intersection', () => {
         const unknownSchema = z.unknown();
         const numberSchema = z.number().max(10);
         const intersection = numberSchema.and(unknownSchema);
@@ -972,8 +1051,8 @@ describe('ZodMockGenerator (後方互換)', () => {
       });
     });
 
-    describe('Map/Set交差', () => {
-      it('Map交差を生成できる', () => {
+    describe('Map/Set intersection', () => {
+      it('Map intersection', () => {
         const schema1 = z.map(z.string(), z.number());
         const schema2 = z.map(z.string(), z.number());
         const intersection = schema1.and(schema2);
@@ -984,7 +1063,7 @@ describe('ZodMockGenerator (後方互換)', () => {
         expect(result).toBeInstanceOf(Map);
       });
 
-      it('Set交差を生成できる', () => {
+      it('Set intersection', () => {
         const schema1 = z.set(z.string());
         const schema2 = z.set(z.string());
         const intersection = schema1.and(schema2);
@@ -995,7 +1074,7 @@ describe('ZodMockGenerator (後方互換)', () => {
         expect(result).toBeInstanceOf(Set);
       });
 
-      it('互換性のないMap交差はエラーになる', () => {
+      it('Mutually incompatible Map intersection', () => {
         const schema1 = z.map(z.string(), z.number());
         const schema2 = z.map(z.number(), z.string());
         const intersection = schema1.and(schema2);
@@ -1004,8 +1083,8 @@ describe('ZodMockGenerator (後方互換)', () => {
       });
     });
 
-    describe('エラーケース', () => {
-      it('互換性のない型の交差はエラーになる', () => {
+    describe('Error cases', () => {
+      it('Mutually incompatible types intersection', () => {
         const stringSchema = z.string();
         const numberSchema = z.number();
         const intersection = stringSchema.and(numberSchema);
@@ -1013,7 +1092,7 @@ describe('ZodMockGenerator (後方互換)', () => {
         expect(() => generator.generate(intersection)).toThrow();
       });
 
-      it('空の制約範囲はエラーになる', () => {
+      it('Mutually incompatible constraint range', () => {
         const schema1 = z.number().min(50).max(100);
         const schema2 = z.number().min(10).max(30);
         const intersection = schema1.and(schema2);
@@ -1023,8 +1102,8 @@ describe('ZodMockGenerator (後方互換)', () => {
     });
   });
 
-  describe('設定オプション', () => {
-    it('seedを設定できる', () => {
+  describe('config', () => {
+    it('seed', () => {
       const config: MockConfig = { seed: 12345 };
       const generator1 = new ZodMockGenerator(config);
       const generator2 = new ZodMockGenerator(config);
@@ -1036,7 +1115,7 @@ describe('ZodMockGenerator (後方互換)', () => {
       expect(result1).toBe(result2);
     });
 
-    it('localeを設定できる', () => {
+    it('locale', () => {
       const config: MockConfig = { locale: 'en' };
       const generator = new ZodMockGenerator(config);
 
@@ -1047,7 +1126,7 @@ describe('ZodMockGenerator (後方互換)', () => {
       expect(typeof result).toBe('string');
     });
 
-    it('複数のlocaleを設定できる', () => {
+    it('locale array', () => {
       const config: MockConfig = { locale: ['ja', 'en'] };
       const generator = new ZodMockGenerator(config);
 
@@ -1059,8 +1138,8 @@ describe('ZodMockGenerator (後方互換)', () => {
     });
   });
 
-  describe('数値の範囲制限', () => {
-    it('最小値・最大値を持つ数値を生成できる', () => {
+  describe('number range', () => {
+    it('min and max', () => {
       const schema = z.number().min(10).max(100);
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
@@ -1069,7 +1148,7 @@ describe('ZodMockGenerator (後方互換)', () => {
       expect(result).toBeLessThanOrEqual(100);
     });
 
-    it('negativeを持つ数値を生成できる', () => {
+    it('negative', () => {
       const schema = z.number().negative();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
@@ -1077,7 +1156,7 @@ describe('ZodMockGenerator (後方互換)', () => {
       expect(result).toBeLessThan(0);
     });
 
-    it('positiveを持つ数値を生成できる', () => {
+    it('positive', () => {
       const schema = z.number().positive();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
@@ -1085,7 +1164,7 @@ describe('ZodMockGenerator (後方互換)', () => {
       expect(result).toBeGreaterThan(0);
     });
 
-    it('nonnegativeを持つ数値を生成できる', () => {
+    it('nonnegative', () => {
       const schema = z.number().nonnegative();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
@@ -1093,7 +1172,7 @@ describe('ZodMockGenerator (後方互換)', () => {
       expect(result).toBeGreaterThanOrEqual(0);
     });
 
-    it('nonpositiveを持つ数値を生成できる', () => {
+    it('nonpositive', () => {
       const schema = z.number().nonpositive();
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
@@ -1101,7 +1180,7 @@ describe('ZodMockGenerator (後方互換)', () => {
       expect(result).toBeLessThanOrEqual(0);
     });
 
-    it('greaterThanを持つ数値を生成できる', () => {
+    it('greaterThan', () => {
       const schema = z.number().gt(10);
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
@@ -1109,7 +1188,7 @@ describe('ZodMockGenerator (後方互換)', () => {
       expect(result).toBeGreaterThan(10);
     });
 
-    it('lessThanを持つ数値を生成できる', () => {
+    it('lessThan', () => {
       const schema = z.number().lt(10);
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
@@ -1117,7 +1196,7 @@ describe('ZodMockGenerator (後方互換)', () => {
       expect(result).toBeLessThan(10);
     });
 
-    it('greaterThanOrEqualを持つ数値を生成できる', () => {
+    it('greaterThanOrEqual', () => {
       const schema = z.number().gte(10);
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
@@ -1125,7 +1204,7 @@ describe('ZodMockGenerator (後方互換)', () => {
       expect(result).toBeGreaterThanOrEqual(10);
     });
 
-    it('lessThanOrEqualを持つ数値を生成できる', () => {
+    it('lessThanOrEqual', () => {
       const schema = z.number().lte(10);
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
@@ -1133,7 +1212,7 @@ describe('ZodMockGenerator (後方互換)', () => {
       expect(result).toBeLessThanOrEqual(10);
     });
 
-    it('最小値・最大値を持つBigIntを生成できる', () => {
+    it('BigInt with min and max', () => {
       const schema = z.bigint().min(BigInt(10)).max(BigInt(100));
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
@@ -1143,19 +1222,19 @@ describe('ZodMockGenerator (後方互換)', () => {
     });
   });
 
-  describe('エラーハンドリング', () => {
-    it('ZodNeverスキーマでnullを返す', () => {
+  describe('error handling', () => {
+    it('ZodNever schema returns null', () => {
       const schema = z.never();
       const result = generator.generate(schema);
       expect(result).toBeNull();
     });
 
-    it('数値範囲が適切でない', () => {
+    it('number range is invalid', () => {
       const schema = z.number().min(100).max(10);
       expect(() => generator.generate(schema)).toThrow();
     });
 
-    it('交差した値が適切でない', () => {
+    it('intersection value is invalid', () => {
       const left = z.object({ value: z.string() });
       const right = z.string();
       const schema = left.and(right);
@@ -1163,8 +1242,8 @@ describe('ZodMockGenerator (後方互換)', () => {
     });
   });
 
-  describe('包括的なテスト', () => {
-    it('複雑なスキーマを生成できる', () => {
+  describe('comprehensive test', () => {
+    it('complex schema', () => {
       const schema = z.object({
         id: z.string(),
         user: z.object({

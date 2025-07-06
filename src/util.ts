@@ -369,7 +369,6 @@ export function createMockConfig(config?: Partial<MockConfig>): MockConfig {
     maxArrayLength = 3,
     optionalProbability = 0.5,
     nullableProbability = 0.5,
-    consistentName = 'name',
     ...rest
   } = config || {};
   return {
@@ -378,7 +377,6 @@ export function createMockConfig(config?: Partial<MockConfig>): MockConfig {
     maxArrayLength,
     optionalProbability,
     nullableProbability,
-    consistentName,
     ...rest,
   };
 }

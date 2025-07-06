@@ -84,9 +84,10 @@ function generateFromSchema(
       min: config.minArrayLength,
       max: config.maxArrayLength,
     });
-    return Array.from({ length }, (_, arrayIndex) =>
-      generateMocks(schema.element, { ...options, arrayIndex }),
-    );
+    return Array.from({ length }, (_, arrayIndex) => {
+      const arrayIndexes = [...options.arrayIndexes, arrayIndex];
+      return generateMocks(schema.element, { ...options, arrayIndexes });
+    });
   }
 
   if (schema instanceof z.ZodTuple) {
@@ -98,7 +99,8 @@ function generateFromSchema(
       const randomOption = faker.helpers.arrayElement<z.core.$ZodType>(
         schema.def.items,
       );
-      return generateMocks(randomOption, { ...options, arrayIndex });
+      const arrayIndexes = [...options.arrayIndexes, arrayIndex];
+      return generateMocks(randomOption, { ...options, arrayIndexes });
     });
   }
 
@@ -203,16 +205,38 @@ export function generateMocks(
   schema: z.core.$ZodType,
   options: GeneraterOptions,
 ): unknown {
-  const { config, registry, valueStore, arrayIndex } = options;
+  const {
+    config,
+    customGenerator,
+    registry,
+    valueStore,
+    arrayIndexes,
+    pinnedHierarchy,
+  } = options;
 
-  if (config.consistentName && registry?.has(schema)) {
-    const consistentName = registry.get(schema)?.consistentName;
-    if (typeof consistentName === 'string' && valueStore?.has(consistentName)) {
-      const values = valueStore.get(consistentName);
-      if (values) return values[arrayIndex ?? 0];
+  if ('meta' in schema && typeof schema.meta === 'function') {
+    const meta = schema.meta();
+    if (meta && config.consistentKey) {
+      const consistentName = meta[config.consistentKey];
+      if (typeof consistentName === 'string') {
+        const lastIndex = arrayIndexes.length - 1;
+        if (!pinnedHierarchy.has(consistentName) && lastIndex !== -1) {
+          pinnedHierarchy.set(consistentName, lastIndex);
+        }
+      }
     }
   }
 
-  if (config.customGenerator) return config.customGenerator(schema, options);
+  if (config.consistentKey && registry?.has(schema)) {
+    const consistentName = registry.get(schema)?.consistentName;
+    if (typeof consistentName === 'string') {
+      const pinnedHierarchyValue = pinnedHierarchy.get(consistentName);
+      const values = valueStore?.get(consistentName);
+      if (values && pinnedHierarchyValue !== undefined) {
+        return values[arrayIndexes[pinnedHierarchyValue]];
+      }
+    }
+  }
+  if (customGenerator) return customGenerator(schema, options);
   return generateFromSchema(schema, options);
 }

@@ -5,64 +5,56 @@ import type { CustomGeneratorType, GeneraterOptions, MockConfig } from './type';
 import { createMockConfig, getLocales } from './util';
 
 class MockGenerator {
-  private schema: z.ZodType;
   private options: GeneraterOptions;
 
-  constructor(schema: z.ZodType, config?: MockConfig) {
-    this.schema = schema;
+  constructor(config?: MockConfig) {
     const mergedConfig = createMockConfig(config);
-    const { locale, randomizer, seed, consistentName } = mergedConfig;
+    const { locale, randomizer, seed, consistentKey } = mergedConfig;
     this.options = {
       faker: new Faker({ locale: getLocales(locale), randomizer, seed }),
       config: mergedConfig,
-      registry: consistentName
-        ? z.registry<{ [consistentName]: string }>()
+      registry: consistentKey
+        ? z.registry<{ [consistentKey]: string }>()
         : null,
       valueStore: new Map(),
+      arrayIndexes: [],
+      pinnedHierarchy: new Map(),
     };
   }
 
   override(customGenerator: CustomGeneratorType): MockGenerator {
-    this.options.config.customGenerator = customGenerator;
+    this.options.customGenerator = customGenerator;
     return this;
   }
 
   register(schemas: z.ZodType[]) {
-    const { config, valueStore, registry } = this.options;
+    const { config, registry, valueStore } = this.options;
     const { maxArrayLength } = config;
     for (const schema of schemas) {
       const meta = schema.meta();
-      if (!meta || !config.consistentName) continue;
-      const consistentName = meta[config.consistentName];
+      if (!meta || !config.consistentKey) continue;
+      const consistentName = meta[config.consistentKey];
       if (!consistentName) continue;
 
       if (typeof consistentName === 'string') {
+        registry?.add(schema, { consistentName });
         const length = maxArrayLength ?? 10;
         const values = Array.from({ length }, () =>
           generateMocks(schema, this.options),
         );
         valueStore?.set(consistentName, values);
       }
-
-      registry?.add(schema, { consistentName });
     }
     return this;
   }
 
-  generate() {
-    return generateMocks(this.schema, this.options);
-  }
-
-  [Symbol.toPrimitive]() {
-    return this.generate();
+  generate(schema: z.ZodType) {
+    return generateMocks(schema, this.options);
   }
 }
 
-export function initGenerator(
-  schema: z.ZodType,
-  config?: MockConfig,
-): MockGenerator {
-  const mockGenerator = new MockGenerator(schema, config);
+export function initGenerator(config?: MockConfig): MockGenerator {
+  const mockGenerator = new MockGenerator(config);
   return mockGenerator;
 }
 
@@ -77,6 +69,6 @@ export class ZodMockGenerator {
   }
 
   generate(schema: z.ZodType) {
-    return initGenerator(schema, this.config).generate();
+    return initGenerator(this.config).generate(schema);
   }
 }

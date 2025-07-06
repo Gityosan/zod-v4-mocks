@@ -1,5 +1,5 @@
-import { allLocales, Faker, type Randomizer } from '@faker-js/faker';
-import { z } from 'zod/v4';
+import { allLocales, type Faker, type Randomizer } from '@faker-js/faker';
+import type { z } from 'zod/v4';
 
 export type { Faker, Randomizer } from '@faker-js/faker';
 export type LocaleType = keyof typeof allLocales;
@@ -10,9 +10,11 @@ export type LocaleType = keyof typeof allLocales;
 export type GeneraterOptions = {
   faker: Faker;
   config: MockConfig;
+  customGenerator?: CustomGeneratorType;
   registry: z.core.$ZodRegistry<z.core.GlobalMeta> | null;
   valueStore?: Map<string, unknown[]>;
-  arrayIndex?: number;
+  arrayIndexes: number[];
+  pinnedHierarchy: Map<string, number>;
 };
 
 export type CustomGeneratorType = (
@@ -28,6 +30,8 @@ export interface MockConfig {
   maxArrayLength?: number;
   optionalProbability?: number;
   nullableProbability?: number;
-  customGenerator?: CustomGeneratorType;
-  consistentName?: string; // meta's attribute name which is used to generate consistent property value
+  /**
+   * @description meta's attribute name which is used to generate consistent property value
+   */
+  consistentKey?: string;
 }
