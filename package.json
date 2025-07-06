@@ -1,12 +1,12 @@
 {
   "name": "zod-v4-mocks",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "license": "MIT",
   "private": false,
   "description": "Mock generator for zod v4",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Gityosan/zod-v4-mocks"
+    "url": "git+https://github.com/Gityosan/zod-v4-mocks.git"
   },
   "author": {
     "name": "IIHARA議長",
