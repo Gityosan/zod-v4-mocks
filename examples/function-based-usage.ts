@@ -1,8 +1,7 @@
 import { z } from 'zod/v4';
-import { createMockConfig, generateMock } from '../src/mock-generator';
+import { type CustomGeneratorType, initGenerator } from '../src';
 
-// 基本的な使用例
-const userSchema = z.object({
+const basicSchema = z.object({
   id: z.string(),
   name: z.string(),
   email: z.email(),
@@ -12,36 +11,34 @@ const userSchema = z.object({
   createdAt: z.date(),
 });
 
-// 関数ベースAPI - シンプルな使用法
-console.log('基本的な使用法:');
-const mockUser = generateMock(userSchema).generate();
+// 1. basic usage
+const mockUser = initGenerator(basicSchema).generate();
 console.log(mockUser);
 
-// カスタム設定を使用
-console.log('\nカスタム設定付き:');
-const customConfig = createMockConfig({
+// 2. custom config
+const config = {
   seed: 42,
   minArrayLength: 2,
   maxArrayLength: 5,
   locale: 'ja',
-});
-
-const mockUserWithConfig = generateMock(userSchema, customConfig).generate();
+} as const;
+const mockUserWithConfig = initGenerator(basicSchema, config).generate();
 console.log(mockUserWithConfig);
 
-// オーバーライド機能の使用例
-console.log('\nオーバーライド機能を使用:');
-const mockUserWithOverride = generateMock(userSchema)
-  .override((faker, schema) => {
-    if (schema instanceof z.ZodString && schema === userSchema.shape.name) {
-      return 'カスタム名前: ' + faker.person.fullName();
-    }
-    return null;
-  })
+// 3. override function
+const customGenerator: CustomGeneratorType = (schema, options) => {
+  const { faker } = options;
+  if (schema instanceof z.ZodString && schema === basicSchema.shape.name) {
+    return 'custom name: ' + faker.person.fullName();
+  }
+};
+
+const mockUserWithOverride = initGenerator(basicSchema)
+  .override(customGenerator)
   .generate();
 console.log(mockUserWithOverride);
 
-// 複雑なスキーマの例
+// 4. complex schema
 const complexSchema = z.object({
   user: z.object({
     profile: z.object({
@@ -66,7 +63,39 @@ const complexSchema = z.object({
     z.union([z.string(), z.number(), z.boolean()]),
   ),
 });
-
-console.log('\n複雑なスキーマ:');
-const complexMock = generateMock(complexSchema, { seed: 123 }).generate();
+const complexMock = initGenerator(complexSchema).generate();
 console.log(JSON.stringify(complexMock, null, 2));
+
+// 5. register function
+const DeviceId = z.uuid().meta({ name: 'DeviceId' });
+const UserId = z.uuid().meta({ name: 'UserId' });
+const PostId = z.uuid().meta({ name: 'PostId' });
+
+const deviceSchema = z.object({
+  id: DeviceId,
+  name: z.string(),
+  type: z.enum(['mobile', 'desktop', 'tablet']),
+});
+const userSchema = z.object({
+  id: UserId,
+  name: z.string(),
+  email: z.email(),
+  deviceId: DeviceId,
+  device: deviceSchema,
+});
+const postSchema = z.object({
+  id: PostId,
+  title: z.string(),
+  content: z.string(),
+  authorId: UserId,
+  author: userSchema,
+});
+const schemas = [DeviceId, UserId, PostId];
+const mock = initGenerator(z.array(postSchema), {
+  consistentName: 'name', // please set meta's attribute name which is used to generate consistent property value
+  minArrayLength: 2,
+  seed: 123,
+})
+  .register(schemas)
+  .generate();
+console.log(JSON.stringify(mock, null, 2));
