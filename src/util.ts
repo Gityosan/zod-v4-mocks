@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto';
 import { intersection as intersectionES, merge } from 'es-toolkit';
 import RandExp from 'randexp';
 import { z } from 'zod/v4';
-import { LocaleType } from './type';
+import type { LocaleType, MockConfig } from './type';
 
 function calcMinMaxString(minLength: number | null, maxLength: number | null) {
   if (typeof minLength === 'number') {
@@ -84,6 +84,9 @@ export const generators = {
   url: (faker: Faker) => faker.internet.url(),
   jwt: (faker: Faker) => faker.internet.jwt(),
   emoji: (faker: Faker) => faker.internet.emoji(),
+  uuidv4: (faker: Faker) => faker.string.uuid(),
+  nanoid: (faker: Faker) => faker.string.nanoid(),
+  ulid: (faker: Faker) => faker.string.ulid(),
   ipv4: (faker: Faker) => faker.internet.ipv4(),
   ipv6: (faker: Faker) => faker.internet.ipv6(),
   date: (faker: Faker) => faker.date.anytime(),
@@ -354,4 +357,28 @@ export function getLocales(
       ...defaultLocales,
     ]),
   ];
+}
+
+/**
+ * @package
+ */
+export function createMockConfig(config?: Partial<MockConfig>): MockConfig {
+  const {
+    seed = 1,
+    minArrayLength = 1,
+    maxArrayLength = 3,
+    optionalProbability = 0.5,
+    nullableProbability = 0.5,
+    consistentName = 'name',
+    ...rest
+  } = config || {};
+  return {
+    seed,
+    minArrayLength,
+    maxArrayLength,
+    optionalProbability,
+    nullableProbability,
+    consistentName,
+    ...rest,
+  };
 }

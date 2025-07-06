@@ -1,72 +1,56 @@
 import { Faker } from '@faker-js/faker';
 import { z } from 'zod/v4';
-import { generateFromSchema } from './generate-from-schema';
-import type { CustomGeneratorType, MockConfig } from './type';
-import { getLocales } from './util';
-
-function createMockConfig(config?: Partial<MockConfig>): MockConfig {
-  const {
-    minArrayLength = 1,
-    maxArrayLength = 3,
-    optionalProbability = 0.5,
-    nullableProbability = 0.5,
-    consistentName = 'name',
-    ...rest
-  } = config || {};
-  return {
-    minArrayLength,
-    maxArrayLength,
-    optionalProbability,
-    nullableProbability,
-    consistentName,
-    ...rest,
-  };
-}
+import { generateMocks } from './generate-from-schema';
+import type { CustomGeneratorType, GeneraterOptions, MockConfig } from './type';
+import { createMockConfig, getLocales } from './util';
 
 class MockGenerator {
   private schema: z.ZodType;
-  private config: MockConfig;
-  private registry: z.core.$ZodRegistry<z.core.GlobalMeta> | null;
-  private faker: Faker;
+  private options: GeneraterOptions;
 
   constructor(schema: z.ZodType, config?: MockConfig) {
-    const mergedConfig = createMockConfig(config);
     this.schema = schema;
-    this.config = mergedConfig;
-    if (mergedConfig.consistentName) {
-      this.registry = z.registry<{ [mergedConfig.consistentName]: string }>();
-    } else {
-      this.registry = null;
-    }
-    this.faker = new Faker({
-      locale: getLocales(this.config.locale),
-      randomizer: this.config.randomizer,
-      seed: this.config.seed,
-    });
+    const mergedConfig = createMockConfig(config);
+    const { locale, randomizer, seed, consistentName } = mergedConfig;
+    this.options = {
+      faker: new Faker({ locale: getLocales(locale), randomizer, seed }),
+      config: mergedConfig,
+      registry: consistentName
+        ? z.registry<{ [consistentName]: string }>()
+        : null,
+      valueStore: new Map(),
+    };
   }
 
   override(customGenerator: CustomGeneratorType): MockGenerator {
-    this.config = { ...this.config, customGenerator };
+    this.options.config.customGenerator = customGenerator;
     return this;
   }
 
   register(schemas: z.ZodType[]) {
+    const { config, valueStore, registry } = this.options;
+    const { maxArrayLength } = config;
     for (const schema of schemas) {
       const meta = schema.meta();
-      if (!meta || !this.config.consistentName) continue;
-      const consistentName = meta[this.config.consistentName];
+      if (!meta || !config.consistentName) continue;
+      const consistentName = meta[config.consistentName];
       if (!consistentName) continue;
-      this.registry?.add(schema, { consistentName });
+
+      if (typeof consistentName === 'string') {
+        const length = maxArrayLength ?? 10;
+        const values = Array.from({ length }, () =>
+          generateMocks(schema, this.options),
+        );
+        valueStore?.set(consistentName, values);
+      }
+
+      registry?.add(schema, { consistentName });
     }
     return this;
   }
 
   generate() {
-    return generateFromSchema(this.schema, {
-      faker: this.faker,
-      config: this.config,
-      registry: this.registry,
-    });
+    return generateMocks(this.schema, this.options);
   }
 
   [Symbol.toPrimitive]() {
@@ -74,7 +58,7 @@ class MockGenerator {
   }
 }
 
-export function generateMock(
+export function initGenerator(
   schema: z.ZodType,
   config?: MockConfig,
 ): MockGenerator {
@@ -93,6 +77,6 @@ export class ZodMockGenerator {
   }
 
   generate(schema: z.ZodType) {
-    return generateMock(schema, this.config).generate();
+    return initGenerator(schema, this.config).generate();
   }
 }

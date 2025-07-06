@@ -1,2 +1,8 @@
 export * from './mock-generator';
-export * from './type';
+export type {
+  CustomGeneratorType,
+  Faker,
+  LocaleType,
+  MockConfig,
+  Randomizer,
+} from './type';
