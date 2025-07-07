@@ -2,7 +2,7 @@ import { z } from 'zod/v4';
 import { type CustomGeneratorType, initGenerator } from '../src';
 
 const basicSchema = z.object({
-  id: z.string(),
+  id: z.uuid(),
   name: z.string(),
   email: z.email(),
   age: z.number().min(18).max(120).optional(),
@@ -24,7 +24,14 @@ const config = {
 const mockUserWithConfig = initGenerator(config).generate(basicSchema);
 console.log(mockUserWithConfig);
 
-// 3. override function
+// 3. supply function
+const mockUserWithSupply = initGenerator()
+  .supply(z.ZodString, 'custom name')
+  .supply(z.ZodEmail, 'custom_email@example.com')
+  .generate(basicSchema);
+console.log(mockUserWithSupply);
+
+// 4. override function
 const customGenerator: CustomGeneratorType = (schema, options) => {
   const { faker } = options;
   if (schema instanceof z.ZodString && schema === basicSchema.shape.name) {
@@ -37,7 +44,7 @@ const mockUserWithOverride = initGenerator()
   .generate(basicSchema);
 console.log(mockUserWithOverride);
 
-// 4. complex schema
+// 5. complex schema
 const complexSchema = z.object({
   user: z.object({
     profile: z.object({
@@ -65,8 +72,8 @@ const complexSchema = z.object({
 const complexMock = initGenerator().generate(complexSchema);
 console.log(JSON.stringify(complexMock, null, 2));
 
-// 5. register function
-// please set meta's attribute name which is used to generate consistent property value
+// 6. register function
+// Please set meta's attribute name which is used to generate consistent property value
 const consistentKey = 'name';
 const DeviceId = z.uuid().meta({ [consistentKey]: 'DeviceId' });
 const UserId = z.uuid().meta({ [consistentKey]: 'UserId' });

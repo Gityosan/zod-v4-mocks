@@ -194,6 +194,11 @@ export function generateMocks(
       }
     }
   }
-  if (customGenerator) return customGenerator(schema, options);
+
+  if (customGenerator) {
+    const res = customGenerator(schema, options);
+    if (res !== undefined) return res;
+  }
+
   return generateFromSchema(schema, options);
 }

@@ -22,8 +22,33 @@ class MockGenerator {
     };
   }
 
+  /**
+   * @description if return value is undefined, fallback to default generator
+   */
+  supply(constructor: z.core.$constructor<any>, value: any): MockGenerator {
+    const prevGenerator = this.options.customGenerator;
+    this.options.customGenerator = (schema, options) => {
+      if (prevGenerator) {
+        const res = prevGenerator(schema, options);
+        if (res !== undefined) return res;
+      }
+      if (schema.constructor.name === constructor.name) return value;
+    };
+    return this;
+  }
+
+  /**
+   * @description if return value is undefined, fallback to default generator
+   */
   override(customGenerator: CustomGeneratorType): MockGenerator {
-    this.options.customGenerator = customGenerator;
+    const prevGenerator = this.options.customGenerator;
+    this.options.customGenerator = (schema, options) => {
+      if (prevGenerator) {
+        const res = prevGenerator(schema, options);
+        if (res !== undefined) return res;
+      }
+      return customGenerator(schema, options);
+    };
     return this;
   }
 
