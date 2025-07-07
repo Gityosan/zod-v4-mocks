@@ -6,7 +6,8 @@ function generateFromSchema(
   schema: z.core.$ZodType,
   options: GeneraterOptions,
 ): unknown {
-  const { faker, config } = options;
+  const { faker } = options;
+  if (schema instanceof z.ZodFile) return generators.file();
   if (schema instanceof z.ZodEmail) return generators.email(faker);
   if (schema instanceof z.ZodURL) return generators.url(faker);
   if (schema instanceof z.ZodJWT) return generators.jwt(faker);
@@ -77,97 +78,53 @@ function generateFromSchema(
     return generators.int(faker, schema);
   }
 
-  if (schema instanceof z.ZodFile) return generators.file();
-
-  if (schema instanceof z.ZodArray) {
-    const length = faker.number.int({
-      min: config.minArrayLength,
-      max: config.maxArrayLength,
-    });
-    return Array.from({ length }, (_, arrayIndex) => {
-      const arrayIndexes = [...options.arrayIndexes, arrayIndex];
-      return generateMocks(schema.element, { ...options, arrayIndexes });
-    });
-  }
-
-  if (schema instanceof z.ZodTuple) {
-    const length = faker.number.int({
-      min: config.minArrayLength,
-      max: config.maxArrayLength,
-    });
-    return Array.from({ length }, (_, arrayIndex) => {
-      const randomOption = faker.helpers.arrayElement<z.core.$ZodType>(
-        schema.def.items,
-      );
-      const arrayIndexes = [...options.arrayIndexes, arrayIndex];
-      return generateMocks(randomOption, { ...options, arrayIndexes });
-    });
-  }
-
-  if (schema instanceof z.ZodObject) {
-    const { shape } = schema;
-    const result: { [key: string]: unknown } = {};
-
-    for (const [key, value] of Object.entries(shape)) {
-      result[key] = generateMocks(value, options);
-    }
-    return result;
-  }
-
-  if (schema instanceof z.ZodIntersection) {
-    return generators.intersection(faker, schema, (schema) =>
-      generateMocks(schema, options),
-    );
-  }
-
-  if (schema instanceof z.ZodOptional) {
-    if (faker.datatype.boolean({ probability: config.optionalProbability }))
-      return undefined;
-    return generateMocks(schema.unwrap(), options);
-  }
-
-  if (schema instanceof z.ZodNullable) {
-    if (faker.datatype.boolean({ probability: config.nullableProbability }))
-      return null;
-    return generateMocks(schema.unwrap(), options);
-  }
-
-  if (schema instanceof z.ZodUnion) {
-    const { options: items } = schema;
-    const randomOption = faker.helpers.arrayElement<z.core.$ZodType>(items);
-    return generateMocks(randomOption, options);
-  }
-  if (schema instanceof z.ZodRecord) {
-    return generators.record(schema, (schema) =>
-      generateMocks(schema, options),
-    );
-  }
-  if (schema instanceof z.ZodMap) {
-    return generators.map(schema, (schema) => generateMocks(schema, options));
-  }
-  if (schema instanceof z.ZodSet) {
-    return generators.set(schema, (schema) => generateMocks(schema, options));
-  }
-
   if (schema instanceof z.ZodNaN) return NaN;
   if (schema instanceof z.ZodBoolean) return faker.datatype.boolean();
-  if (schema instanceof z.ZodLiteral) {
-    return faker.helpers.arrayElement([...schema.values]);
-  }
-  if (schema instanceof z.ZodEnum) {
-    return faker.helpers.arrayElement(schema.options);
-  }
   if (schema instanceof z.ZodNull) return null;
   if (schema instanceof z.ZodUndefined) return undefined;
   if (schema instanceof z.ZodAny) return faker.lorem.word();
   if (schema instanceof z.ZodUnknown) return faker.lorem.word();
   if (schema instanceof z.ZodVoid) return undefined;
   if (schema instanceof z.ZodSymbol) return Symbol(faker.lorem.word());
-  if (schema instanceof z.ZodDefault) {
-    return generateMocks(schema.unwrap(), options);
+
+  if (schema instanceof z.ZodLiteral) {
+    return generators.literal(schema, options);
   }
-  if (schema instanceof z.ZodPrefault) {
-    return generateMocks(schema.unwrap(), options);
+  if (schema instanceof z.ZodEnum) {
+    return generators.enum(schema, options);
+  }
+  if (schema instanceof z.ZodArray) {
+    return generators.array(schema, options, generateMocks);
+  }
+  if (schema instanceof z.ZodTuple) {
+    return generators.tuple(schema, options, generateMocks);
+  }
+  if (schema instanceof z.ZodObject) {
+    return generators.object(schema, options, generateMocks);
+  }
+  if (schema instanceof z.ZodRecord) {
+    return generators.record(schema, options, generateMocks);
+  }
+  if (schema instanceof z.ZodMap) {
+    return generators.map(schema, options, generateMocks);
+  }
+  if (schema instanceof z.ZodSet) {
+    return generators.set(schema, options, generateMocks);
+  }
+  if (schema instanceof z.ZodUnion) {
+    return generators.union(schema, options, generateMocks);
+  }
+  if (schema instanceof z.ZodIntersection) {
+    return generators.intersection(schema, options, generateMocks);
+  }
+  if (schema instanceof z.ZodOptional) {
+    return generators.optional(schema, options, generateMocks);
+  }
+  if (schema instanceof z.ZodNullable) {
+    return generators.nullable(schema, options, generateMocks);
+  }
+  if (schema instanceof z.ZodDefault || schema instanceof z.ZodPrefault) {
+    return generators.default(schema, options, generateMocks);
   }
   if (schema instanceof z.ZodReadonly) {
     return generateMocks(schema.def.innerType, options);
@@ -176,7 +133,7 @@ function generateFromSchema(
     return generateMocks(schema.unwrap(), options);
   }
   if (schema instanceof z.ZodPipe) {
-    return generators.pipe(schema, (schema) => generateMocks(schema, options));
+    return generators.pipe(schema, options, generateMocks);
   }
   if (schema instanceof z.ZodTransform) {
     return generators.transform(schema);

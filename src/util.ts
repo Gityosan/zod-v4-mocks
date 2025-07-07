@@ -3,7 +3,12 @@ import { randomBytes } from 'crypto';
 import { intersection as intersectionES, merge } from 'es-toolkit';
 import RandExp from 'randexp';
 import { z } from 'zod/v4';
-import type { LocaleType, MockConfig } from './type';
+import type {
+  CustomGeneratorType,
+  GeneraterOptions,
+  LocaleType,
+  MockConfig,
+} from './type';
 
 function calcMinMaxString(minLength: number | null, maxLength: number | null) {
   if (typeof minLength === 'number') {
@@ -147,37 +152,117 @@ export const generators = {
     }
     return faker.number.float({ min, max });
   },
+  literal: (schema: z.ZodLiteral, options: GeneraterOptions) => {
+    const { faker } = options;
+    return faker.helpers.arrayElement([...schema.values]);
+  },
+  enum: (schema: z.ZodEnum, options: GeneraterOptions) => {
+    const { faker } = options;
+    return faker.helpers.arrayElement(schema.options);
+  },
+  array: (
+    schema: z.ZodArray,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    const { faker, config } = options;
+    const length = faker.number.int(config.array);
+    return Array.from({ length }, (_, arrayIndex) => {
+      const arrayIndexes = [...options.arrayIndexes, arrayIndex];
+      return generator(schema.element, { ...options, arrayIndexes });
+    });
+  },
+  tuple: (
+    schema: z.ZodTuple,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    const { faker, config } = options;
+    const length = faker.number.int(config.array);
+    return Array.from({ length }, (_, arrayIndex) => {
+      const randomOption = faker.helpers.arrayElement<z.core.$ZodType>(
+        schema.def.items,
+      );
+      const arrayIndexes = [...options.arrayIndexes, arrayIndex];
+      return generator(randomOption, { ...options, arrayIndexes });
+    });
+  },
+  map: (
+    schema: z.ZodMap,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    const { faker, config } = options;
+    const { keyType, valueType } = schema;
+    const length = faker.number.int(config.map);
+    return new Map(
+      Array.from({ length }, () => {
+        const key = generator(keyType, options);
+        const value = generator(valueType, options);
+        return [key, value];
+      }),
+    );
+  },
+  set: (
+    schema: z.ZodSet,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    const { faker, config } = options;
+    const { valueType } = schema.def;
+    const length = faker.number.int(config.set);
+    return new Set(Array.from({ length }, () => generator(valueType, options)));
+  },
+  object: (
+    schema: z.ZodObject,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    const { shape } = schema;
+    const result: { [key: string]: unknown } = {};
+
+    for (const [key, value] of Object.entries(shape)) {
+      result[key] = generator(value, options);
+    }
+    return result;
+  },
   record: (
     schema: z.ZodRecord,
-    generator: (schema: z.core.$ZodType) => unknown,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
   ) => {
+    const { faker, config } = options;
     const { keyType, valueType } = schema;
-    const key = generator(keyType);
-    const value = generator(valueType);
-    if (
-      typeof key === 'string' ||
-      typeof key === 'number' ||
-      typeof key === 'symbol'
-    )
-      return { [key]: value };
-    throw new Error('Invalid record key type');
+    const length = faker.number.int(config.record);
+    return [...Array(length)].reduce((acc) => {
+      const key = generator(keyType, options);
+      const value = generator(valueType, options);
+      if (
+        typeof key === 'string' ||
+        typeof key === 'number' ||
+        typeof key === 'symbol'
+      )
+        return { ...acc, [key]: value };
+      throw new Error('Invalid record key type');
+    }, {});
   },
-  map: (schema: z.ZodMap, generator: (schema: z.core.$ZodType) => unknown) => {
-    const { keyType, valueType } = schema;
-    const key = generator(keyType);
-    const value = generator(valueType);
-    return new Map([[key, value]]);
-  },
-  set: (schema: z.ZodSet, generator: (schema: z.core.$ZodType) => unknown) => {
-    const { valueType } = schema.def;
-    const value = generator(valueType);
-    return new Set([value]);
+  union: (
+    schema: z.ZodUnion,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    const { faker } = options;
+    const randomOption = faker.helpers.arrayElement<z.core.$ZodType>(
+      schema.options,
+    );
+    return generator(randomOption, options);
   },
   intersection: (
-    faker: Faker,
     schema: z.ZodIntersection,
-    generator: (schema: z.core.$ZodType) => unknown,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
   ) => {
+    const { faker } = options;
     const { left, right } = schema.def;
 
     const unwrappedLeft = unwrapSchema(left);
@@ -188,15 +273,15 @@ export const generators = {
       unwrappedRight.constructor !== right.constructor
     ) {
       const intersected = z.intersection(unwrappedLeft, unwrappedRight);
-      return generator(intersected);
+      return generator(intersected, options);
     }
 
     if (left instanceof z.ZodAny || left instanceof z.ZodUnknown) {
-      return generator(right);
+      return generator(right, options);
     }
 
     if (right instanceof z.ZodAny || right instanceof z.ZodUnknown) {
-      return generator(left);
+      return generator(left, options);
     }
 
     if (left instanceof z.ZodMap && right instanceof z.ZodMap) {
@@ -207,7 +292,7 @@ export const generators = {
         leftValueType.constructor === rightValueType.constructor
       ) {
         const newMapSchema = z.map(rightKeyType, rightValueType);
-        return generator(newMapSchema);
+        return generator(newMapSchema, options);
       }
       throw new Error('Incompatible Map types in intersection');
     }
@@ -215,7 +300,7 @@ export const generators = {
     if (left instanceof z.ZodLiteral && right instanceof z.ZodLiteral) {
       const intersection = intersectionES([...left.values], [...right.values]);
       const mergedSchema = z.literal(intersection);
-      return generator(mergedSchema);
+      return generator(mergedSchema, options);
     }
 
     if (left instanceof z.ZodSet && right instanceof z.ZodSet) {
@@ -223,7 +308,7 @@ export const generators = {
       const { valueType: rightValueType } = right.def;
       if (leftValueType.constructor === rightValueType.constructor) {
         const newSetSchema = z.set(rightValueType);
-        return generator(newSetSchema);
+        return generator(newSetSchema, options);
       }
       throw new Error('Incompatible Set types in intersection');
     }
@@ -232,12 +317,12 @@ export const generators = {
       const min = compareMin(left.minLength, right.minLength);
       const max = compareMax(left.maxLength, right.maxLength);
       if (min === null) {
-        if (max === null) return generator(z.string());
-        return generator(z.string().max(max));
+        if (max === null) return generator(z.string(), options);
+        return generator(z.string().max(max), options);
       }
-      if (max === null) return generator(z.string().min(min));
+      if (max === null) return generator(z.string().min(min), options);
       if (min > max) throw new Error('Min value should be less than max value');
-      return generator(z.string().min(min).max(max));
+      return generator(z.string().min(min).max(max), options);
     }
 
     if (left instanceof z.ZodNumber && right instanceof z.ZodNumber) {
@@ -249,15 +334,15 @@ export const generators = {
         left.maxValue ?? Number.MAX_SAFE_INTEGER,
         right.maxValue ?? Number.MAX_SAFE_INTEGER,
       );
-      return generator(z.number().min(min).max(max));
+      return generator(z.number().min(min).max(max), options);
     }
 
     if (left instanceof z.ZodBoolean && right instanceof z.ZodBoolean) {
-      return generator(right);
+      return generator(right, options);
     }
 
     if (left instanceof z.ZodDate && right instanceof z.ZodDate) {
-      return generator(right);
+      return generator(right, options);
     }
 
     if (left instanceof z.ZodBigInt && right instanceof z.ZodBigInt) {
@@ -269,7 +354,7 @@ export const generators = {
       const min = leftMin > rightMin ? leftMin : rightMin;
       const max = leftMax < rightMax ? leftMax : rightMax;
 
-      return generator(z.bigint().min(min).max(max));
+      return generator(z.bigint().min(min).max(max), options);
     }
 
     if (left instanceof z.ZodEnum && right instanceof z.ZodEnum) {
@@ -298,11 +383,11 @@ export const generators = {
         throw new Error('No compatible types in union intersection');
       }
       const selectedType = faker.helpers.arrayElement(commonTypes);
-      return generator(selectedType);
+      return generator(selectedType, options);
     }
 
-    const leftResult = generator(left);
-    const rightResult = generator(right);
+    const leftResult = generator(left, options);
+    const rightResult = generator(right, options);
 
     if (Array.isArray(leftResult) && Array.isArray(rightResult)) {
       return intersectionES(leftResult, rightResult);
@@ -327,17 +412,48 @@ export const generators = {
 
     return rightResult;
   },
+  optional: (
+    schema: z.ZodOptional,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    const { faker, config } = options;
+    const { optionalProbability: probability } = config;
+    if (faker.datatype.boolean({ probability })) return undefined;
+    return generator(schema.unwrap(), options);
+  },
+  nullable: (
+    schema: z.ZodNullable,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    const { faker, config } = options;
+    const { nullableProbability: probability } = config;
+    if (faker.datatype.boolean({ probability })) return null;
+    return generator(schema.unwrap(), options);
+  },
+  default: (
+    schema: z.ZodDefault | z.ZodPrefault,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    const { faker, config } = options;
+    const { defaultProbability: probability } = config;
+    if (faker.datatype.boolean({ probability })) return schema.def.defaultValue;
+    return generator(schema.unwrap(), options);
+  },
   pipe: (
     schema: z.ZodPipe,
-    generator: (schema: z.core.$ZodType) => unknown,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
   ) => {
     const { in: input, out } = schema;
     if (out instanceof z.ZodTransform) {
-      const inputValue = generator(input);
+      const inputValue = generator(input, options);
       const ctx: z.core.ParsePayload = { value: inputValue, issues: [] };
       return out.def.transform(inputValue, ctx);
     }
-    return generator(out);
+    return generator(out, options);
   },
   transform: (schema: z.ZodTransform) => schema.def.transform,
 };
@@ -365,18 +481,24 @@ export function getLocales(
 export function createMockConfig(config?: Partial<MockConfig>): MockConfig {
   const {
     seed = 1,
-    minArrayLength = 1,
-    maxArrayLength = 3,
+    array: { min: arrayMin = 1, max: arrayMax = 3 } = { min: 1, max: 3 },
+    map: { min: mapMin = 1, max: mapMax = 3 } = { min: 1, max: 3 },
+    set: { min: setMin = 1, max: setMax = 3 } = { min: 1, max: 3 },
+    record: { min: recordMin = 1, max: recordMax = 3 } = { min: 1, max: 3 },
     optionalProbability = 0.5,
     nullableProbability = 0.5,
+    defaultProbability = 0.5,
     ...rest
   } = config || {};
   return {
     seed,
-    minArrayLength,
-    maxArrayLength,
+    array: { min: arrayMin, max: arrayMax },
+    map: { min: mapMin, max: mapMax },
+    set: { min: setMin, max: setMax },
+    record: { min: recordMin, max: recordMax },
     optionalProbability,
     nullableProbability,
+    defaultProbability,
     ...rest,
   };
 }

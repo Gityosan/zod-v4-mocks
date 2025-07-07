@@ -143,7 +143,7 @@ describe('initGenerator (functional base API)', () => {
   });
   describe('options', () => {
     it('seed', () => {
-      const config: MockConfig = { seed: 12345 };
+      const config: Partial<MockConfig> = { seed: 12345 };
       const generator1 = initGenerator(config);
       const generator2 = initGenerator(config);
 
@@ -155,7 +155,7 @@ describe('initGenerator (functional base API)', () => {
     });
 
     it('locale', () => {
-      const config: MockConfig = { locale: 'en' };
+      const config: Partial<MockConfig> = { locale: 'en' };
       const generator = initGenerator(config);
 
       const schema = z.string();
@@ -166,7 +166,7 @@ describe('initGenerator (functional base API)', () => {
     });
 
     it('locale array', () => {
-      const config: MockConfig = { locale: ['ja', 'en'] };
+      const config: Partial<MockConfig> = { locale: ['ja', 'en'] };
       const generator = initGenerator(config);
 
       const schema = z.string();
@@ -1104,7 +1104,7 @@ describe('ZodMockGenerator (backward compatibility)', () => {
 
   describe('config', () => {
     it('seed', () => {
-      const config: MockConfig = { seed: 12345 };
+      const config: Partial<MockConfig> = { seed: 12345 };
       const generator1 = new ZodMockGenerator(config);
       const generator2 = new ZodMockGenerator(config);
 
@@ -1116,7 +1116,7 @@ describe('ZodMockGenerator (backward compatibility)', () => {
     });
 
     it('locale', () => {
-      const config: MockConfig = { locale: 'en' };
+      const config: Partial<MockConfig> = { locale: 'en' };
       const generator = new ZodMockGenerator(config);
 
       const schema = z.string();
@@ -1127,7 +1127,7 @@ describe('ZodMockGenerator (backward compatibility)', () => {
     });
 
     it('locale array', () => {
-      const config: MockConfig = { locale: ['ja', 'en'] };
+      const config: Partial<MockConfig> = { locale: ['ja', 'en'] };
       const generator = new ZodMockGenerator(config);
 
       const schema = z.string();

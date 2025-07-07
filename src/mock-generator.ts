@@ -7,7 +7,7 @@ import { createMockConfig, getLocales } from './util';
 class MockGenerator {
   private options: GeneraterOptions;
 
-  constructor(config?: MockConfig) {
+  constructor(config?: Partial<MockConfig>) {
     const mergedConfig = createMockConfig(config);
     const { locale, randomizer, seed, consistentKey } = mergedConfig;
     this.options = {
@@ -29,7 +29,7 @@ class MockGenerator {
 
   register(schemas: z.ZodType[]) {
     const { config, registry, valueStore } = this.options;
-    const { maxArrayLength } = config;
+    const length = config.array?.max ?? 10;
     for (const schema of schemas) {
       const meta = schema.meta();
       if (!meta || !config.consistentKey) continue;
@@ -38,7 +38,6 @@ class MockGenerator {
 
       if (typeof consistentName === 'string') {
         registry?.add(schema, { consistentName });
-        const length = maxArrayLength ?? 10;
         const values = Array.from({ length }, () =>
           generateMocks(schema, this.options),
         );
@@ -53,7 +52,7 @@ class MockGenerator {
   }
 }
 
-export function initGenerator(config?: MockConfig): MockGenerator {
+export function initGenerator(config?: Partial<MockConfig>): MockGenerator {
   const mockGenerator = new MockGenerator(config);
   return mockGenerator;
 }
@@ -64,7 +63,7 @@ export function initGenerator(config?: MockConfig): MockGenerator {
 export class ZodMockGenerator {
   private config: MockConfig;
 
-  constructor(config: MockConfig) {
+  constructor(config: Partial<MockConfig>) {
     this.config = createMockConfig(config);
   }
 

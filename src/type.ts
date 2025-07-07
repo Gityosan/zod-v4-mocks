@@ -25,11 +25,14 @@ export type CustomGeneratorType = (
 export interface MockConfig {
   locale?: LocaleType | LocaleType[];
   randomizer?: Randomizer;
-  seed?: number;
-  minArrayLength?: number;
-  maxArrayLength?: number;
-  optionalProbability?: number;
-  nullableProbability?: number;
+  seed: number;
+  array: { min: number; max: number };
+  map: { min: number; max: number };
+  set: { min: number; max: number };
+  record: { min: number; max: number };
+  optionalProbability: number;
+  nullableProbability: number;
+  defaultProbability: number;
   /**
    * @description meta's attribute name which is used to generate consistent property value
    */

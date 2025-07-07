@@ -18,8 +18,7 @@ console.log(mockUser);
 // 2. custom config
 const config = {
   seed: 42,
-  minArrayLength: 2,
-  maxArrayLength: 5,
+  array: { min: 2, max: 5 },
   locale: 'ja',
 } as const;
 const mockUserWithConfig = initGenerator(config).generate(basicSchema);
