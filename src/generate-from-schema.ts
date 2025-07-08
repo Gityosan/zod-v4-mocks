@@ -49,25 +49,27 @@ function generateFromSchema(
   if (schema instanceof z.ZodString) {
     const { def, format } = schema;
     const { checks } = def;
-    let stringResult: unknown;
+    let stringResult: unknown = generators.string(faker, schema);
     if (format === 'email') stringResult = generators.email(faker);
-    if (format === 'url') stringResult = generators.url(faker);
-    if (format === 'jwt') stringResult = generators.jwt(faker);
-    if (format === 'emoji') stringResult = generators.emoji(faker);
-    if (format === 'ipv4') stringResult = generators.ipv4(faker);
-    if (format === 'ipv6') stringResult = generators.ipv6(faker);
-    if (format === 'cidrv6') stringResult = generators.cidrv6();
-    if (format === 'base64url') stringResult = generators.base64url();
-    if (format === 'datetime') stringResult = generators.isoDateTime(faker);
-    if (format === 'date') stringResult = generators.isoDate(faker);
-    if (format === 'time') stringResult = generators.isoTime(faker);
-    if (format === 'duration') stringResult = generators.isoDuration(faker);
-
-    const regexCheck = checks?.find((v) => 'pattern' in v._zod.def);
-    if (regexCheck instanceof z.core.$ZodCheckStringFormat) {
-      stringResult = generators.regex(faker, regexCheck);
+    else if (format === 'url') stringResult = generators.url(faker);
+    else if (format === 'jwt') stringResult = generators.jwt(faker);
+    else if (format === 'emoji') stringResult = generators.emoji(faker);
+    else if (format === 'ipv4') stringResult = generators.ipv4(faker);
+    else if (format === 'ipv6') stringResult = generators.ipv6(faker);
+    else if (format === 'cidrv6') stringResult = generators.cidrv6();
+    else if (format === 'base64url') stringResult = generators.base64url();
+    else if (format === 'datetime') {
+      stringResult = generators.isoDateTime(faker);
+    } else if (format === 'date') stringResult = generators.isoDate(faker);
+    else if (format === 'time') stringResult = generators.isoTime(faker);
+    else if (format === 'duration') {
+      stringResult = generators.isoDuration(faker);
+    } else {
+      const regexCheck = checks?.find((v) => 'pattern' in v._zod.def);
+      if (regexCheck instanceof z.core.$ZodCheckStringFormat) {
+        stringResult = generators.regex(faker, regexCheck);
+      }
     }
-    stringResult = generators.string(faker, schema);
 
     const overwriteChecks =
       checks?.filter((v) => v._zod.def.check === 'overwrite') ?? [];
