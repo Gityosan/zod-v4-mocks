@@ -15,6 +15,7 @@ export type GeneraterOptions = {
   valueStore?: Map<string, unknown[]>;
   arrayIndexes: number[];
   pinnedHierarchy: Map<string, number>;
+  lazyDepth?: number;
 };
 
 export type CustomGeneratorType = (
@@ -23,16 +24,50 @@ export type CustomGeneratorType = (
 ) => unknown;
 
 export interface MockConfig {
+  /**
+   * @default [en, base]
+   */
   locale?: LocaleType | LocaleType[];
+  /**
+   * @default generateMersenne53Randomizer()
+   */
   randomizer?: Randomizer;
+  /**
+   * @default 1
+   */
   seed: number;
+  /**
+   * @default { min: 1, max: 3 }
+   */
   array: { min: number; max: number };
+  /**
+   * @default { min: 1, max: 3 }
+   */
   map: { min: number; max: number };
+  /**
+   * @default { min: 1, max: 3 }
+   */
   set: { min: number; max: number };
+  /**
+   * @default { min: 1, max: 3 }
+   */
   record: { min: number; max: number };
+  /**
+   * @default 0.5
+   */
   optionalProbability: number;
+  /**
+   * @default 0.5
+   */
   nullableProbability: number;
+  /**
+   * @default 0.5
+   */
   defaultProbability: number;
+  /**
+   * @default 5
+   */
+  lazyDepthLimit: number;
   /**
    * @description meta's attribute name which is used to generate consistent property value
    */

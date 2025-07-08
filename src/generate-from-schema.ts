@@ -48,24 +48,37 @@ function generateFromSchema(
 
   if (schema instanceof z.ZodString) {
     const { def, format } = schema;
-    if (format === 'email') return generators.email(faker);
-    if (format === 'url') return generators.url(faker);
-    if (format === 'jwt') return generators.jwt(faker);
-    if (format === 'emoji') return generators.emoji(faker);
-    if (format === 'ipv4') return generators.ipv4(faker);
-    if (format === 'ipv6') return generators.ipv6(faker);
-    if (format === 'cidrv6') return generators.cidrv6();
-    if (format === 'base64url') return generators.base64url();
-    if (format === 'datetime') return generators.isoDateTime(faker);
-    if (format === 'date') return generators.isoDate(faker);
-    if (format === 'time') return generators.isoTime(faker);
-    if (format === 'duration') return generators.isoDuration(faker);
+    const { checks } = def;
+    let stringResult: unknown;
+    if (format === 'email') stringResult = generators.email(faker);
+    if (format === 'url') stringResult = generators.url(faker);
+    if (format === 'jwt') stringResult = generators.jwt(faker);
+    if (format === 'emoji') stringResult = generators.emoji(faker);
+    if (format === 'ipv4') stringResult = generators.ipv4(faker);
+    if (format === 'ipv6') stringResult = generators.ipv6(faker);
+    if (format === 'cidrv6') stringResult = generators.cidrv6();
+    if (format === 'base64url') stringResult = generators.base64url();
+    if (format === 'datetime') stringResult = generators.isoDateTime(faker);
+    if (format === 'date') stringResult = generators.isoDate(faker);
+    if (format === 'time') stringResult = generators.isoTime(faker);
+    if (format === 'duration') stringResult = generators.isoDuration(faker);
 
-    const regexCheck = def.checks?.find((v) => 'pattern' in v._zod.def);
+    const regexCheck = checks?.find((v) => 'pattern' in v._zod.def);
     if (regexCheck instanceof z.core.$ZodCheckStringFormat) {
-      return generators.regex(faker, regexCheck);
+      stringResult = generators.regex(faker, regexCheck);
     }
-    return generators.string(faker, schema);
+    stringResult = generators.string(faker, schema);
+
+    const overwriteChecks =
+      checks?.filter((v) => v._zod.def.check === 'overwrite') ?? [];
+    for (const check of overwriteChecks) {
+      if (check instanceof z.core.$ZodCheckOverwrite) {
+        const { tx } = check._zod.def;
+        stringResult = tx(stringResult);
+      }
+    }
+
+    return stringResult;
   }
   if (schema instanceof z.ZodBigInt) return generators.bigInt(faker, schema);
 
@@ -130,13 +143,16 @@ function generateFromSchema(
     return generateMocks(schema.def.innerType, options);
   }
   if (schema instanceof z.ZodLazy) {
-    return generateMocks(schema.unwrap(), options);
+    return generators.lazy(schema, options, generateMocks);
   }
   if (schema instanceof z.ZodPipe) {
     return generators.pipe(schema, options, generateMocks);
   }
   if (schema instanceof z.ZodTransform) {
     return generators.transform(schema);
+  }
+  if (schema instanceof z.ZodCatch) {
+    return generators.catch(schema, options, generateMocks);
   }
 
   if (schema instanceof z.ZodNever) {

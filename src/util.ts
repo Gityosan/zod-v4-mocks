@@ -442,12 +442,36 @@ export const generators = {
     if (faker.datatype.boolean({ probability })) return schema.def.defaultValue;
     return generator(schema.unwrap(), options);
   },
+  lazy: (
+    schema: z.ZodLazy,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    const { lazyDepth = 1, config } = options;
+    const innerSchema = schema.unwrap();
+    if (lazyDepth < config.lazyDepthLimit) {
+      const newOptions = { ...options, lazyDepth: lazyDepth + 1 };
+      return generator(innerSchema, newOptions);
+    }
+    if (innerSchema instanceof z.ZodObject) return {};
+    if (innerSchema instanceof z.ZodRecord) return {};
+    if (innerSchema instanceof z.ZodArray) return [];
+    if (innerSchema instanceof z.ZodTuple) return [];
+    if (innerSchema instanceof z.ZodMap) return new Map();
+    if (innerSchema instanceof z.ZodSet) return new Set();
+    throw new Error('Unsupported lazy schema type');
+  },
   pipe: (
     schema: z.ZodPipe,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
   ) => {
     const { in: input, out } = schema;
+    if (input instanceof z.ZodTransform) {
+      const inputValue = generator(out, options);
+      const ctx: z.core.ParsePayload = { value: inputValue, issues: [] };
+      return input.def.transform(inputValue, ctx);
+    }
     if (out instanceof z.ZodTransform) {
       const inputValue = generator(input, options);
       const ctx: z.core.ParsePayload = { value: inputValue, issues: [] };
@@ -456,6 +480,16 @@ export const generators = {
     return generator(out, options);
   },
   transform: (schema: z.ZodTransform) => schema.def.transform,
+  catch: (
+    schema: z.ZodCatch,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    const innerType = schema.unwrap();
+    const value = generator(innerType, options);
+    const parsedValue = schema.safeParse(value);
+    return parsedValue.data;
+  },
 };
 
 /**
@@ -488,6 +522,7 @@ export function createMockConfig(config?: Partial<MockConfig>): MockConfig {
     optionalProbability = 0.5,
     nullableProbability = 0.5,
     defaultProbability = 0.5,
+    lazyDepthLimit = 5,
     ...rest
   } = config || {};
   return {
@@ -499,6 +534,7 @@ export function createMockConfig(config?: Partial<MockConfig>): MockConfig {
     optionalProbability,
     nullableProbability,
     defaultProbability,
+    lazyDepthLimit,
     ...rest,
   };
 }
