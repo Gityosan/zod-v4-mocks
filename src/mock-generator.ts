@@ -5,7 +5,7 @@ import type { CustomGeneratorType, GeneraterOptions, MockConfig } from './type';
 import { createMockConfig, getLocales } from './util';
 
 class MockGenerator {
-  private options: GeneraterOptions;
+  protected options: GeneraterOptions;
 
   constructor(config?: Partial<MockConfig>) {
     const mergedConfig = createMockConfig(config);
@@ -76,6 +76,8 @@ class MockGenerator {
     return generateMocks(schema, this.options);
   }
 }
+
+export type { MockGenerator };
 
 export function initGenerator(config?: Partial<MockConfig>): MockGenerator {
   const mockGenerator = new MockGenerator(config);
