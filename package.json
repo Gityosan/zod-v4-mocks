@@ -1,6 +1,6 @@
 {
   "name": "zod-v4-mocks",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "license": "MIT",
   "private": false,
   "description": "Mock generator for zod v4",
@@ -36,7 +36,7 @@
     "@faker-js/faker": "9.8.0",
     "es-toolkit": "1.39.5",
     "randexp": "0.5.3",
-    "zod": "3.25.75"
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@types/node": "24.0.7",
