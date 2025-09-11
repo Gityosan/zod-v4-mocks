@@ -12,7 +12,7 @@ npm install zod-v4-mocks
 
 ```ts
 import { initGenerator } from 'zod-v4-mocks';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 const schema = z.string();
 
@@ -28,7 +28,7 @@ console.log(schema.parse(res));
 The simplest way to use the library. Generate mock data from a schema.
 
 ```ts
-import { z } from 'zod/v4';
+import { z } from 'zod';
 import { initGenerator } from 'zod-v4-mocks';
 
 const basicSchema = z.object({

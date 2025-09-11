@@ -18,8 +18,8 @@ importers:
         specifier: 0.5.3
         version: 0.5.3
       zod:
-        specifier: 3.25.76
-        version: 3.25.76
+        specifier: 4.1.8
+        version: 4.1.8
     devDependencies:
       '@types/node':
         specifier: 24.0.7
@@ -575,8 +575,8 @@ packages:
     engines: {node: '>=8'}
     hasBin: true
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+  zod@4.1.8:
+    resolution: {integrity: sha512-5R1P+WwQqmmMIEACyzSvo4JXHY5WiAFHRMg+zBZKgKS+Q1viRa0C1hmUKtHltoIFKtIdki3pRxkmpP74jnNYHQ==}
 
 snapshots:
 
@@ -1011,4 +1011,4 @@ snapshots:
       siginfo: 2.0.0
       stackback: 0.0.2
 
-  zod@3.25.76: {}
+  zod@4.1.8: {}

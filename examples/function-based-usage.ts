@@ -1,4 +1,4 @@
-import { z } from 'zod/v4';
+import { z } from 'zod';
 import { type CustomGeneratorType, initGenerator } from '../src';
 
 const basicSchema = z.object({

@@ -1,5 +1,5 @@
 import { Faker } from '@faker-js/faker';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 import { generateMocks } from './generate-from-schema';
 import type { CustomGeneratorType, GeneraterOptions, MockConfig } from './type';
 import { createMockConfig, getLocales } from './util';

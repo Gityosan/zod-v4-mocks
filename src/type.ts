@@ -1,5 +1,5 @@
 import { allLocales, type Faker, type Randomizer } from '@faker-js/faker';
-import type { z } from 'zod/v4';
+import type { z } from 'zod';
 
 export type { Faker, Randomizer } from '@faker-js/faker';
 export type LocaleType = keyof typeof allLocales;

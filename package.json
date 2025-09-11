@@ -36,7 +36,7 @@
     "@faker-js/faker": "9.8.0",
     "es-toolkit": "1.39.5",
     "randexp": "0.5.3",
-    "zod": "3.25.76"
+    "zod": "4.1.8"
   },
   "devDependencies": {
     "@types/node": "24.0.7",

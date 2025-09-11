@@ -2,7 +2,7 @@ import { Faker, LocaleDefinition, allLocales } from '@faker-js/faker';
 import { randomBytes } from 'crypto';
 import { intersection as intersectionES, merge } from 'es-toolkit';
 import RandExp from 'randexp';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 import type {
   CustomGeneratorType,
   GeneraterOptions,
