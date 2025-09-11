@@ -25,11 +25,11 @@ export type CustomGeneratorType = (
 
 export interface MockConfig {
   /**
-   * @default [en, base]
+   * @default [en, base] from faker.js
    */
   locale?: LocaleType | LocaleType[];
   /**
-   * @default generateMersenne53Randomizer()
+   * @default generateMersenne53Randomizer() from faker.js
    */
   randomizer?: Randomizer;
   /**

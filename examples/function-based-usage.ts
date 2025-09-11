@@ -75,31 +75,31 @@ console.log(JSON.stringify(complexMock, null, 2));
 // 6. register function
 // Please set meta's attribute name which is used to generate consistent property value
 const consistentKey = 'name';
-const DeviceId = z.uuid().meta({ [consistentKey]: 'DeviceId' });
 const UserId = z.uuid().meta({ [consistentKey]: 'UserId' });
+const CommentId = z.uuid().meta({ [consistentKey]: 'CommentId' });
 const PostId = z.uuid().meta({ [consistentKey]: 'PostId' });
 
-const deviceSchema = z.object({
-  id: DeviceId,
-  name: z.string(),
-  type: z.enum(['mobile', 'desktop', 'tablet']),
-});
 const userSchema = z.object({
   id: UserId,
   name: z.string(),
-  email: z.email(),
-  deviceId: DeviceId,
-  device: deviceSchema,
 });
+
+const commentSchema = z.object({
+  id: CommentId,
+  postId: PostId,
+  user: userSchema,
+  userId: UserId,
+});
+
 const postSchema = z.object({
   id: PostId,
-  title: z.string(),
-  content: z.string(),
-  authorId: UserId,
-  author: userSchema,
+  comments: z.array(commentSchema),
 });
-const postsResponse = z.array(postSchema);
+
+const PostsResponse = z.array(postSchema);
+
+const schemas = [CommentId, UserId, PostId];
 const mock = initGenerator({ consistentKey })
-  .register([DeviceId, UserId, PostId])
-  .generate(postsResponse);
+  .register(schemas)
+  .generate(PostsResponse);
 console.log(JSON.stringify(mock, null, 2));
