@@ -83,18 +83,3 @@ export function initGenerator(config?: Partial<MockConfig>): MockGenerator {
   const mockGenerator = new MockGenerator(config);
   return mockGenerator;
 }
-
-/**
- * @deprecated Use generateMock function instead
- */
-export class ZodMockGenerator {
-  private config: MockConfig;
-
-  constructor(config: Partial<MockConfig>) {
-    this.config = createMockConfig(config);
-  }
-
-  generate(schema: z.ZodType) {
-    return initGenerator(this.config).generate(schema);
-  }
-}
