@@ -341,3 +341,12 @@ This generator will generate mock like below.
     - But, ZodObject and ZodRecord would be successfully generated
     - But, ZodArray and ZodTuple would be successfully generated
   - If one element type is ZodAny/ZodUnknown, the other element type is used
+
+## Future Support
+
+- `.nonoptional()`
+- `.catchall()`
+- codec series
+  - `.codec()`
+  - `.json()`
+  - `.stringbool()`

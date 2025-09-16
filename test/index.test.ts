@@ -42,6 +42,21 @@ describe('initGenerator (functional base API)', () => {
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('number');
+      // int32's range: -2^31 to 2^31-1
+      expect((result as number) >= -2147483648).toBe(true);
+      expect((result as number) <= 2147483647).toBe(true);
+      expect(Number.isInteger(result as number)).toBe(true);
+    });
+
+    it('uint32', () => {
+      const schema = z.uint32();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('number');
+      // uint32's range: 0 to 2^32-1
+      expect((result as number) >= 0).toBe(true);
+      expect((result as number) <= 4294967295).toBe(true);
+      expect(Number.isInteger(result as number)).toBe(true);
     });
 
     it('int64', () => {
@@ -49,6 +64,9 @@ describe('initGenerator (functional base API)', () => {
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('bigint');
+      // int64's range: -2^63 to 2^63-1
+      expect((result as bigint) >= -9223372036854775808n).toBe(true);
+      expect((result as bigint) <= 9223372036854775807n).toBe(true);
     });
 
     it('uint64', () => {
@@ -56,6 +74,9 @@ describe('initGenerator (functional base API)', () => {
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('bigint');
+      // uint64's range: 0 to 2^64-1
+      expect((result as bigint) >= 0n).toBe(true);
+      expect((result as bigint) <= 18446744073709551615n).toBe(true);
     });
 
     it('float32', () => {
@@ -63,6 +84,9 @@ describe('initGenerator (functional base API)', () => {
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('number');
+      // float32's range: -3.4e38 to 3.4e38
+      expect(Math.abs(result as number) <= 3.4028235e38).toBe(true);
+      expect(isFinite(result as number)).toBe(true);
     });
 
     it('float64', () => {
@@ -70,6 +94,9 @@ describe('initGenerator (functional base API)', () => {
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('number');
+      // float64's range: -1.8e308 to 1.8e308 (JavaScript's number range)
+      expect(Math.abs(result as number) <= 1.7976931348623157e308).toBe(true);
+      expect(isFinite(result as number)).toBe(true);
     });
 
     it('boolean', () => {
@@ -138,6 +165,347 @@ describe('initGenerator (functional base API)', () => {
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('symbol');
+    });
+
+    it('httpUrl', () => {
+      const schema = z.httpUrl();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/^https?:\/\//);
+    });
+
+    it('nonoptional', () => {
+      const schema = z.nonoptional(z.string().optional());
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).not.toBeUndefined();
+    });
+
+    it('hex', () => {
+      const schema = z.hex();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/^[0-9a-fA-F]*$/);
+    });
+
+    it('hash md5', () => {
+      const schema = z.hash('md5');
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/^[0-9a-fA-F]{32}$/);
+    });
+
+    it('hash sha256', () => {
+      const schema = z.hash('sha256');
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/^[0-9a-fA-F]{64}$/);
+    });
+
+    it('email', () => {
+      const schema = z.email();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/@/);
+    });
+
+    it('url', () => {
+      const schema = z.url();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/^https?:\/\//);
+    });
+
+    it('jwt', () => {
+      const schema = z.jwt();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect((result as string).split('.')).toHaveLength(3);
+    });
+
+    it('emoji', () => {
+      const schema = z.emoji();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect((result as string).length).toBeGreaterThan(0);
+    });
+
+    it('guid', () => {
+      const schema = z.guid();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      );
+    });
+
+    it('uuidv4', () => {
+      const schema = z.uuidv4();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+      );
+    });
+
+    it('uuidv6', () => {
+      const schema = z.uuidv6();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+
+    it('uuidv7', () => {
+      const schema = z.uuidv7();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+
+    it('nanoid', () => {
+      const schema = z.nanoid();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect((result as string).length).toBeGreaterThan(0);
+    });
+
+    it('cuid', () => {
+      const schema = z.cuid();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+
+    it('cuid2', () => {
+      const schema = z.cuid2();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+
+    it('ulid', () => {
+      const schema = z.ulid();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect((result as string).length).toBe(26);
+    });
+
+    it('xid', () => {
+      const schema = z.xid();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+
+    it('ksuid', () => {
+      const schema = z.ksuid();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+
+    it('ipv4', () => {
+      const schema = z.ipv4();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/^\d+\.\d+\.\d+\.\d+$/);
+    });
+
+    it('ipv6', () => {
+      const schema = z.ipv6();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/:/);
+    });
+
+    it('cidrv4', () => {
+      const schema = z.cidrv4();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/\/\d+$/);
+    });
+
+    it('cidrv6', () => {
+      const schema = z.cidrv6();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/\/\d+$/);
+    });
+
+    it('base64', () => {
+      const schema = z.base64();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+
+    it('base64url', () => {
+      const schema = z.base64url();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+
+    it('e164', () => {
+      const schema = z.e164();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/^\+\d+$/);
+    });
+
+    it('hostname', () => {
+      const schema = z.hostname();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect((result as string).length).toBeGreaterThan(0);
+    });
+
+    it('default', () => {
+      const schema = z.string().default('test');
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toBe('test');
+    });
+
+    it('prefault', () => {
+      const schema = z
+        .string()
+        .transform((value) => value + '!')
+        .prefault('test');
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toBe('test');
+    });
+
+    it('success', () => {
+      const schema = z.success(z.string());
+      const result = generator.generate(schema);
+      expect(typeof result).toBe('boolean');
+    });
+
+    it('catch', () => {
+      const schema = z.string().catch('test');
+      const result = generator.generate(schema);
+      expect(typeof result).toBe('string');
+    });
+  });
+  describe('complex types', () => {
+    const generator = initGenerator();
+    describe('templateLiteral', () => {
+      it('with string', () => {
+        const schema = z.templateLiteral(['Hello ', z.string(), '!']);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(typeof result).toBe('string');
+        expect(result as string).toMatch(/^Hello .+!$/);
+      });
+
+      it('with number', () => {
+        const schema = z.templateLiteral(['Count: ', z.number()]);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(typeof result).toBe('string');
+        expect(result as string).toMatch(/^Count: \d+(\.\d+)?$/);
+      });
+
+      it('with multiple parts', () => {
+        const schema = z.templateLiteral([
+          'User ',
+          z.string(),
+          ' has ',
+          z.number(),
+          ' items',
+        ]);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(typeof result).toBe('string');
+        expect(result as string).toMatch(/^User .+ has \d+(\.\d+)? items$/);
+      });
+
+      it('with literal values', () => {
+        const schema = z.templateLiteral([
+          'Status: ',
+          z.literal('active'),
+          ' - ID: ',
+          z.number(),
+        ]);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(typeof result).toBe('string');
+        expect(result as string).toMatch(/^Status: active - ID: \d+(\.\d+)?$/);
+      });
+
+      it('with boolean', () => {
+        const schema = z.templateLiteral(['Enabled: ', z.boolean()]);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(typeof result).toBe('string');
+        expect(result as string).toMatch(/^Enabled: (true|false)$/);
+      });
+
+      it('with union', () => {
+        const schema = z.templateLiteral([
+          'Type: ',
+          z.union([z.literal('user'), z.literal('admin')]),
+        ]);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(typeof result).toBe('string');
+        expect(result as string).toMatch(/^Type: (user|admin)$/);
+      });
+
+      it('with null', () => {
+        const schema = z.templateLiteral(['Value: ', z.null()]);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(typeof result).toBe('string');
+        expect(result).toBe('Value: null');
+      });
+
+      it('with undefined', () => {
+        const schema = z.templateLiteral(['Value: ', z.undefined()]);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(typeof result).toBe('string');
+        expect(result).toBe('Value: undefined');
+      });
+
+      it('with nullable', () => {
+        const schema = z.templateLiteral(['Result: ', z.string().nullable()]);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(typeof result).toBe('string');
+        expect(result as string).toMatch(/^Result: (null|.+)$/);
+      });
+
+      it('with optional', () => {
+        const schema = z.templateLiteral(['Message: ', z.string().optional()]);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(typeof result).toBe('string');
+        expect(result as string).toMatch(/^Message: (.*)$/);
+      });
     });
   });
   describe('options', () => {

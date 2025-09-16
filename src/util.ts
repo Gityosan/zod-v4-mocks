@@ -110,6 +110,7 @@ export const generators = {
     const seconds = faker.number.int({ min: 0, max: 59 });
     return `PT${hours}H${minutes}M${seconds}S`;
   },
+  hostname: (faker: Faker) => faker.internet.domainName(),
   regex: (faker: Faker, check: z.core.$ZodCheckStringFormat) => {
     const { pattern } = check._zod.def;
     if (pattern !== undefined) {
@@ -155,6 +156,28 @@ export const generators = {
   literal: (schema: z.ZodLiteral, options: GeneraterOptions) => {
     const { faker } = options;
     return faker.helpers.arrayElement([...schema.values]);
+  },
+  templateLiteral: (
+    schema: z.ZodTemplateLiteral,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    const parts = schema.def.parts.filter((v) => v !== undefined);
+    const result = parts.map((v) => {
+      if (v === null) return 'null';
+      if (typeof v === 'string') return v;
+      if (typeof v === 'number') return v.toString();
+      if (typeof v === 'bigint') return v.toString();
+      if (typeof v === 'boolean') return v.toString();
+      const value = generator(v, options);
+      if (value === undefined) return 'undefined';
+      if (value === null) return 'null';
+      if (typeof value === 'number') return value.toString();
+      if (typeof value === 'bigint') return value.toString();
+      if (typeof value === 'boolean') return value.toString();
+      return value;
+    });
+    return result.join('');
   },
   enum: (schema: z.ZodEnum, options: GeneraterOptions) => {
     const { faker } = options;
@@ -432,15 +455,8 @@ export const generators = {
     if (faker.datatype.boolean({ probability })) return null;
     return generator(schema.unwrap(), options);
   },
-  default: (
-    schema: z.ZodDefault | z.ZodPrefault,
-    options: GeneraterOptions,
-    generator: CustomGeneratorType,
-  ) => {
-    const { faker, config } = options;
-    const { defaultProbability: probability } = config;
-    if (faker.datatype.boolean({ probability })) return schema.def.defaultValue;
-    return generator(schema.unwrap(), options);
+  default: (schema: z.ZodDefault | z.ZodPrefault) => {
+    return schema.def.defaultValue;
   },
   lazy: (
     schema: z.ZodLazy,
@@ -480,6 +496,11 @@ export const generators = {
     return generator(out, options);
   },
   transform: (schema: z.ZodTransform) => schema.def.transform,
+  success: (schema: z.ZodSuccess, options: GeneraterOptions) => {
+    const { faker, config } = options;
+    const { nullableProbability: probability } = config;
+    return faker.datatype.boolean({ probability });
+  },
   catch: (
     schema: z.ZodCatch,
     options: GeneraterOptions,

@@ -46,6 +46,11 @@ function generateFromSchema(
     return generators.regex(faker, schema);
   }
 
+  if (schema instanceof z.ZodCustomStringFormat) {
+    if (schema.format === 'hostname') return generators.hostname(faker);
+    return generators.regex(faker, schema);
+  }
+
   if (schema instanceof z.ZodString) {
     const { def, format } = schema;
     const { checks } = def;
@@ -105,6 +110,9 @@ function generateFromSchema(
   if (schema instanceof z.ZodLiteral) {
     return generators.literal(schema, options);
   }
+  if (schema instanceof z.ZodTemplateLiteral) {
+    return generators.templateLiteral(schema, options, generateMocks);
+  }
   if (schema instanceof z.ZodEnum) {
     return generators.enum(schema, options);
   }
@@ -139,7 +147,7 @@ function generateFromSchema(
     return generators.nullable(schema, options, generateMocks);
   }
   if (schema instanceof z.ZodDefault || schema instanceof z.ZodPrefault) {
-    return generators.default(schema, options, generateMocks);
+    return generators.default(schema);
   }
   if (schema instanceof z.ZodReadonly) {
     return generateMocks(schema.def.innerType, options);
@@ -153,6 +161,9 @@ function generateFromSchema(
   if (schema instanceof z.ZodTransform) {
     return generators.transform(schema);
   }
+  if (schema instanceof z.ZodSuccess) {
+    return generators.success(schema, options);
+  }
   if (schema instanceof z.ZodCatch) {
     return generators.catch(schema, options, generateMocks);
   }
@@ -163,9 +174,6 @@ function generateFromSchema(
     );
     return null;
   }
-
-  if (schema instanceof z.core.$ZodCheckStringFormat)
-    return generators.regex(faker, schema);
 
   console.warn(
     `Unhandled Zod schema type: ${schema.constructor.name}. Returning dummy value.`,
