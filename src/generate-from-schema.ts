@@ -146,6 +146,9 @@ function generateFromSchema(
   if (schema instanceof z.ZodNullable) {
     return generators.nullable(schema, options, generateMocks);
   }
+  if (schema instanceof z.ZodNonOptional) {
+    return generators.nonoptional(schema, options, generateMocks);
+  }
   if (schema instanceof z.ZodDefault || schema instanceof z.ZodPrefault) {
     return generators.default(schema);
   }
@@ -155,14 +158,15 @@ function generateFromSchema(
   if (schema instanceof z.ZodLazy) {
     return generators.lazy(schema, options, generateMocks);
   }
+  // ZodPipe series
+  if (schema instanceof z.ZodCodec) {
+    return generators.codec(schema, options, generateMocks);
+  }
   if (schema instanceof z.ZodPipe) {
     return generators.pipe(schema, options, generateMocks);
   }
-  if (schema instanceof z.ZodTransform) {
-    return generators.transform(schema);
-  }
   if (schema instanceof z.ZodSuccess) {
-    return generators.success(schema, options);
+    return generators.success(schema, options, generateMocks);
   }
   if (schema instanceof z.ZodCatch) {
     return generators.catch(schema, options, generateMocks);

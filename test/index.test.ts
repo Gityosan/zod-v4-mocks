@@ -99,6 +99,54 @@ describe('initGenerator (functional base API)', () => {
       expect(isFinite(result as number)).toBe(true);
     });
 
+    it('success', () => {
+      const schema = z.success(z.string());
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+
+    it('codec', () => {
+      const stringToDate = z.codec(z.iso.datetime(), z.date(), {
+        decode: (isoString: string) => new Date(isoString),
+        encode: (date: Date) => date.toISOString(),
+      });
+      const result = generator.generate(stringToDate);
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    });
+
+    it('stringbool', () => {
+      const schema = z.stringbool();
+      const result = generator.generate(schema);
+      expect(typeof result).toBe('string');
+      const validValues = [
+        'true',
+        '1',
+        'yes',
+        'on',
+        'y',
+        'enabled',
+        'false',
+        '0',
+        'no',
+        'off',
+        'n',
+        'disabled',
+      ];
+      expect(validValues).toContain(result);
+
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof schema.parse(result)).toBe('boolean');
+    });
+
+    it('json', () => {
+      const schema = z.json();
+      const result = generator.generate(schema);
+      expect(result).toEqual({});
+      expect(() => schema.parse(result)).not.toThrow();
+    });
+
     it('boolean', () => {
       const schema = z.boolean();
       const result = generator.generate(schema);
@@ -176,11 +224,11 @@ describe('initGenerator (functional base API)', () => {
     });
 
     it('nonoptional', () => {
-      const schema = z.nonoptional(z.string().optional());
+      const schema = z.string().optional().nonoptional();
       const result = generator.generate(schema);
-      expect(() => schema.parse(result)).not.toThrow();
+      expect(result).toBeDefined();
       expect(typeof result).toBe('string');
-      expect(result).not.toBeUndefined();
+      expect(() => schema.parse(result)).not.toThrow();
     });
 
     it('hex', () => {
@@ -401,7 +449,7 @@ describe('initGenerator (functional base API)', () => {
     it('success', () => {
       const schema = z.success(z.string());
       const result = generator.generate(schema);
-      expect(typeof result).toBe('boolean');
+      expect(typeof result).toBe('string');
     });
 
     it('catch', () => {

@@ -445,6 +445,17 @@ export const generators = {
     if (faker.datatype.boolean({ probability })) return undefined;
     return generator(schema.unwrap(), options);
   },
+  nonoptional: (
+    schema: z.ZodNonOptional,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    let innerSchema = schema.unwrap();
+    while (innerSchema instanceof z.ZodOptional) {
+      innerSchema = innerSchema.unwrap();
+    }
+    return generator(innerSchema, options);
+  },
   nullable: (
     schema: z.ZodNullable,
     options: GeneraterOptions,
@@ -465,6 +476,25 @@ export const generators = {
   ) => {
     const { lazyDepth = 1, config } = options;
     const innerSchema = schema.unwrap();
+
+    // for z.json
+    if (innerSchema instanceof z.ZodUnion) {
+      const unionTypes = innerSchema.options;
+      const hasJsonTypes = unionTypes.some(
+        (type) =>
+          type instanceof z.ZodString ||
+          type instanceof z.ZodNumber ||
+          type instanceof z.ZodBoolean ||
+          type instanceof z.ZodNull ||
+          type instanceof z.ZodArray ||
+          type instanceof z.ZodRecord,
+      );
+
+      if (hasJsonTypes && unionTypes.length >= 4) {
+        return {};
+      }
+    }
+
     if (lazyDepth < config.lazyDepthLimit) {
       const newOptions = { ...options, lazyDepth: lazyDepth + 1 };
       return generator(innerSchema, newOptions);
@@ -495,11 +525,41 @@ export const generators = {
     }
     return generator(out, options);
   },
-  transform: (schema: z.ZodTransform) => schema.def.transform,
-  success: (schema: z.ZodSuccess, options: GeneraterOptions) => {
-    const { faker, config } = options;
-    const { nullableProbability: probability } = config;
-    return faker.datatype.boolean({ probability });
+  success: (
+    schema: z.ZodSuccess,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    return generator(schema.def.innerType, options);
+  },
+  codec: (
+    schema: z.ZodCodec,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    // for z.stringbool
+    if (
+      schema.def.in instanceof z.ZodString &&
+      schema.def.out instanceof z.ZodBoolean
+    ) {
+      const validValues = [
+        'true',
+        '1',
+        'yes',
+        'on',
+        'y',
+        'enabled',
+        'false',
+        '0',
+        'no',
+        'off',
+        'n',
+        'disabled',
+      ];
+      return options.faker.helpers.arrayElement(validValues);
+    }
+
+    return generator(schema.def.in, options);
   },
   catch: (
     schema: z.ZodCatch,
