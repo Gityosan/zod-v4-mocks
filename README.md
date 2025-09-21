@@ -324,6 +324,7 @@ This generator will generate mock like below.
 - `z.ZodCustom`
   - `.custom()` and `.instanceof()` are not supported
   - `.refine()` and `.check()` are ignored
+- `.catchall()` is ignored
 - `.function()` is not supported
 - `.nativeEnum()` is deprecated in v4
 - `.promise()` is deprecated in v4
@@ -344,9 +345,18 @@ This generator will generate mock like below.
 
 ## Future Support
 
-- `.nonoptional()`
-- `.catchall()`
-- codec series
-  - `.codec()`
-  - `.json()`
-  - `.stringbool()`
+(No items currently planned)
+
+## Note
+
+In `.templateLiteral`
+
+```ts
+const schema = z.templateLiteral(['Value: ', z.undefined()]);
+// or
+const schema = z.templateLiteral(['Value: ', undefined]);
+type Schema = z.infer<typeof schema>;
+// typesciprt guess `type Schema = "Value: "`
+```
+
+But, zod expect `"Value: undefined"`, so, this library would generate `Value: undefined`
