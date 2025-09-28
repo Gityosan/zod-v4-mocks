@@ -349,7 +349,7 @@ This generator will generate mock like below.
 
 ## Note
 
-In `.templateLiteral`
+### In `.templateLiteral`
 
 ```ts
 const schema = z.templateLiteral(['Value: ', z.undefined()]);
@@ -360,3 +360,15 @@ type Schema = z.infer<typeof schema>;
 ```
 
 But, zod expect `"Value: undefined"`, so, this library would generate `Value: undefined`
+
+### Branded types
+
+In Zod v4, `brand()` is a type-level concept. There is no special brand class exposed at runtime, so generated values follow the inner schema (e.g., `z.string().brand<'UserId'>()` generates a `string`). Meanwhile, thanks to the overload `initGenerator().generate<T extends z.ZodTypeAny>(schema: T): z.infer<T>`, the returned value type is inferred with the brand.
+
+```ts
+const BrandedUserId = z.string().brand<'UserId'>();
+const val = initGenerator().generate(BrandedUserId);
+// The type is inferred as branded
+type T = z.infer<typeof BrandedUserId>;
+const _: T = val; // OK
+```

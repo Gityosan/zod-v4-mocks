@@ -103,3 +103,11 @@ const mock = initGenerator({ consistentKey })
   .register(schemas)
   .generate(PostsResponse);
 console.log(JSON.stringify(mock, null, 2));
+
+// 7. branded schema example (type inference check)
+const BrandedUserId = z.string().brand<'UserId'>();
+const brandedValue = initGenerator().generate(BrandedUserId);
+// Type check: this should compile if generate() returns z.infer<typeof BrandedUserId>
+type BrandedUserIdType = z.infer<typeof BrandedUserId>;
+const _typeCheckBranded: BrandedUserIdType = brandedValue;
+console.log('branded:', brandedValue);
