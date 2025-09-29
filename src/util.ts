@@ -1,5 +1,4 @@
 import { Faker, LocaleDefinition, allLocales } from '@faker-js/faker';
-import { randomBytes } from 'crypto';
 import { intersection as intersectionES, merge } from 'es-toolkit';
 import RandExp from 'randexp';
 import { z } from 'zod';
@@ -95,12 +94,15 @@ export const generators = {
   ipv4: (faker: Faker) => faker.internet.ipv4(),
   ipv6: (faker: Faker) => faker.internet.ipv6(),
   date: (faker: Faker) => faker.date.anytime(),
-  cidrv6: () => {
-    return new RandExp(
+  cidrv6: (faker: Faker) => {
+    const randexp = new RandExp(
       /([0-9a-f]{1,4}:){7}[0-9a-f]{1,4}\/(12[0-8]|1[01][0-9]|[1-9]?[0-9])/,
-    ).gen();
+    );
+    randexp.randInt = (a: number, b: number) =>
+      faker.number.int({ min: a, max: b });
+    return randexp.gen();
   },
-  base64url: () => randomBytes(16).toString('base64url'),
+  base64url: (faker: Faker) => faker.string.alphanumeric(22),
   isoDateTime: (faker: Faker) => faker.date.anytime().toISOString(),
   isoDate: (faker: Faker) => faker.date.anytime().toISOString().split('T')[0],
   isoTime: (faker: Faker) => faker.date.anytime().toISOString().slice(11, 19),
@@ -115,6 +117,8 @@ export const generators = {
     const { pattern } = check._zod.def;
     if (pattern !== undefined) {
       const randexp = new RandExp(pattern);
+      randexp.randInt = (a: number, b: number) =>
+        faker.number.int({ min: a, max: b });
       return randexp.gen();
     }
     return faker.lorem.word();

@@ -16,6 +16,84 @@ describe('initGenerator (functional base API)', () => {
       expect(typeof result).toBe('string');
     });
 
+  describe('determinism (same seed => same output)', () => {
+    it('regex-based string', () => {
+      const schema = z.string().regex(/^[a-z]{8}$/);
+      const g1 = initGenerator({ seed: 777 });
+      const g2 = initGenerator({ seed: 777 });
+      const r1 = g1.generate(schema);
+      const r2 = g2.generate(schema);
+      expect(r1).toBe(r2);
+    });
+
+    it('cidrv6', () => {
+      const schema = z.cidrv6();
+      const g1 = initGenerator({ seed: 888 });
+      const g2 = initGenerator({ seed: 888 });
+      const r1 = g1.generate(schema);
+      const r2 = g2.generate(schema);
+      expect(r1).toBe(r2);
+    });
+
+    it('base64url', () => {
+      const schema = z.base64url();
+      const g1 = initGenerator({ seed: 999 });
+      const g2 = initGenerator({ seed: 999 });
+      const r1 = g1.generate(schema);
+      const r2 = g2.generate(schema);
+      expect(r1).toBe(r2);
+    });
+
+    it('union selection', () => {
+      const schema = z.union([z.literal('A'), z.literal('B'), z.literal('C')]);
+      const g1 = initGenerator({ seed: 13579 });
+      const g2 = initGenerator({ seed: 13579 });
+      const r1 = g1.generate(schema);
+      const r2 = g2.generate(schema);
+      expect(r1).toBe(r2);
+    });
+
+    it('composed object and array', () => {
+      const schema = z.object({
+        id: z.uuidv4(),
+        list: z.array(z.union([z.int(), z.string().regex(/^x[0-9]{2}$/)])),
+      });
+      const g1 = initGenerator({ seed: 24680, array: { min: 3, max: 3 } });
+      const g2 = initGenerator({ seed: 24680, array: { min: 3, max: 3 } });
+      const r1 = g1.generate(schema);
+      const r2 = g2.generate(schema);
+      expect(r1).toEqual(r2);
+    });
+
+    it('optional probability', () => {
+      const schema = z.string().optional();
+      const g1 = initGenerator({ seed: 11111, optionalProbability: 0.5 });
+      const g2 = initGenerator({ seed: 11111, optionalProbability: 0.5 });
+      const r1 = g1.generate(schema);
+      const r2 = g2.generate(schema);
+      expect(r1).toEqual(r2);
+    });
+
+    it('nullable probability', () => {
+      const schema = z.string().nullable();
+      const g1 = initGenerator({ seed: 22222, nullableProbability: 0.5 });
+      const g2 = initGenerator({ seed: 22222, nullableProbability: 0.5 });
+      const r1 = g1.generate(schema);
+      const r2 = g2.generate(schema);
+      expect(r1).toEqual(r2);
+    });
+
+    it('random array length within bounds', () => {
+      const schema = z.array(z.int());
+      const g1 = initGenerator({ seed: 33333, array: { min: 1, max: 5 } });
+      const g2 = initGenerator({ seed: 33333, array: { min: 1, max: 5 } });
+      const r1 = g1.generate(schema) as unknown[];
+      const r2 = g2.generate(schema) as unknown[];
+      expect(r1.length).toBe(r2.length);
+      expect(r1).toEqual(r2);
+    });
+  });
+
     it('number', () => {
       const schema = z.number();
       const result = generator.generate(schema);

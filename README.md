@@ -347,6 +347,37 @@ This generator will generate mock like below.
 
 (No items currently planned)
 
+## Determinism
+
+When you pass the same `seed` to `initGenerator`, generated values are deterministic across runs.
+
+- Covered by seed determinism: strings, numbers, dates, arrays, unions, regex-based strings, `cidrv6`, `base64url`, etc.
+- Internally, we ensure that random sources (including `RandExp` for regex generation) are wired to the seeded Faker RNG.
+
+Tips for custom generation via `override`
+
+- If you define a custom generator, use the provided `options.faker` rather than `Math.random()` or `Date.now()` to keep determinism.
+
+```ts
+import { type CustomGeneratorType, initGenerator } from 'zod-v4-mocks';
+import { z } from 'zod';
+
+const Email = z.email();
+
+const deterministicOverride: CustomGeneratorType = (schema, options) => {
+  const { faker } = options; // seeded
+  if (schema === Email) {
+    const user = faker.internet.userName();
+    const host = faker.internet.domainName();
+    return `${user}@${host}`;
+  }
+};
+
+const gen = initGenerator({ seed: 12345 }).override(deterministicOverride);
+const a = gen.generate(Email); // same output for the same seed
+const b = gen.generate(Email); // same across runs with seed 12345
+```
+
 ## Note
 
 ### In `.templateLiteral`
