@@ -17,8 +17,8 @@ function generateFromSchema(
   if (schema instanceof z.ZodULID) return generators.ulid(faker);
   if (schema instanceof z.ZodIPv4) return generators.ipv4(faker);
   if (schema instanceof z.ZodIPv6) return generators.ipv6(faker);
-  if (schema instanceof z.ZodCIDRv6) return generators.cidrv6();
-  if (schema instanceof z.ZodBase64URL) return generators.base64url();
+  if (schema instanceof z.ZodCIDRv6) return generators.cidrv6(faker);
+  if (schema instanceof z.ZodBase64URL) return generators.base64url(faker);
   if (schema instanceof z.ZodDate) return generators.date(faker);
   if (schema instanceof z.ZodISODateTime) return generators.isoDateTime(faker);
   if (schema instanceof z.ZodISODate) return generators.isoDate(faker);
@@ -61,8 +61,8 @@ function generateFromSchema(
     else if (format === 'emoji') stringResult = generators.emoji(faker);
     else if (format === 'ipv4') stringResult = generators.ipv4(faker);
     else if (format === 'ipv6') stringResult = generators.ipv6(faker);
-    else if (format === 'cidrv6') stringResult = generators.cidrv6();
-    else if (format === 'base64url') stringResult = generators.base64url();
+    else if (format === 'cidrv6') stringResult = generators.cidrv6(faker);
+    else if (format === 'base64url') stringResult = generators.base64url(faker);
     else if (format === 'datetime') {
       stringResult = generators.isoDateTime(faker);
     } else if (format === 'date') stringResult = generators.isoDate(faker);

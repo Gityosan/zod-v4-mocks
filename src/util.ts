@@ -196,7 +196,9 @@ export const generators = {
     const length = faker.number.int(config.array);
     return Array.from({ length }, (_, arrayIndex) => {
       const arrayIndexes = [...options.arrayIndexes, arrayIndex];
-      return generator(schema.element, { ...options, arrayIndexes });
+      const path = [...(options.path ?? []), arrayIndex];
+      const key = arrayIndex;
+      return generator(schema.element, { ...options, arrayIndexes, path, key });
     });
   },
   tuple: (
@@ -211,7 +213,9 @@ export const generators = {
         schema.def.items,
       );
       const arrayIndexes = [...options.arrayIndexes, arrayIndex];
-      return generator(randomOption, { ...options, arrayIndexes });
+      const path = [...(options.path ?? []), arrayIndex];
+      const key = arrayIndex;
+      return generator(randomOption, { ...options, arrayIndexes, path, key });
     });
   },
   map: (
@@ -224,9 +228,10 @@ export const generators = {
     const length = faker.number.int(config.map);
     return new Map(
       Array.from({ length }, () => {
-        const key = generator(keyType, options);
-        const value = generator(valueType, options);
-        return [key, value];
+        const k = generator(keyType, options) as unknown;
+        const childPath = [...(options.path ?? []), '(map)'];
+        const value = generator(valueType, { ...options, key: '(map)', path: childPath });
+        return [k, value];
       }),
     );
   },
@@ -238,7 +243,12 @@ export const generators = {
     const { faker, config } = options;
     const { valueType } = schema.def;
     const length = faker.number.int(config.set);
-    return new Set(Array.from({ length }, () => generator(valueType, options)));
+    return new Set(
+      Array.from({ length }, (_, i) => {
+        const path = [...(options.path ?? []), i];
+        return generator(valueType, { ...options, key: i, path });
+      }),
+    );
   },
   object: (
     schema: z.ZodObject,
@@ -249,7 +259,8 @@ export const generators = {
     const result: { [key: string]: unknown } = {};
 
     for (const [key, value] of Object.entries(shape)) {
-      result[key] = generator(value, options);
+      const path = [...(options.path ?? []), key];
+      result[key] = generator(value, { ...options, key, path });
     }
     return result;
   },
@@ -262,14 +273,15 @@ export const generators = {
     const { keyType, valueType } = schema;
     const length = faker.number.int(config.record);
     return [...Array(length)].reduce((acc) => {
-      const key = generator(keyType, options);
-      const value = generator(valueType, options);
-      if (
-        typeof key === 'string' ||
-        typeof key === 'number' ||
-        typeof key === 'symbol'
-      )
-        return { ...acc, [key]: value };
+      const k = generator(keyType, options) as unknown;
+      const keyIsValid =
+        typeof k === 'string' || typeof k === 'number' || typeof k === 'symbol';
+      if (keyIsValid) {
+        const keyStr = typeof k === 'symbol' ? String(k) : (k as string | number);
+        const path = [...(options.path ?? []), keyStr];
+        const value = generator(valueType, { ...options, key: keyStr, path });
+        return { ...acc, [keyStr]: value };
+      }
       throw new Error('Invalid record key type');
     }, {});
   },

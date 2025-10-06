@@ -378,6 +378,77 @@ const a = gen.generate(Email); // same output for the same seed
 const b = gen.generate(Email); // same across runs with seed 12345
 ```
 
+### Using `path` and `key` in `override` for field-specific control
+
+The `options` argument passed to your custom generator includes `path` and `key`, allowing you to override values based on field location:
+
+- `options.path`: Array of keys/indexes from root to current field (e.g., `['user', 'id']` or `['items', 0, 'label']`)
+- `options.key`: The immediate key or index for the current field (e.g., `'id'` or `0`)
+
+#### Naming rules for `path` and `key`
+
+| Schema Type | `key` | `path` | Example |
+|-------------|-------|--------|---------|
+| **Object property** | Property name (string) | `[...parentPath, key]` | `z.object({ id: z.string() })` → `key: 'id'`, `path: ['id']` |
+| **Array element** | Index (number) | `[...parentPath, index]` | `z.array(z.string())` → `key: 0`, `path: [0]` for first element |
+| **Tuple element** | Index (number) | `[...parentPath, index]` | `z.tuple([z.string(), z.number()])` → `key: 0`, `path: [0]` for first element |
+| **Record entry** | Generated key (string/number) | `[...parentPath, generatedKey]` | `z.record(z.string(), z.number())` → `key: 'someKey'`, `path: ['someKey']` |
+| **Set element** | Index (number) | `[...parentPath, index]` | `z.set(z.string())` → `key: 0`, `path: [0]` for first element |
+| **Map value** | `'(map)'` (string literal) | `[...parentPath, '(map)']` | `z.map(z.string(), z.number())` → `key: '(map)'`, `path: ['(map)']` for values |
+| **Nested structure** | Varies by type | Accumulated from root | `z.object({ user: z.object({ id: z.string() }) })` → `key: 'id'`, `path: ['user', 'id']` |
+
+**Notes:**
+- `path` is always an array accumulated from the root to the current field
+- For arrays/tuples/sets, `key` is the numeric index (0, 1, 2, ...)
+- For objects, `key` is the property name as a string
+- For records, `key` is the generated key (string or number depending on keyType)
+- For maps, we use the special literal `'(map)'` as both `key` and path segment for values (since map keys can be any type)
+- Root-level fields have `path` with a single element: `['fieldName']` or `[0]`
+
+```ts
+import { z } from 'zod';
+import { initGenerator, type CustomGeneratorType } from 'zod-v4-mocks';
+
+const schema = z.object({
+  id: z.uuidv4(),
+  user: z.object({
+    id: z.uuidv4(),
+    name: z.string(),
+  }),
+  items: z.array(
+    z.object({
+      id: z.uuidv4(),
+      label: z.string(),
+    }),
+  ),
+});
+
+const overrideByPath: CustomGeneratorType = (schema, options) => {
+  const { path, key, faker } = options;
+  const pathStr = path.join('.');
+
+  // Override root-level id
+  if (pathStr === 'id') return 'root-fixed-id';
+
+  // Override user.id specifically
+  if (pathStr === 'user.id') return 'user-fixed-id';
+
+  // Override all id fields inside items array
+  if (pathStr.startsWith('items.') && key === 'id') {
+    return faker.string.uuid(); // seeded, deterministic
+  }
+
+  // Fallback to default generator
+  return undefined;
+};
+
+const gen = initGenerator({ seed: 123 }).override(overrideByPath);
+const result = gen.generate(schema);
+// result.id === 'root-fixed-id'
+// result.user.id === 'user-fixed-id'
+// result.items[0].id and result.items[1].id are seeded UUIDs
+```
+
 ## Note
 
 ### In `.templateLiteral`

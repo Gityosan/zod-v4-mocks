@@ -19,6 +19,8 @@ class MockGenerator {
       valueStore: new Map(),
       arrayIndexes: [],
       pinnedHierarchy: new Map(),
+      path: [],
+      key: undefined,
     };
   }
 
