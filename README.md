@@ -323,7 +323,6 @@ This generator will generate mock like below.
 
 - `z.ZodCustom`
   - `.custom()` and `.instanceof()` are not supported
-  - `.refine()` and `.check()` are ignored
 - `.catchall()` is ignored
 - `.function()` is not supported
 - `.nativeEnum()` is deprecated in v4
@@ -342,6 +341,15 @@ This generator will generate mock like below.
     - But, ZodObject and ZodRecord would be successfully generated
     - But, ZodArray and ZodTuple would be successfully generated
   - If one element type is ZodAny/ZodUnknown, the other element type is used
+- `z.ZodEffects` (transform/refine/preprocess/check) is partially supported
+  - `.transform()` and `.preprocess()` are fully supported
+  - `.refine()` validation conditions are ignored during mock generation
+  - `.check()` function is mostly NOT supported:
+    - `z.string().check(z.regex(/pattern/))` - ❌ NOT supported
+    - `z.string().check(z.minLength(10))` - ❌ NOT supported
+    - `z.string().check(z.overwrite(...))` - ✅ Supported (only exception)
+    - `z.string().check(z.trim())` - ✅ Supported (overwrite helper)
+    - **Recommendation**: Use method forms (`.regex()`, `.trim()`) instead of `.check()` function
 
 ## Future Support
 
@@ -387,17 +395,18 @@ The `options` argument passed to your custom generator includes `path` and `key`
 
 #### Naming rules for `path` and `key`
 
-| Schema Type | `key` | `path` | Example |
-|-------------|-------|--------|---------|
-| **Object property** | Property name (string) | `[...parentPath, key]` | `z.object({ id: z.string() })` → `key: 'id'`, `path: ['id']` |
-| **Array element** | Index (number) | `[...parentPath, index]` | `z.array(z.string())` → `key: 0`, `path: [0]` for first element |
-| **Tuple element** | Index (number) | `[...parentPath, index]` | `z.tuple([z.string(), z.number()])` → `key: 0`, `path: [0]` for first element |
-| **Record entry** | Generated key (string/number) | `[...parentPath, generatedKey]` | `z.record(z.string(), z.number())` → `key: 'someKey'`, `path: ['someKey']` |
-| **Set element** | Index (number) | `[...parentPath, index]` | `z.set(z.string())` → `key: 0`, `path: [0]` for first element |
-| **Map value** | `'(map)'` (string literal) | `[...parentPath, '(map)']` | `z.map(z.string(), z.number())` → `key: '(map)'`, `path: ['(map)']` for values |
-| **Nested structure** | Varies by type | Accumulated from root | `z.object({ user: z.object({ id: z.string() }) })` → `key: 'id'`, `path: ['user', 'id']` |
+| Schema Type          | `key`                         | `path`                          | Example                                                                                  |
+| -------------------- | ----------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------- |
+| **Object property**  | Property name (string)        | `[...parentPath, key]`          | `z.object({ id: z.string() })` → `key: 'id'`, `path: ['id']`                             |
+| **Array element**    | Index (number)                | `[...parentPath, index]`        | `z.array(z.string())` → `key: 0`, `path: [0]` for first element                          |
+| **Tuple element**    | Index (number)                | `[...parentPath, index]`        | `z.tuple([z.string(), z.number()])` → `key: 0`, `path: [0]` for first element            |
+| **Record entry**     | Generated key (string/number) | `[...parentPath, generatedKey]` | `z.record(z.string(), z.number())` → `key: 'someKey'`, `path: ['someKey']`               |
+| **Set element**      | Index (number)                | `[...parentPath, index]`        | `z.set(z.string())` → `key: 0`, `path: [0]` for first element                            |
+| **Map value**        | `'(map)'` (string literal)    | `[...parentPath, '(map)']`      | `z.map(z.string(), z.number())` → `key: '(map)'`, `path: ['(map)']` for values           |
+| **Nested structure** | Varies by type                | Accumulated from root           | `z.object({ user: z.object({ id: z.string() }) })` → `key: 'id'`, `path: ['user', 'id']` |
 
 **Notes:**
+
 - `path` is always an array accumulated from the root to the current field
 - For arrays/tuples/sets, `key` is the numeric index (0, 1, 2, ...)
 - For objects, `key` is the property name as a string
