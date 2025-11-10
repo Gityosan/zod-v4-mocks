@@ -1,6 +1,7 @@
 {
   "name": "zod-v4-mocks",
   "version": "1.0.14",
+  "type": "module",
   "license": "MIT",
   "private": false,
   "description": "Mock generator for zod v4",
@@ -22,10 +23,12 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
+    "build": "tsup",
+    "dev": "tsup --watch",
     "test": "vitest",
     "test:run": "vitest run",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "prepare": "pnpm run build"
   },
   "files": [
@@ -39,8 +42,13 @@
     "zod": "4.1.8"
   },
   "devDependencies": {
+    "@stylistic/eslint-plugin": "5.5.0",
     "@types/node": "24.0.7",
+    "@typescript-eslint/eslint-plugin": "8.46.3",
+    "@typescript-eslint/parser": "8.46.3",
+    "eslint": "9.39.1",
     "prettier": "3.6.1",
+    "tsup": "8.3.5",
     "typescript": "5.8.3",
     "vitest": "3.2.4"
   }
