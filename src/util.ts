@@ -45,6 +45,7 @@ function calcMinMaxInt(minValue: number | null, maxValue: number | null) {
   if (min !== undefined && max === undefined) return { min, max: min + 100 };
   return { min, max };
 }
+
 function calcMinMaxBigInt(minValue: bigint | null, maxValue: bigint | null) {
   const min = minValue === null ? undefined : minValue;
   const max = maxValue === null ? undefined : maxValue;
@@ -52,6 +53,7 @@ function calcMinMaxBigInt(minValue: bigint | null, maxValue: bigint | null) {
   if (min !== undefined && max === undefined) return { min, max: min + 100n };
   return { min, max };
 }
+
 function calcMinMaxFloat(minValue: number | null, maxValue: number | null) {
   const min =
     minValue === null
@@ -228,9 +230,13 @@ export const generators = {
     const length = faker.number.int(config.map);
     return new Map(
       Array.from({ length }, () => {
-        const k = generator(keyType, options) as unknown;
+        const k = generator(keyType, options);
         const childPath = [...(options.path ?? []), '(map)'];
-        const value = generator(valueType, { ...options, key: '(map)', path: childPath });
+        const value = generator(valueType, {
+          ...options,
+          key: '(map)',
+          path: childPath,
+        });
         return [k, value];
       }),
     );
@@ -273,11 +279,11 @@ export const generators = {
     const { keyType, valueType } = schema;
     const length = faker.number.int(config.record);
     return [...Array(length)].reduce((acc) => {
-      const k = generator(keyType, options) as unknown;
+      const k = generator(keyType, options);
       const keyIsValid =
         typeof k === 'string' || typeof k === 'number' || typeof k === 'symbol';
       if (keyIsValid) {
-        const keyStr = typeof k === 'symbol' ? String(k) : (k as string | number);
+        const keyStr = typeof k === 'symbol' ? String(k) : k;
         const path = [...(options.path ?? []), keyStr];
         const value = generator(valueType, { ...options, key: keyStr, path });
         return { ...acc, [keyStr]: value };
@@ -409,7 +415,7 @@ export const generators = {
       const { options: leftOptions } = left;
       const { options: rightOptions } = right;
 
-      const commonTypes: z.ZodTypeAny[] = [];
+      const commonTypes: z.ZodType[] = [];
       for (const leftOption of leftOptions) {
         for (const rightOption of rightOptions) {
           if (leftOption.constructor === rightOption.constructor) {

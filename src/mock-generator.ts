@@ -76,8 +76,8 @@ class MockGenerator {
 
   // Overloads: ZodFunction is not supported -> unknown, others -> z.infer<T>
   generate<T extends z.ZodFunction>(schema: T): unknown;
-  generate<T extends z.ZodTypeAny>(schema: T): z.infer<T>;
-  generate(schema: z.ZodType) {
+  generate<T extends z.ZodType>(schema: T): z.infer<T>;
+  generate(schema: z.ZodType): unknown {
     return generateMocks(schema, this.options);
   }
 }
