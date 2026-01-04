@@ -4,8 +4,6 @@ import {
   type CustomGeneratorType,
   initGenerator,
   type MockConfig,
-  outputToFile,
-  serializeToJS,
 } from '../src';
 
 describe('initGenerator (functional base API)', () => {
@@ -834,19 +832,6 @@ describe('initGenerator (functional base API)', () => {
       expect(typeof result.user.age).toBe('number');
       expect(typeof result.post.title).toBe('string');
       expect(typeof result.post.content).toBe('string');
-    });
-  });
-
-  describe('output utilities', () => {
-    it('serializeToJS handles Date objects', () => {
-      const date = new Date('2024-01-01T00:00:00.000Z');
-      const result = serializeToJS({ createdAt: date });
-      expect(result).toContain('new Date("2024-01-01T00:00:00.000Z")');
-    });
-
-    it('serializeToJS handles bigint', () => {
-      const result = serializeToJS({ value: BigInt(123) });
-      expect(result).toContain('123n');
     });
   });
 

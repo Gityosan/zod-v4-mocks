@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { GeneraterOptions } from './type';
-import { generators } from './util';
+import { generators } from './utils';
 
 function generateFromSchema(
   schema: z.core.$ZodType,

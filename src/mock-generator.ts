@@ -1,9 +1,13 @@
 import { Faker } from '@faker-js/faker';
 import { z } from 'zod';
 import { generateMocks } from './generate-from-schema';
-import { outputToFile, type OutputOptions } from './output';
 import type { CustomGeneratorType, GeneraterOptions, MockConfig } from './type';
-import { createMockConfig, getLocales } from './util';
+import {
+  createMockConfig,
+  getLocales,
+  outputToFile,
+  type OutputOptions,
+} from './utils';
 
 class MockGenerator {
   protected options: GeneraterOptions;
