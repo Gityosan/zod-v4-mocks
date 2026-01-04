@@ -185,9 +185,6 @@ function generateFromSchema(
   return faker.lorem.word();
 }
 
-/**
- * @package
- */
 export function generateMocks(
   schema: z.core.$ZodType,
   options: GeneraterOptions,

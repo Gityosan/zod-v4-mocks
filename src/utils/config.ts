@@ -1,9 +1,6 @@
 import { type LocaleDefinition, allLocales } from '@faker-js/faker';
 import type { LocaleType, MockConfig } from '../type';
 
-/**
- * @package
- */
 export function getLocales(
   locales?: LocaleType | LocaleType[],
 ): LocaleDefinition[] {
@@ -18,9 +15,6 @@ export function getLocales(
   ];
 }
 
-/**
- * @package
- */
 export function createMockConfig(config?: Partial<MockConfig>): MockConfig {
   const {
     seed = 1,

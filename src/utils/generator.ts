@@ -76,9 +76,6 @@ function unwrapSchema(schema: z.core.$ZodType) {
   return schema;
 }
 
-/**
- * @package
- */
 export const generators = {
   file: () => new File([], 'test.txt'),
   email: (faker: Faker) => faker.internet.email(),
