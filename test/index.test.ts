@@ -4,6 +4,8 @@ import {
   type CustomGeneratorType,
   initGenerator,
   type MockConfig,
+  outputToFile,
+  serializeToJS,
 } from '../src';
 
 describe('initGenerator (functional base API)', () => {
@@ -835,9 +837,21 @@ describe('initGenerator (functional base API)', () => {
     });
   });
 
+  describe('output utilities', () => {
+    it('serializeToJS handles Date objects', () => {
+      const date = new Date('2024-01-01T00:00:00.000Z');
+      const result = serializeToJS({ createdAt: date });
+      expect(result).toContain('new Date("2024-01-01T00:00:00.000Z")');
+    });
+
+    it('serializeToJS handles bigint', () => {
+      const result = serializeToJS({ value: BigInt(123) });
+      expect(result).toContain('123n');
+    });
+  });
+
   describe('output', () => {
     const fs = require('node:fs');
-    const path = require('node:path');
     const testOutputDir = './__test_generated__';
 
     afterEach(() => {
@@ -846,14 +860,15 @@ describe('initGenerator (functional base API)', () => {
       }
     });
 
-    it('outputs JSON file', () => {
+    it('outputs JSON file and returns path', () => {
       const generator = initGenerator();
       const schema = z.object({ name: z.string() });
       const data = generator.generate(schema);
       const outputPath = `${testOutputDir}/test.json`;
 
-      generator.output(data, { path: outputPath });
+      const result = generator.output(data, { path: outputPath });
 
+      expect(result).toBe(outputPath);
       expect(fs.existsSync(outputPath)).toBe(true);
       const content = JSON.parse(fs.readFileSync(outputPath, 'utf-8'));
       expect(content).toHaveProperty('name');
@@ -865,8 +880,9 @@ describe('initGenerator (functional base API)', () => {
       const data = generator.generate(schema);
       const outputPath = `${testOutputDir}/test.ts`;
 
-      generator.output(data, { path: outputPath });
+      const result = generator.output(data, { path: outputPath });
 
+      expect(result).toBe(outputPath);
       expect(fs.existsSync(outputPath)).toBe(true);
       const content = fs.readFileSync(outputPath, 'utf-8');
       expect(content).toContain('export const mockData');
@@ -878,8 +894,9 @@ describe('initGenerator (functional base API)', () => {
       const data = { test: 'value' };
       const defaultPath = './__generated__/generated-mock-data.ts';
 
-      generator.output(data);
+      const result = generator.output(data);
 
+      expect(result).toBe(defaultPath);
       expect(fs.existsSync(defaultPath)).toBe(true);
       fs.rmSync('./__generated__', { recursive: true });
     });

@@ -1,49 +1,9 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
 import { Faker } from '@faker-js/faker';
 import { z } from 'zod';
 import { generateMocks } from './generate-from-schema';
+import { outputToFile, type OutputOptions } from './output';
 import type { CustomGeneratorType, GeneraterOptions, MockConfig } from './type';
 import { createMockConfig, getLocales } from './util';
-
-type OutputExt = 'json' | 'js' | 'ts';
-type OutputOptions = {
-  path?: string;
-  ext?: OutputExt;
-};
-
-const DEFAULT_OUTPUT_DIR = './__generated__';
-const DEFAULT_OUTPUT_FILENAME = 'generated-mock-data';
-
-function serializeForJS(value: unknown, indent: number = 0): string {
-  const spaces = '  '.repeat(indent);
-  const nextSpaces = '  '.repeat(indent + 1);
-
-  if (value === null) return 'null';
-  if (value === undefined) return 'undefined';
-  if (typeof value === 'string') return JSON.stringify(value);
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-  if (typeof value === 'bigint') return `${value}n`;
-  if (value instanceof Date) {
-    return `new Date("${value.toISOString()}")`;
-  }
-  if (Array.isArray(value)) {
-    if (value.length === 0) return '[]';
-    const items = value.map((v) => `${nextSpaces}${serializeForJS(v, indent + 1)}`);
-    return `[\n${items.join(',\n')}\n${spaces}]`;
-  }
-  if (typeof value === 'object') {
-    const entries = Object.entries(value);
-    if (entries.length === 0) return '{}';
-    const props = entries.map(
-      ([k, v]) => `${nextSpaces}${JSON.stringify(k)}: ${serializeForJS(v, indent + 1)}`,
-    );
-    return `{\n${props.join(',\n')}\n${spaces}}`;
-  }
-  return String(value);
-}
 
 class MockGenerator {
   protected options: GeneraterOptions;
@@ -132,30 +92,8 @@ class MockGenerator {
     return result as { [K in keyof T]: z.infer<T[K]> };
   }
 
-  output(data: unknown, options?: OutputOptions): void {
-    const ext = options?.ext ?? this.getExtFromPath(options?.path) ?? 'ts';
-    const outputPath =
-      options?.path ?? `${DEFAULT_OUTPUT_DIR}/${DEFAULT_OUTPUT_FILENAME}.${ext}`;
-
-    const dir = dirname(outputPath);
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
-    }
-
-    let content: string;
-    if (ext === 'json') {
-      content = JSON.stringify(data, null, 2);
-    } else {
-      content = `export const mockData = ${serializeForJS(data, 0)};\n`;
-    }
-
-    writeFileSync(outputPath, content, 'utf-8');
-  }
-
-  private getExtFromPath(path?: string): OutputExt | undefined {
-    if (!path) return undefined;
-    const match = path.match(/\.(json|js|ts)$/);
-    return match ? (match[1] as OutputExt) : undefined;
+  output(data: unknown, options?: OutputOptions): string {
+    return outputToFile(data, options);
   }
 }
 
