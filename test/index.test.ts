@@ -814,4 +814,90 @@ describe('initGenerator (functional base API)', () => {
       });
     });
   });
+
+  describe('multiGenerate', () => {
+    it('generates multiple schemas with keys', () => {
+      const generator = initGenerator();
+      const userSchema = z.object({ name: z.string(), age: z.number() });
+      const postSchema = z.object({ title: z.string(), content: z.string() });
+
+      const result = generator.multiGenerate({
+        user: userSchema,
+        post: postSchema,
+      });
+
+      expect(result).toHaveProperty('user');
+      expect(result).toHaveProperty('post');
+      expect(typeof result.user.name).toBe('string');
+      expect(typeof result.user.age).toBe('number');
+      expect(typeof result.post.title).toBe('string');
+      expect(typeof result.post.content).toBe('string');
+    });
+  });
+
+  describe('output', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const testOutputDir = './__test_generated__';
+
+    afterEach(() => {
+      if (fs.existsSync(testOutputDir)) {
+        fs.rmSync(testOutputDir, { recursive: true });
+      }
+    });
+
+    it('outputs JSON file', () => {
+      const generator = initGenerator();
+      const schema = z.object({ name: z.string() });
+      const data = generator.generate(schema);
+      const outputPath = `${testOutputDir}/test.json`;
+
+      generator.output(data, { path: outputPath });
+
+      expect(fs.existsSync(outputPath)).toBe(true);
+      const content = JSON.parse(fs.readFileSync(outputPath, 'utf-8'));
+      expect(content).toHaveProperty('name');
+    });
+
+    it('outputs TS file with Date serialization', () => {
+      const generator = initGenerator();
+      const schema = z.object({ name: z.string(), createdAt: z.date() });
+      const data = generator.generate(schema);
+      const outputPath = `${testOutputDir}/test.ts`;
+
+      generator.output(data, { path: outputPath });
+
+      expect(fs.existsSync(outputPath)).toBe(true);
+      const content = fs.readFileSync(outputPath, 'utf-8');
+      expect(content).toContain('export const mockData');
+      expect(content).toContain('new Date(');
+    });
+
+    it('outputs to default path when no path specified', () => {
+      const generator = initGenerator();
+      const data = { test: 'value' };
+      const defaultPath = './__generated__/generated-mock-data.ts';
+
+      generator.output(data);
+
+      expect(fs.existsSync(defaultPath)).toBe(true);
+      fs.rmSync('./__generated__', { recursive: true });
+    });
+
+    it('works with multiGenerate result', () => {
+      const generator = initGenerator();
+      const schemas = {
+        user: z.object({ name: z.string() }),
+        post: z.object({ title: z.string() }),
+      };
+      const data = generator.multiGenerate(schemas);
+      const outputPath = `${testOutputDir}/multi.ts`;
+
+      generator.output(data, { path: outputPath });
+
+      const content = fs.readFileSync(outputPath, 'utf-8');
+      expect(content).toContain('"user"');
+      expect(content).toContain('"post"');
+    });
+  });
 });
