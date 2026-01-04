@@ -1,0 +1,185 @@
+# zod-v4-mocks
+
+Mock data generator for Zod v4 schemas. Automatically generates type-safe mock data from Zod schema definitions.
+
+## Installation
+
+```bash
+npm install zod-v4-mocks
+```
+
+## Quick Start
+
+```ts
+import { z } from 'zod';
+import { initGenerator } from 'zod-v4-mocks';
+
+const schema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  email: z.email(),
+  age: z.number().min(18).max(120).optional(),
+  isActive: z.boolean(),
+  tags: z.array(z.string()),
+  createdAt: z.date(),
+});
+
+const generator = initGenerator({ seed: 1 });
+const mockData = generator.generate(schema);
+```
+
+## API Reference
+
+### initGenerator(config?)
+
+Creates a mock generator instance.
+
+**Config options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| seed | number | 1 | Seed for deterministic generation |
+| locale | LocaleType | ['en', 'base'] | Faker.js locale |
+| array | { min, max } | { min: 1, max: 3 } | Array length range |
+| map | { min, max } | { min: 1, max: 3 } | Map size range |
+| set | { min, max } | { min: 1, max: 3 } | Set size range |
+| record | { min, max } | { min: 1, max: 3 } | Record entries range |
+| optionalProbability | number | 0.5 | Probability of generating optional fields |
+| nullableProbability | number | 0.5 | Probability of generating null for nullable fields |
+| defaultProbability | number | 0.5 | Probability of using default value |
+| lazyDepthLimit | number | 5 | Max depth for lazy schemas |
+| consistentKey | string | undefined | Meta attribute name for consistent value generation |
+
+### generator.generate(schema)
+
+Generates mock data matching the given Zod schema.
+
+### generator.supply(ZodType, value)
+
+Supplies a fixed value for all instances of a specific Zod type.
+
+```ts
+const mock = initGenerator()
+  .supply(z.ZodEmail, 'test@example.com')
+  .supply(z.ZodString, 'fixed string')
+  .generate(schema);
+```
+
+### generator.override(customGenerator)
+
+Defines a custom generator function. Return `undefined` to fall back to default generation.
+
+```ts
+import { type CustomGeneratorType } from 'zod-v4-mocks';
+
+const customGenerator: CustomGeneratorType = (schema, options) => {
+  const { faker, path, key } = options;
+
+  // Override specific field by path
+  if (path.join('.') === 'user.id') {
+    return 'custom-user-id';
+  }
+
+  // Override by schema type
+  if (schema instanceof z.ZodEmail) {
+    return faker.internet.email();
+  }
+
+  // Return undefined to use default generator
+  return undefined;
+};
+
+const mock = initGenerator().override(customGenerator).generate(schema);
+```
+
+**CustomGeneratorType options:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| faker | Faker | Seeded Faker instance |
+| path | (string \| number)[] | Path from root to current field |
+| key | string \| number | Immediate key/index of current field |
+
+### generator.register(schemas)
+
+Registers schemas for consistent value generation across related fields.
+
+```ts
+const consistentKey = 'entityId';
+const UserId = z.uuid().meta({ [consistentKey]: 'UserId' });
+
+const userSchema = z.object({ id: UserId, name: z.string() });
+const postSchema = z.object({ authorId: UserId, title: z.string() });
+
+// UserId will have consistent values across userSchema and postSchema
+const mock = initGenerator({ consistentKey })
+  .register([UserId])
+  .generate(z.object({ user: userSchema, post: postSchema }));
+```
+
+## Supported Zod Types
+
+All standard Zod v4 types are supported:
+
+- Primitives: string, number, boolean, bigint, date, symbol, undefined, null, void, never, any, unknown
+- String validations: email, uuid, url, regex, min, max, length, startsWith, endsWith, includes, ip, cidr, base64, etc.
+- Number validations: min, max, int, positive, negative, finite, etc.
+- Objects: object, record, passthrough, strict, catchall (ignored)
+- Collections: array, set, map, tuple
+- Unions: union, discriminatedUnion, enum, literal
+- Modifiers: optional, nullable, default, readonly, branded, pipe, lazy
+- Effects: transform, preprocess (refine conditions are ignored)
+
+## Unsupported / Partially Supported
+
+**Not supported:**
+- z.custom() and z.instanceof()
+- z.function()
+- z.nativeEnum() (deprecated in v4)
+- z.promise() (deprecated in v4)
+
+**Partially supported:**
+- z.lazy(): Errors with top-level union, tuple, or intersection
+- z.intersection(): Works with same schema types; ZodObject+ZodRecord and ZodArray+ZodTuple work
+- z.check(): Only z.overwrite() and z.trim() work; other checks (regex, minLength, etc.) are ignored
+
+## Determinism
+
+Same seed produces identical output across runs. Use `options.faker` in custom generators instead of `Math.random()` to maintain determinism.
+
+## Common Patterns
+
+### Generate array with specific length
+
+```ts
+const mock = initGenerator({ array: { min: 5, max: 5 } }).generate(z.array(z.string()));
+```
+
+### Always generate optional fields
+
+```ts
+const mock = initGenerator({ optionalProbability: 1 }).generate(schema);
+```
+
+### Never generate null for nullable fields
+
+```ts
+const mock = initGenerator({ nullableProbability: 0 }).generate(schema);
+```
+
+### Japanese locale
+
+```ts
+const mock = initGenerator({ locale: 'ja' }).generate(schema);
+```
+
+### Multiple custom overrides (priority: first defined wins)
+
+```ts
+const mock = initGenerator()
+  .supply(z.ZodEmail, 'priority@example.com')  // This wins
+  .override((schema) => {
+    if (schema instanceof z.ZodEmail) return 'ignored@example.com';
+  })
+  .generate(schema);
+```
