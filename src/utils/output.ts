@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-export type OutputExt = 'json' | 'js' | 'ts';
+type OutputExt = 'json' | 'js' | 'ts';
 export type OutputOptions = {
   path?: string;
   ext?: OutputExt;
@@ -10,7 +10,7 @@ export type OutputOptions = {
 const DEFAULT_OUTPUT_DIR = './__generated__';
 const DEFAULT_OUTPUT_FILENAME = 'generated-mock-data';
 
-export function serializeToJS(value: unknown, indent: number = 0): string {
+function serializeToJS(value: unknown, indent = 0): string {
   const spaces = '  '.repeat(indent);
   const nextSpaces = '  '.repeat(indent + 1);
 
@@ -45,7 +45,7 @@ export function serializeToJS(value: unknown, indent: number = 0): string {
 
 function getExtFromPath(path?: string): OutputExt | undefined {
   if (!path) return undefined;
-  const match = path.match(/\.(json|js|ts)$/);
+  const match = /\.(json|js|ts)$/.exec(path);
   return match ? (match[1] as OutputExt) : undefined;
 }
 
