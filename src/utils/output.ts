@@ -1,7 +1,10 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { z } from 'zod';
 
-type OutputExt = 'json' | 'js' | 'ts';
+const outputExtSchema = z.enum(['json', 'js', 'ts']);
+type OutputExt = z.infer<typeof outputExtSchema>;
+
 export type OutputOptions = {
   path?: string;
   ext?: OutputExt;
@@ -46,7 +49,9 @@ function serializeToJS(value: unknown, indent = 0): string {
 function getExtFromPath(path?: string): OutputExt | undefined {
   if (!path) return undefined;
   const match = /\.(json|js|ts)$/.exec(path);
-  return match ? (match[1] as OutputExt) : undefined;
+  if (!match) return undefined;
+  const result = outputExtSchema.safeParse(match[1]);
+  return result.success ? result.data : undefined;
 }
 
 export function outputToFile(data: unknown, options?: OutputOptions): string {
