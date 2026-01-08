@@ -66,7 +66,11 @@ export function outputToFile(data: unknown, options?: OutputOptions): string {
 
   let content: string;
   if (ext === 'json') {
-    content = JSON.stringify(data, null, 2);
+    content = JSON.stringify(
+      data,
+      (_, v) => (typeof v === 'bigint' ? v.toString() : v),
+      2,
+    );
   } else {
     content = `export const mockData = ${serializeToJS(data, 0)};\n`;
   }
