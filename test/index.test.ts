@@ -874,6 +874,91 @@ describe('initGenerator (functional base API)', () => {
       expect(content).toContain('new Date(');
     });
 
+    it('outputs JS file with Date serialization', () => {
+      const generator = initGenerator();
+      const schema = z.object({ name: z.string(), createdAt: z.date() });
+      const data = generator.generate(schema);
+      const outputPath = `${testOutputDir}/test.js`;
+
+      const result = generator.output(data, { path: outputPath });
+
+      expect(result).toBe(outputPath);
+      expect(fs.existsSync(outputPath)).toBe(true);
+      const content = fs.readFileSync(outputPath, 'utf-8');
+      expect(content).toContain('export const mockData');
+      expect(content).toContain('new Date(');
+    });
+
+    it('outputs JSON file with Date as ISO string', () => {
+      const generator = initGenerator();
+      const schema = z.object({ name: z.string(), createdAt: z.date() });
+      const data = generator.generate(schema);
+      const outputPath = `${testOutputDir}/date.json`;
+
+      generator.output(data, { path: outputPath });
+
+      const content = JSON.parse(fs.readFileSync(outputPath, 'utf-8'));
+      expect(typeof content.createdAt).toBe('string');
+      expect(content.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    });
+
+    it('outputs TS file with combined Date and BigInt', () => {
+      const generator = initGenerator();
+      const schema = z.object({
+        createdAt: z.date(),
+        count: z.bigint(),
+      });
+      const data = generator.generate(schema);
+      const outputPath = `${testOutputDir}/combined.ts`;
+
+      generator.output(data, { path: outputPath });
+
+      const content = fs.readFileSync(outputPath, 'utf-8');
+      expect(content).toContain('new Date(');
+      expect(content).toMatch(/\d+n/);
+    });
+
+    it('outputs JS file with combined Date and BigInt', () => {
+      const generator = initGenerator();
+      const schema = z.object({
+        createdAt: z.date(),
+        count: z.bigint(),
+      });
+      const data = generator.generate(schema);
+      const outputPath = `${testOutputDir}/combined.js`;
+
+      generator.output(data, { path: outputPath });
+
+      const content = fs.readFileSync(outputPath, 'utf-8');
+      expect(content).toContain('new Date(');
+      expect(content).toMatch(/\d+n/);
+    });
+
+    it('outputs JSON file with combined Date and BigInt', () => {
+      const generator = initGenerator();
+      const schema = z.object({
+        createdAt: z.date(),
+        count: z.bigint(),
+      });
+      const data = generator.generate(schema);
+      const outputPath = `${testOutputDir}/combined.json`;
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      generator.output(data, { path: outputPath });
+
+      const content = JSON.parse(fs.readFileSync(outputPath, 'utf-8'));
+      expect(typeof content.createdAt).toBe('string');
+      expect(content.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      expect(typeof content.count).toBe('string');
+      expect(content.count).toMatch(/^\d+$/);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('BigInt values were converted to strings'),
+      );
+
+      warnSpy.mockRestore();
+    });
+
     it('outputs to default path when no path specified', () => {
       const generator = initGenerator();
       const data = { test: 'value' };
