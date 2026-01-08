@@ -66,21 +66,25 @@ export function outputToFile(data: unknown, options?: OutputOptions): string {
 
   let content: string;
   if (ext === 'json') {
-    let hasBigInt = false;
+    const bigIntFields: { key: string; value: string }[] = [];
     content = JSON.stringify(
       data,
-      (_, v) => {
+      (key, v) => {
         if (typeof v === 'bigint') {
-          hasBigInt = true;
-          return v.toString();
+          const strValue = v.toString();
+          bigIntFields.push({ key, value: strValue });
+          return strValue;
         }
         return v;
       },
       2,
     );
-    if (hasBigInt) {
+    if (bigIntFields.length > 0) {
+      const details = bigIntFields
+        .map(({ key, value }) => `  - ${key}: ${value}`)
+        .join('\n');
       console.warn(
-        'Warning: BigInt values were converted to strings in JSON output. Consider using .ts or .js format instead.',
+        `Warning: BigInt values were converted to strings in JSON output. Consider using .ts or .js format instead.\n${details}`,
       );
     }
   } else {
