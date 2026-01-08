@@ -2,7 +2,12 @@ import { Faker } from '@faker-js/faker';
 import { z } from 'zod';
 import { generateMocks } from './generate-from-schema';
 import type { CustomGeneratorType, GeneraterOptions, MockConfig } from './type';
-import { createMockConfig, getLocales } from './util';
+import {
+  createMockConfig,
+  getLocales,
+  outputToFile,
+  type OutputOptions,
+} from './utils';
 
 class MockGenerator {
   protected options: GeneraterOptions;
@@ -79,6 +84,20 @@ class MockGenerator {
   generate<T extends z.ZodType>(schema: T): z.infer<T>;
   generate(schema: z.ZodType): unknown {
     return generateMocks(schema, this.options);
+  }
+
+  multiGenerate<T extends Record<string, z.ZodType>>(
+    schemas: T,
+  ): { [K in keyof T]: z.infer<T[K]> } {
+    const result: Record<string, unknown> = {};
+    for (const key of Object.keys(schemas)) {
+      result[key] = this.generate(schemas[key]);
+    }
+    return result as { [K in keyof T]: z.infer<T[K]> };
+  }
+
+  output(data: unknown, options?: OutputOptions): string {
+    return outputToFile(data, options);
   }
 }
 

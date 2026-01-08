@@ -4,9 +4,6 @@ import type { z } from 'zod';
 export type { Faker, Randomizer } from '@faker-js/faker';
 export type LocaleType = keyof typeof allLocales;
 
-/**
- * @package
- */
 export type GeneraterOptions = {
   faker: Faker;
   config: MockConfig;
