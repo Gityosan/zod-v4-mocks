@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import {
   type CustomGeneratorType,
@@ -900,6 +900,80 @@ describe('initGenerator (functional base API)', () => {
       const content = fs.readFileSync(outputPath, 'utf-8');
       expect(content).toContain('"user"');
       expect(content).toContain('"post"');
+    });
+
+    it('outputs TS file with BigInt serialization', () => {
+      const generator = initGenerator();
+      const schema = z.object({ count: z.bigint() });
+      const data = generator.generate(schema);
+      const outputPath = `${testOutputDir}/bigint.ts`;
+
+      generator.output(data, { path: outputPath });
+
+      const content = fs.readFileSync(outputPath, 'utf-8');
+      expect(content).toContain('export const mockData');
+      expect(content).toMatch(/\d+n/);
+    });
+
+    it('outputs JS file with BigInt serialization', () => {
+      const generator = initGenerator();
+      const schema = z.object({ count: z.bigint() });
+      const data = generator.generate(schema);
+      const outputPath = `${testOutputDir}/bigint.js`;
+
+      generator.output(data, { path: outputPath });
+
+      const content = fs.readFileSync(outputPath, 'utf-8');
+      expect(content).toContain('export const mockData');
+      expect(content).toMatch(/\d+n/);
+    });
+
+    it('outputs JSON file with BigInt converted to string', () => {
+      const generator = initGenerator();
+      const schema = z.object({ count: z.bigint() });
+      const data = generator.generate(schema);
+      const outputPath = `${testOutputDir}/bigint.json`;
+
+      generator.output(data, { path: outputPath });
+
+      const content = JSON.parse(fs.readFileSync(outputPath, 'utf-8'));
+      expect(typeof content.count).toBe('string');
+      expect(content.count).toMatch(/^\d+$/);
+    });
+
+    it('warns when BigInt is converted to string in JSON output', () => {
+      const generator = initGenerator();
+      const schema = z.object({ count: z.bigint(), amount: z.bigint() });
+      const data = generator.generate(schema);
+      const outputPath = `${testOutputDir}/bigint-warn.json`;
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      generator.output(data, { path: outputPath });
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('BigInt values were converted to strings'),
+      );
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('count:'));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('amount:'));
+
+      warnSpy.mockRestore();
+    });
+
+    it('does not warn when no BigInt in JSON output', () => {
+      const generator = initGenerator();
+      const schema = z.object({ name: z.string() });
+      const data = generator.generate(schema);
+      const outputPath = `${testOutputDir}/no-bigint.json`;
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      generator.output(data, { path: outputPath });
+
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      warnSpy.mockRestore();
     });
   });
 });
