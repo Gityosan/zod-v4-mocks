@@ -117,6 +117,53 @@ const mock = initGenerator({ consistentKey })
   .generate(z.object({ user: userSchema, post: postSchema }));
 ```
 
+### generator.multiGenerate(schemas)
+
+Generates mock data for multiple schemas at once. Takes an object with schema values and returns an object with the same keys containing generated data.
+
+```ts
+const schemas = {
+  user: z.object({ id: z.uuid(), name: z.string() }),
+  post: z.object({ title: z.string(), content: z.string() }),
+  tags: z.array(z.string()),
+};
+
+const mocks = initGenerator().multiGenerate(schemas);
+// mocks.user, mocks.post, mocks.tags are all generated
+```
+
+### generator.output(data, options?)
+
+Outputs generated data to a file. Supports JSON, JavaScript, and TypeScript formats.
+
+**Options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| path | string | `./__generated__/generated-mock-data.ts` | Output file path |
+| ext | 'json' \| 'js' \| 'ts' | 'ts' (or inferred from path) | Output format |
+
+```ts
+const generator = initGenerator();
+const data = generator.generate(schema);
+
+// Output as TypeScript (default)
+generator.output(data);
+// Creates: ./__generated__/generated-mock-data.ts
+// Content: export const mockData = { ... };
+
+// Output as JSON with custom path
+generator.output(data, { path: './mocks/user.json' });
+
+// Output as JavaScript
+generator.output(data, { path: './mocks/data.js', ext: 'js' });
+```
+
+**Notes:**
+- BigInt values are converted to strings in JSON format (with console warning)
+- Date objects are serialized as `new Date("...")` in JS/TS format
+- Directory is created automatically if it doesn't exist
+
 ## Supported Zod Types
 
 All standard Zod v4 types are supported:
