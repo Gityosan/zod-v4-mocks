@@ -66,11 +66,23 @@ export function outputToFile(data: unknown, options?: OutputOptions): string {
 
   let content: string;
   if (ext === 'json') {
+    let hasBigInt = false;
     content = JSON.stringify(
       data,
-      (_, v) => (typeof v === 'bigint' ? v.toString() : v),
+      (_, v) => {
+        if (typeof v === 'bigint') {
+          hasBigInt = true;
+          return v.toString();
+        }
+        return v;
+      },
       2,
     );
+    if (hasBigInt) {
+      console.warn(
+        'Warning: BigInt values were converted to strings in JSON output. Consider using .ts or .js format instead.',
+      );
+    }
   } else {
     content = `export const mockData = ${serializeToJS(data, 0)};\n`;
   }
