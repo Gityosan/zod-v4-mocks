@@ -140,3 +140,6 @@ vite.config.ts.timestamp-*
 
 .vscode
 docs
+
+# Node.js compile cache
+node-compile-cache/

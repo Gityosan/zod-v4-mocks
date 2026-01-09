@@ -538,6 +538,54 @@ describe('initGenerator (functional base API)', () => {
   });
   describe('complex types', () => {
     const generator = initGenerator();
+    describe('discriminatedUnion', () => {
+      it('basic discriminatedUnion', () => {
+        const schema = z.discriminatedUnion('type', [
+          z.object({ type: z.literal('TypeA'), fieldA: z.string() }),
+          z.object({ type: z.literal('TypeB'), fieldB: z.number() }),
+        ]);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(result).toHaveProperty('type');
+        expect(['TypeA', 'TypeB']).toContain((result as any).type);
+      });
+
+      it('discriminatedUnion with multiple options', () => {
+        const schema = z.discriminatedUnion('kind', [
+          z.object({ kind: z.literal('circle'), radius: z.number() }),
+          z.object({ kind: z.literal('square'), side: z.number() }),
+          z.object({ kind: z.literal('rectangle'), width: z.number(), height: z.number() }),
+        ]);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(['circle', 'square', 'rectangle']).toContain((result as any).kind);
+      });
+
+      it('discriminatedUnion works after generating other schemas', () => {
+        // Regression test for bug: discriminatedUnion fails after processing other schemas
+        const gen = initGenerator({ seed: 123, consistentKey: 'mockKey' });
+
+        const CommunitySchema = z.object({
+          id: z.string().uuid(),
+          name: z.string(),
+          createdAt: z.date().optional(),
+        });
+        const ListCommunityResponse = z.array(CommunitySchema);
+
+        const DetailedTicket = z.discriminatedUnion('type', [
+          z.object({ type: z.literal('TypeA'), fieldA: z.string() }),
+          z.object({ type: z.literal('TypeB'), fieldB: z.number() }),
+        ]);
+
+        // Generate other schema first
+        gen.generate(ListCommunityResponse);
+
+        // discriminatedUnion should still work
+        const result = gen.generate(DetailedTicket);
+        expect(() => DetailedTicket.parse(result)).not.toThrow();
+        expect(['TypeA', 'TypeB']).toContain((result as any).type);
+      });
+    });
     describe('templateLiteral', () => {
       it('with string', () => {
         const schema = z.templateLiteral(['Hello ', z.string(), '!']);

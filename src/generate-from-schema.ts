@@ -137,6 +137,9 @@ function generateFromSchema(
   if (schema instanceof z.ZodUnion) {
     return generators.union(schema, options, generateMocks);
   }
+  if (schema instanceof z.ZodDiscriminatedUnion) {
+    return generators.discriminatedUnion(schema, options, generateMocks);
+  }
   if (schema instanceof z.ZodIntersection) {
     return generators.intersection(schema, options, generateMocks);
   }
