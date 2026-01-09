@@ -538,6 +538,76 @@ describe('initGenerator (functional base API)', () => {
   });
   describe('complex types', () => {
     const generator = initGenerator();
+    describe('xor (exclusive union)', () => {
+      it('basic xor with primitives', () => {
+        const schema = z.xor([z.string(), z.number()]);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(
+          typeof result === 'string' || typeof result === 'number',
+        ).toBe(true);
+      });
+
+      it('xor with objects', () => {
+        const schema = z.xor([
+          z.object({ type: z.literal('a'), value: z.string() }),
+          z.object({ type: z.literal('b'), count: z.number() }),
+        ]);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(result).toHaveProperty('type');
+        expect(['a', 'b']).toContain((result as any).type);
+      });
+
+      it('xor with multiple options', () => {
+        const schema = z.xor([
+          z.literal('active'),
+          z.literal('inactive'),
+          z.literal('pending'),
+        ]);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(['active', 'inactive', 'pending']).toContain(result);
+      });
+
+      it('xor determinism (same seed => same output)', () => {
+        const schema = z.xor([z.literal('A'), z.literal('B'), z.literal('C')]);
+        const g1 = initGenerator({ seed: 12345 });
+        const g2 = initGenerator({ seed: 12345 });
+        const r1 = g1.generate(schema);
+        const r2 = g2.generate(schema);
+        expect(r1).toBe(r2);
+      });
+    });
+
+    describe('apply (schema transformation helper)', () => {
+      it('apply with min/max constraints', () => {
+        const setConstraints = <T extends z.ZodNumber>(s: T) => s.min(0).max(100);
+        const schema = z.number().apply(setConstraints);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(typeof result).toBe('number');
+        expect(result as number).toBeGreaterThanOrEqual(0);
+        expect(result as number).toBeLessThanOrEqual(100);
+      });
+
+      it('apply with nullable', () => {
+        const makeNullable = <T extends z.ZodString>(s: T) => s.nullable();
+        const schema = z.string().apply(makeNullable);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(result === null || typeof result === 'string').toBe(true);
+      });
+
+      it('apply with optional', () => {
+        const makeOptional = <T extends z.ZodNumber>(s: T) => s.optional();
+        const schema = z.number().apply(makeOptional);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(result === undefined || typeof result === 'number').toBe(true);
+      });
+    });
+
     describe('discriminatedUnion', () => {
       it('basic discriminatedUnion', () => {
         const schema = z.discriminatedUnion('type', [
