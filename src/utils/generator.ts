@@ -294,6 +294,17 @@ export const generators = {
     );
     return generator(randomOption, options);
   },
+  discriminatedUnion: (
+    schema: z.ZodDiscriminatedUnion,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    const { faker } = options;
+    const randomOption = faker.helpers.arrayElement<z.core.$ZodType>(
+      schema.options,
+    );
+    return generator(randomOption, options);
+  },
   intersection: (
     schema: z.ZodIntersection,
     options: GeneraterOptions,
