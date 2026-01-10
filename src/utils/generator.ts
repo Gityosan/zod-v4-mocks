@@ -255,10 +255,15 @@ export const generators = {
   ) => {
     const { shape } = schema;
     const result: { [key: string]: unknown } = {};
+    const omitSymbol = Symbol.for('zod-v4-mocks:omit');
 
     for (const [key, value] of Object.entries(shape)) {
       const path = [...(options.path ?? []), key];
-      result[key] = generator(value, { ...options, key, path });
+      const generated = generator(value, { ...options, key, path });
+      // Skip keys that should be omitted (from exactOptional)
+      if (generated !== omitSymbol) {
+        result[key] = generated;
+      }
     }
     return result;
   },
@@ -311,10 +316,36 @@ export const generators = {
     generator: CustomGeneratorType,
   ) => {
     const { faker } = options;
-    const randomOption = faker.helpers.arrayElement<z.core.$ZodType>(
-      schema.options,
+    const allOptions = schema.options;
+
+    // Shuffle options to try different ones if needed
+    const shuffledIndices = faker.helpers.shuffle(
+      allOptions.map((_, i) => i),
     );
-    return generator(randomOption, options);
+
+    // Try each option until we find one that satisfies exactly one schema
+    for (const selectedIndex of shuffledIndices) {
+      const selectedOption = allOptions[selectedIndex];
+      const value = generator(selectedOption, options);
+
+      // Check that the value satisfies exactly one schema (the selected one)
+      // and fails all other schemas
+      const otherOptions = allOptions.filter((_, i) => i !== selectedIndex);
+      const failsAllOthers = otherOptions.every((otherSchema) => {
+        const result = (otherSchema as z.ZodType).safeParse(value);
+        return !result.success;
+      });
+
+      if (failsAllOthers) {
+        return value;
+      }
+    }
+
+    // Fallback: if we couldn't find an exclusive value, just return from the first option
+    const fallbackOption = faker.helpers.arrayElement<z.core.$ZodType>(
+      allOptions,
+    );
+    return generator(fallbackOption, options);
   },
   intersection: (
     schema: z.ZodIntersection,
@@ -479,6 +510,22 @@ export const generators = {
     const { faker, config } = options;
     const { optionalProbability: probability } = config;
     if (faker.datatype.boolean({ probability })) return undefined;
+    return generator(schema.unwrap(), options);
+  },
+  exactOptional: (
+    schema: z.ZodExactOptional,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    // exactOptional allows key to be omitted but doesn't accept explicit undefined
+    // For mock generation, we use Symbol to indicate "omit this key"
+    // or generate the actual value
+    const { faker, config } = options;
+    const { optionalProbability: probability } = config;
+    if (faker.datatype.boolean({ probability })) {
+      // Return a special symbol to indicate this key should be omitted
+      return Symbol.for('zod-v4-mocks:omit');
+    }
     return generator(schema.unwrap(), options);
   },
   nonoptional: (

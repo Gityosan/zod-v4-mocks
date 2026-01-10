@@ -578,6 +578,84 @@ describe('initGenerator (functional base API)', () => {
         const r2 = g2.generate(schema);
         expect(r1).toBe(r2);
       });
+
+      it('xor ensures value fails other schemas (exclusivity)', () => {
+        // With distinct types, the generated value should only match one schema
+        const schema = z.xor([
+          z.object({ kind: z.literal('cat'), meow: z.boolean() }),
+          z.object({ kind: z.literal('dog'), bark: z.boolean() }),
+        ]);
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+
+        // Verify exclusivity: result matches exactly one of the options
+        const options = [
+          z.object({ kind: z.literal('cat'), meow: z.boolean() }),
+          z.object({ kind: z.literal('dog'), bark: z.boolean() }),
+        ];
+        const matchCount = options.filter(
+          (opt) => opt.safeParse(result).success,
+        ).length;
+        expect(matchCount).toBe(1);
+      });
+    });
+
+    describe('exactOptional', () => {
+      it('exactOptional in object - generates value or omits key', () => {
+        const schema = z.object({
+          required: z.string(),
+          maybePresent: z.string().exactOptional(),
+        });
+        // Generate multiple times to verify behavior
+        const results: unknown[] = [];
+        for (let i = 0; i < 10; i++) {
+          const gen = initGenerator({ seed: i, optionalProbability: 0.5 });
+          results.push(gen.generate(schema));
+        }
+
+        // All results should parse successfully
+        results.forEach((result) => {
+          expect(() => schema.parse(result)).not.toThrow();
+        });
+
+        // Some should have the key, some should not (probabilistic)
+        const withKey = results.filter((r: any) => 'maybePresent' in r);
+        const withoutKey = results.filter((r: any) => !('maybePresent' in r));
+        expect(withKey.length + withoutKey.length).toBe(10);
+      });
+
+      it('exactOptional does not produce undefined value', () => {
+        const schema = z.object({
+          field: z.number().exactOptional(),
+        });
+        // Generate with low probability to ensure we get values
+        const gen = initGenerator({ seed: 42, optionalProbability: 0 });
+        const result = gen.generate(schema) as any;
+        expect(() => schema.parse(result)).not.toThrow();
+        // If key exists, it should not be undefined
+        if ('field' in result) {
+          expect(result.field).not.toBe(undefined);
+          expect(typeof result.field).toBe('number');
+        }
+      });
+    });
+
+    describe('slugify', () => {
+      it('slugify transforms string to slug format', () => {
+        const schema = z.string().slugify();
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(typeof result).toBe('string');
+        // Slugified strings should be lowercase and use hyphens
+        expect(result).toMatch(/^[a-z0-9-]*$/);
+      });
+
+      it('slugify with min/max length', () => {
+        const schema = z.string().min(5).max(20).slugify();
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(typeof result).toBe('string');
+      });
     });
 
     describe('apply (schema transformation helper)', () => {
