@@ -219,7 +219,23 @@ export const generators = {
   ) => {
     const { faker, config } = options;
     const { keyType, valueType } = schema;
-    const length = faker.number.int(config.map);
+
+    // Read min/max constraints from schema checks
+    const checks = schema.def.checks ?? [];
+    let minSize = config.map.min;
+    let maxSize = config.map.max;
+
+    for (const check of checks) {
+      const checkDef = check._zod?.def as { check?: string; minimum?: number; maximum?: number };
+      if (checkDef?.check === 'min_size' && typeof checkDef.minimum === 'number') {
+        minSize = Math.max(minSize, checkDef.minimum);
+      }
+      if (checkDef?.check === 'max_size' && typeof checkDef.maximum === 'number') {
+        maxSize = Math.min(maxSize, checkDef.maximum);
+      }
+    }
+
+    const length = faker.number.int({ min: minSize, max: maxSize });
     return new Map(
       Array.from({ length }, () => {
         const k = generator(keyType, options);
@@ -240,7 +256,23 @@ export const generators = {
   ) => {
     const { faker, config } = options;
     const { valueType } = schema.def;
-    const length = faker.number.int(config.set);
+
+    // Read min/max constraints from schema checks
+    const checks = schema.def.checks ?? [];
+    let minSize = config.set.min;
+    let maxSize = config.set.max;
+
+    for (const check of checks) {
+      const checkDef = check._zod?.def as { check?: string; minimum?: number; maximum?: number };
+      if (checkDef?.check === 'min_size' && typeof checkDef.minimum === 'number') {
+        minSize = Math.max(minSize, checkDef.minimum);
+      }
+      if (checkDef?.check === 'max_size' && typeof checkDef.maximum === 'number') {
+        maxSize = Math.min(maxSize, checkDef.maximum);
+      }
+    }
+
+    const length = faker.number.int({ min: minSize, max: maxSize });
     return new Set(
       Array.from({ length }, (_, i) => {
         const path = [...(options.path ?? []), i];

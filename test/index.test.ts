@@ -722,6 +722,38 @@ describe('initGenerator (functional base API)', () => {
       });
     });
 
+    describe('map and set size constraints', () => {
+      it('map respects min/max constraints', () => {
+        const schema = z.map(z.string(), z.number()).min(3).max(5);
+        const result = generator.generate(schema) as Map<string, number>;
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(result.size).toBeGreaterThanOrEqual(3);
+        expect(result.size).toBeLessThanOrEqual(5);
+      });
+
+      it('set respects min/max constraints', () => {
+        const schema = z.set(z.string()).min(2).max(4);
+        const result = generator.generate(schema) as Set<string>;
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(result.size).toBeGreaterThanOrEqual(2);
+        expect(result.size).toBeLessThanOrEqual(4);
+      });
+
+      it('map nonempty generates at least one entry', () => {
+        const schema = z.map(z.string(), z.number()).nonempty();
+        const result = generator.generate(schema) as Map<string, number>;
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(result.size).toBeGreaterThanOrEqual(1);
+      });
+
+      it('set nonempty generates at least one entry', () => {
+        const schema = z.set(z.number()).nonempty();
+        const result = generator.generate(schema) as Set<number>;
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(result.size).toBeGreaterThanOrEqual(1);
+      });
+    });
+
     describe('discriminatedUnion', () => {
       it('basic discriminatedUnion', () => {
         const schema = z.discriminatedUnion('type', [
