@@ -140,11 +140,17 @@ function generateFromSchema(
   if (schema instanceof z.ZodDiscriminatedUnion) {
     return generators.discriminatedUnion(schema, options, generateMocks);
   }
+  if (schema instanceof z.ZodXor) {
+    return generators.xor(schema, options, generateMocks);
+  }
   if (schema instanceof z.ZodIntersection) {
     return generators.intersection(schema, options, generateMocks);
   }
   if (schema instanceof z.ZodOptional) {
     return generators.optional(schema, options, generateMocks);
+  }
+  if (schema instanceof z.ZodExactOptional) {
+    return generators.exactOptional(schema, options, generateMocks);
   }
   if (schema instanceof z.ZodNullable) {
     return generators.nullable(schema, options, generateMocks);
