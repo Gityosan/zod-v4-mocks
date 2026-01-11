@@ -686,6 +686,42 @@ describe('initGenerator (functional base API)', () => {
       });
     });
 
+    describe('with and check (schema check helpers)', () => {
+      it('with applies multiple checks', () => {
+        const schema = z.string().with(z.minLength(5), z.toLowerCase());
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(typeof result).toBe('string');
+        expect((result as string).length).toBeGreaterThanOrEqual(5);
+        expect(result).toBe((result as string).toLowerCase());
+      });
+
+      it('check applies multiple checks with trim', () => {
+        const schema = z.string().check(z.minLength(5), z.trim(), z.toLowerCase());
+        const result = generator.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(typeof result).toBe('string');
+        expect((result as string).length).toBeGreaterThanOrEqual(5);
+        expect(result).toBe((result as string).toLowerCase());
+        expect(result).toBe((result as string).trim());
+      });
+
+      it('with and check are equivalent', () => {
+        const schema1 = z.string().with(z.minLength(3), z.toUpperCase());
+        const schema2 = z.string().check(z.minLength(3), z.toUpperCase());
+
+        const g1 = initGenerator({ seed: 999 });
+        const g2 = initGenerator({ seed: 999 });
+
+        const r1 = g1.generate(schema1);
+        const r2 = g2.generate(schema2);
+
+        expect(r1).toBe(r2);
+        expect(() => schema1.parse(r1)).not.toThrow();
+        expect(() => schema2.parse(r2)).not.toThrow();
+      });
+    });
+
     describe('discriminatedUnion', () => {
       it('basic discriminatedUnion', () => {
         const schema = z.discriminatedUnion('type', [
