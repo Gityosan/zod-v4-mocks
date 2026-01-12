@@ -187,7 +187,23 @@ export const generators = {
     generator: CustomGeneratorType,
   ) => {
     const { faker, config } = options;
-    const length = faker.number.int(config.array);
+    const { checks = [] } = schema.def;
+
+    let { min, max } = config.array;
+
+    for (const check of checks) {
+      if (check instanceof z.core.$ZodCheckMinLength) {
+        min = Math.max(min, check._zod.def.minimum);
+      }
+      if (check instanceof z.core.$ZodCheckMaxLength) {
+        max = Math.min(max, check._zod.def.maximum);
+      }
+    }
+
+    // Ensure min <= max (schema min may exceed config max)
+    max = Math.max(min, max);
+
+    const length = faker.number.int({ min, max });
     return Array.from({ length }, (_, arrayIndex) => {
       const arrayIndexes = [...options.arrayIndexes, arrayIndex];
       const path = [...(options.path ?? []), arrayIndex];

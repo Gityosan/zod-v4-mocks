@@ -722,6 +722,31 @@ describe('initGenerator (functional base API)', () => {
       });
     });
 
+    describe('array size constraints', () => {
+      it('array respects min/max constraints', () => {
+        const schema = z.array(z.string()).min(3).max(5);
+        const result = generator.generate(schema) as string[];
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(result.length).toBeGreaterThanOrEqual(3);
+        expect(result.length).toBeLessThanOrEqual(5);
+      });
+
+      it('array nonempty generates at least one element', () => {
+        const schema = z.array(z.number()).nonempty();
+        const result = generator.generate(schema) as number[];
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(result.length).toBeGreaterThanOrEqual(1);
+      });
+
+      it('array handles min > config.max', () => {
+        const gen = initGenerator({ seed: 42, array: { min: 1, max: 2 } });
+        const schema = z.array(z.string()).min(5);
+        const result = gen.generate(schema) as string[];
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(result.length).toBeGreaterThanOrEqual(5);
+      });
+    });
+
     describe('map and set size constraints', () => {
       it('map respects min/max constraints', () => {
         const schema = z.map(z.string(), z.number()).min(3).max(5);
