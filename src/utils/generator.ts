@@ -219,22 +219,23 @@ export const generators = {
   ) => {
     const { faker, config } = options;
     const { keyType, valueType } = schema;
+    const { checks = [] } = schema.def;
 
-    // Read min/max constraints from schema checks
-    const checks = schema.def.checks ?? [];
-    let minSize = config.map.min;
-    let maxSize = config.map.max;
+    let { min, max } = config.map;
 
     for (const check of checks) {
       if (check instanceof z.core.$ZodCheckMinSize) {
-        minSize = Math.max(minSize, check._zod.def.minimum);
+        min = Math.max(min, check._zod.def.minimum);
       }
       if (check instanceof z.core.$ZodCheckMaxSize) {
-        maxSize = Math.min(maxSize, check._zod.def.maximum);
+        max = Math.min(max, check._zod.def.maximum);
       }
     }
 
-    const length = faker.number.int({ min: minSize, max: maxSize });
+    // Ensure min <= max (schema min may exceed config max)
+    max = Math.max(min, max);
+
+    const length = faker.number.int({ min, max });
     return new Map(
       Array.from({ length }, () => {
         const k = generator(keyType, options);
@@ -254,23 +255,23 @@ export const generators = {
     generator: CustomGeneratorType,
   ) => {
     const { faker, config } = options;
-    const { valueType } = schema.def;
+    const { valueType, checks = [] } = schema.def;
 
-    // Read min/max constraints from schema checks
-    const checks = schema.def.checks ?? [];
-    let minSize = config.set.min;
-    let maxSize = config.set.max;
+    let { min, max } = config.set;
 
     for (const check of checks) {
       if (check instanceof z.core.$ZodCheckMinSize) {
-        minSize = Math.max(minSize, check._zod.def.minimum);
+        min = Math.max(min, check._zod.def.minimum);
       }
       if (check instanceof z.core.$ZodCheckMaxSize) {
-        maxSize = Math.min(maxSize, check._zod.def.maximum);
+        max = Math.min(max, check._zod.def.maximum);
       }
     }
 
-    const length = faker.number.int({ min: minSize, max: maxSize });
+    // Ensure min <= max (schema min may exceed config max)
+    max = Math.max(min, max);
+
+    const length = faker.number.int({ min, max });
     return new Set(
       Array.from({ length }, (_, i) => {
         const path = [...(options.path ?? []), i];
