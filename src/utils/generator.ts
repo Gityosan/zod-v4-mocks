@@ -74,7 +74,7 @@ function unwrapSchema(schema: z.core.$ZodType) {
   if (schema instanceof z.ZodOptional) return schema.unwrap();
   if (schema instanceof z.ZodNullable) return schema.unwrap();
   if (schema instanceof z.ZodDefault) return schema.unwrap();
-  if (schema instanceof z.ZodReadonly) return schema.def.innerType;
+  if (schema instanceof z.ZodReadonly) return schema.unwrap();
   if (schema instanceof z.ZodLazy) return schema.unwrap();
   return schema;
 }
@@ -107,6 +107,19 @@ function calcLengthFromChecks(
   max = Math.max(min, max);
 
   return faker.number.int({ min, max });
+}
+
+function regenInOmitSymbol(
+  value: unknown,
+  schema: z.core.$ZodType,
+  options: GeneraterOptions,
+  generator: CustomGeneratorType,
+) {
+  // If result is omit symbol, unwrap and regenerate the actual value
+  if (value === OMIT_SYMBOL && schema instanceof z.ZodExactOptional) {
+    return generator(schema.unwrap(), options);
+  }
+  return value;
 }
 
 export const generators = {
@@ -238,9 +251,7 @@ export const generators = {
     const { faker, config } = options;
     const length = faker.number.int(config.array);
     return Array.from({ length }, (_, arrayIndex) => {
-      const randomOption = faker.helpers.arrayElement<z.core.$ZodType>(
-        schema.def.items,
-      );
+      const randomOption = faker.helpers.arrayElement(schema.def.items);
       const arrayIndexes = [...options.arrayIndexes, arrayIndex];
       const path = [...(options.path ?? []), arrayIndex];
       const key = arrayIndex;
@@ -335,31 +346,20 @@ export const generators = {
     generator: CustomGeneratorType,
   ) => {
     const { faker } = options;
-    const randomOption = faker.helpers.arrayElement<z.core.$ZodType>(
-      schema.options,
-    );
+    const randomOption = faker.helpers.arrayElement(schema.options);
     const result = generator(randomOption, options);
-    // If result is omit symbol, unwrap and regenerate the actual value
-    if (result === OMIT_SYMBOL && randomOption instanceof z.ZodExactOptional) {
-      return generator(randomOption.unwrap(), options);
-    }
-    return result;
+    return regenInOmitSymbol(result, randomOption, options, generator);
   },
   discriminatedUnion: (
     schema: z.ZodDiscriminatedUnion,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
   ) => {
+    // z.undefined().exactOptional();
     const { faker } = options;
-    const randomOption = faker.helpers.arrayElement<z.core.$ZodType>(
-      schema.options,
-    );
+    const randomOption = faker.helpers.arrayElement(schema.options);
     const result = generator(randomOption, options);
-    // If result is omit symbol, unwrap and regenerate the actual value
-    if (result === OMIT_SYMBOL && randomOption instanceof z.ZodExactOptional) {
-      return generator(randomOption.unwrap(), options);
-    }
-    return result;
+    return regenInOmitSymbol(result, randomOption, options, generator);
   },
   xor: (
     schema: z.ZodXor,
@@ -370,22 +370,13 @@ export const generators = {
     const allOptions = schema.options;
 
     // Shuffle options to try different ones if needed
-    const shuffledIndices = faker.helpers.shuffle(
-      allOptions.map((_, i) => i),
-    );
+    const shuffledIndices = faker.helpers.shuffle(allOptions.map((_, i) => i));
 
     // Try each option until we find one that satisfies exactly one schema
     for (const selectedIndex of shuffledIndices) {
       const selectedOption = allOptions[selectedIndex];
       let value = generator(selectedOption, options);
-
-      // If result is omit symbol, unwrap and regenerate the actual value
-      if (
-        value === OMIT_SYMBOL &&
-        selectedOption instanceof z.ZodExactOptional
-      ) {
-        value = generator(selectedOption.unwrap(), options);
-      }
+      value = regenInOmitSymbol(value, selectedOption, options, generator);
 
       // Check that the value satisfies exactly one schema (the selected one)
       // and fails all other schemas
@@ -401,17 +392,9 @@ export const generators = {
     }
 
     // Fallback: if we couldn't find an exclusive value, just return from the first option
-    const fallbackOption = faker.helpers.arrayElement<z.core.$ZodType>(
-      allOptions,
-    );
-    let fallbackValue = generator(fallbackOption, options);
-    if (
-      fallbackValue === OMIT_SYMBOL &&
-      fallbackOption instanceof z.ZodExactOptional
-    ) {
-      fallbackValue = generator(fallbackOption.unwrap(), options);
-    }
-    return fallbackValue;
+    const fallbackOption = faker.helpers.arrayElement(allOptions);
+    const fallbackValue = generator(fallbackOption, options);
+    return regenInOmitSymbol(fallbackValue, fallbackOption, options, generator);
   },
   intersection: (
     schema: z.ZodIntersection,
