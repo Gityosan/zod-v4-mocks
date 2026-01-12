@@ -226,12 +226,11 @@ export const generators = {
     let maxSize = config.map.max;
 
     for (const check of checks) {
-      const checkDef = check._zod?.def as { check?: string; minimum?: number; maximum?: number };
-      if (checkDef?.check === 'min_size' && typeof checkDef.minimum === 'number') {
-        minSize = Math.max(minSize, checkDef.minimum);
+      if (check instanceof z.core.$ZodCheckMinSize) {
+        minSize = Math.max(minSize, check._zod.def.minimum);
       }
-      if (checkDef?.check === 'max_size' && typeof checkDef.maximum === 'number') {
-        maxSize = Math.min(maxSize, checkDef.maximum);
+      if (check instanceof z.core.$ZodCheckMaxSize) {
+        maxSize = Math.min(maxSize, check._zod.def.maximum);
       }
     }
 
@@ -263,12 +262,11 @@ export const generators = {
     let maxSize = config.set.max;
 
     for (const check of checks) {
-      const checkDef = check._zod?.def as { check?: string; minimum?: number; maximum?: number };
-      if (checkDef?.check === 'min_size' && typeof checkDef.minimum === 'number') {
-        minSize = Math.max(minSize, checkDef.minimum);
+      if (check instanceof z.core.$ZodCheckMinSize) {
+        minSize = Math.max(minSize, check._zod.def.minimum);
       }
-      if (checkDef?.check === 'max_size' && typeof checkDef.maximum === 'number') {
-        maxSize = Math.min(maxSize, checkDef.maximum);
+      if (check instanceof z.core.$ZodCheckMaxSize) {
+        maxSize = Math.min(maxSize, check._zod.def.maximum);
       }
     }
 
