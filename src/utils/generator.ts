@@ -581,6 +581,14 @@ export const generators = {
       schema.def.in instanceof z.ZodString &&
       schema.def.out instanceof z.ZodBoolean
     ) {
+      const { reverseTransform } = schema.def;
+      if (reverseTransform) {
+        // Use reverseTransform to get valid truthy/falsy values
+        const boolValue = options.faker.datatype.boolean();
+        const ctx: z.core.ParsePayload = { value: boolValue, issues: [] };
+        return reverseTransform(boolValue, ctx);
+      }
+      // Fallback to default values if reverseTransform is not available
       const validValues = [
         'true',
         '1',
