@@ -3,72 +3,16 @@ import { intersection as intersectionES, merge } from 'es-toolkit';
 import RandExp from 'randexp';
 import { z } from 'zod';
 import type { CustomGeneratorType, GeneraterOptions } from '../type';
-
-// Symbol used to indicate a key should be omitted (for exactOptional)
-export const OMIT_SYMBOL = Symbol.for('zod-v4-mocks:omit');
-
-function calcMinMaxString(minLength: number | null, maxLength: number | null) {
-  if (typeof minLength === 'number') {
-    if (maxLength === null) return { length: minLength };
-    return { length: { min: minLength, max: maxLength } };
-  }
-  if (typeof maxLength === 'number') {
-    if (minLength === null) return { length: maxLength };
-    return { length: { min: minLength, max: maxLength } };
-  }
-  return { length: undefined };
-}
-
-function compareMin(leftMin: number | null, rightMin: number | null) {
-  if (typeof leftMin === 'number' && typeof rightMin === 'number')
-    return Math.max(leftMin, rightMin);
-  if (typeof leftMin === 'number') return leftMin;
-  if (typeof rightMin === 'number') return rightMin;
-  return null;
-}
-
-function compareMax(leftMax: number | null, rightMax: number | null) {
-  if (typeof leftMax === 'number' && typeof rightMax === 'number')
-    return Math.min(leftMax, rightMax);
-  if (typeof leftMax === 'number') return leftMax;
-  if (typeof rightMax === 'number') return rightMax;
-  return null;
-}
-
-function calcMinMaxInt(minValue: number | null, maxValue: number | null) {
-  const min =
-    minValue === -Infinity || minValue === null ? undefined : minValue;
-  const max = maxValue === Infinity || maxValue === null ? undefined : maxValue;
-  if (min === undefined && max !== undefined) return { min: max - 100, max };
-  if (min !== undefined && max === undefined) return { min, max: min + 100 };
-  return { min, max };
-}
-
-function calcMinMaxBigInt(minValue: bigint | null, maxValue: bigint | null) {
-  const min = minValue === null ? undefined : minValue;
-  const max = maxValue === null ? undefined : maxValue;
-  if (min === undefined && max !== undefined) return { min: max - 100n, max };
-  if (min !== undefined && max === undefined) return { min, max: min + 100n };
-  return { min, max };
-}
-
-function calcMinMaxFloat(minValue: number | null, maxValue: number | null) {
-  const min =
-    minValue === null
-      ? undefined
-      : minValue === Number.MIN_VALUE
-        ? Number.MIN_SAFE_INTEGER
-        : minValue;
-  const max =
-    maxValue === null
-      ? undefined
-      : maxValue === Number.MAX_VALUE
-        ? Number.MAX_SAFE_INTEGER
-        : maxValue;
-  if (min === undefined && max !== undefined) return { min: max - 100, max };
-  if (min !== undefined && max === undefined) return { min, max: min + 100 };
-  return { min, max };
-}
+import {
+  calcLengthFromChecks,
+  calcMinMaxBigInt,
+  calcMinMaxFloat,
+  calcMinMaxInt,
+  calcMinMaxString,
+  compareMax,
+  compareMin,
+} from './calc-values';
+import { OMIT_SYMBOL, regenInOmitSymbol } from './exact-optional';
 
 function unwrapSchema(schema: z.core.$ZodType) {
   if (schema instanceof z.ZodOptional) return schema.unwrap();
@@ -77,49 +21,6 @@ function unwrapSchema(schema: z.core.$ZodType) {
   if (schema instanceof z.ZodReadonly) return schema.unwrap();
   if (schema instanceof z.ZodLazy) return schema.unwrap();
   return schema;
-}
-
-function calcLengthFromChecks(
-  checks: z.core.$ZodCheck<never>[],
-  faker: Faker,
-  config: { min: number; max: number },
-): number {
-  let { min, max } = config;
-
-  for (const check of checks) {
-    // Array checks (MinLength/MaxLength)
-    if (check instanceof z.core.$ZodCheckMinLength) {
-      min = Math.max(min, check._zod.def.minimum);
-    }
-    if (check instanceof z.core.$ZodCheckMaxLength) {
-      max = Math.min(max, check._zod.def.maximum);
-    }
-    // Map/Set checks (MinSize/MaxSize)
-    if (check instanceof z.core.$ZodCheckMinSize) {
-      min = Math.max(min, check._zod.def.minimum);
-    }
-    if (check instanceof z.core.$ZodCheckMaxSize) {
-      max = Math.min(max, check._zod.def.maximum);
-    }
-  }
-
-  // Ensure min <= max (schema min may exceed config max)
-  max = Math.max(min, max);
-
-  return faker.number.int({ min, max });
-}
-
-export function regenInOmitSymbol(
-  value: unknown,
-  schema: z.core.$ZodType,
-  options: GeneraterOptions,
-  generator: CustomGeneratorType,
-) {
-  // If result is omit symbol, unwrap and regenerate the actual value
-  if (value === OMIT_SYMBOL && schema instanceof z.ZodExactOptional) {
-    return generator(schema.unwrap(), options);
-  }
-  return value;
 }
 
 export const generators = {
@@ -213,7 +114,9 @@ export const generators = {
       if (typeof v === 'number') return v.toString();
       if (typeof v === 'bigint') return v.toString();
       if (typeof v === 'boolean') return v.toString();
-      const value = generator(v, options);
+      let value = generator(v, options);
+      // Template literals cannot have omitted parts, unwrap if OMIT_SYMBOL
+      value = regenInOmitSymbol(value, v, options, generator);
       if (value === undefined) return 'undefined';
       if (value === null) return 'null';
       if (typeof value === 'number') return value.toString();
@@ -557,7 +460,9 @@ export const generators = {
   ) => {
     const { faker, config } = options;
     const { optionalProbability: probability } = config;
-    if (faker.datatype.boolean({ probability })) return undefined;
+    if (faker.datatype.boolean({ probability })) {
+      return OMIT_SYMBOL;
+    }
     return generator(schema.unwrap(), options);
   },
   exactOptional: (

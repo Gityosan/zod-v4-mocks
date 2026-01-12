@@ -162,7 +162,7 @@ function generateFromSchema(
     return generators.default(schema);
   }
   if (schema instanceof z.ZodReadonly) {
-    return generateMocks(schema.def.innerType, options);
+    return generateMocks(schema.unwrap(), options);
   }
   if (schema instanceof z.ZodLazy) {
     return generators.lazy(schema, options, generateMocks);
