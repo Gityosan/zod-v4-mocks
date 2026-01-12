@@ -109,7 +109,7 @@ function calcLengthFromChecks(
   return faker.number.int({ min, max });
 }
 
-function regenInOmitSymbol(
+export function regenInOmitSymbol(
   value: unknown,
   schema: z.core.$ZodType,
   options: GeneraterOptions,
@@ -355,7 +355,6 @@ export const generators = {
     options: GeneraterOptions,
     generator: CustomGeneratorType,
   ) => {
-    // z.undefined().exactOptional();
     const { faker } = options;
     const randomOption = faker.helpers.arrayElement(schema.options);
     const result = generator(randomOption, options);

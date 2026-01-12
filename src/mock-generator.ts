@@ -5,7 +5,7 @@ import type { CustomGeneratorType, GeneraterOptions, MockConfig } from './type';
 import {
   createMockConfig,
   getLocales,
-  OMIT_SYMBOL,
+  regenInOmitSymbol,
   outputToFile,
   type OutputOptions,
 } from './utils';
@@ -85,11 +85,7 @@ class MockGenerator {
   generate<T extends z.ZodType>(schema: T): z.infer<T>;
   generate(schema: z.ZodType): unknown {
     const result = generateMocks(schema, this.options);
-    // Handle top-level exactOptional: if OMIT_SYMBOL is returned, unwrap and generate actual value
-    if (result === OMIT_SYMBOL && schema instanceof z.ZodExactOptional) {
-      return generateMocks(schema.unwrap(), this.options);
-    }
-    return result;
+    return regenInOmitSymbol(result, schema, this.options, generateMocks);
   }
 
   multiGenerate<T extends Record<string, z.ZodType>>(
