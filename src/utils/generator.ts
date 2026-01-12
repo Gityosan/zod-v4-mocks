@@ -76,6 +76,36 @@ function unwrapSchema(schema: z.core.$ZodType) {
   return schema;
 }
 
+function calcLengthFromChecks(
+  checks: z.core.$ZodCheck<never>[],
+  faker: Faker,
+  config: { min: number; max: number },
+): number {
+  let { min, max } = config;
+
+  for (const check of checks) {
+    // Array checks (MinLength/MaxLength)
+    if (check instanceof z.core.$ZodCheckMinLength) {
+      min = Math.max(min, check._zod.def.minimum);
+    }
+    if (check instanceof z.core.$ZodCheckMaxLength) {
+      max = Math.min(max, check._zod.def.maximum);
+    }
+    // Map/Set checks (MinSize/MaxSize)
+    if (check instanceof z.core.$ZodCheckMinSize) {
+      min = Math.max(min, check._zod.def.minimum);
+    }
+    if (check instanceof z.core.$ZodCheckMaxSize) {
+      max = Math.min(max, check._zod.def.maximum);
+    }
+  }
+
+  // Ensure min <= max (schema min may exceed config max)
+  max = Math.max(min, max);
+
+  return faker.number.int({ min, max });
+}
+
 export const generators = {
   file: () => new File([], 'test.txt'),
   email: (faker: Faker) => faker.internet.email(),
@@ -189,21 +219,7 @@ export const generators = {
     const { faker, config } = options;
     const { checks = [] } = schema.def;
 
-    let { min, max } = config.array;
-
-    for (const check of checks) {
-      if (check instanceof z.core.$ZodCheckMinLength) {
-        min = Math.max(min, check._zod.def.minimum);
-      }
-      if (check instanceof z.core.$ZodCheckMaxLength) {
-        max = Math.min(max, check._zod.def.maximum);
-      }
-    }
-
-    // Ensure min <= max (schema min may exceed config max)
-    max = Math.max(min, max);
-
-    const length = faker.number.int({ min, max });
+    const length = calcLengthFromChecks(checks, faker, config.array);
     return Array.from({ length }, (_, arrayIndex) => {
       const arrayIndexes = [...options.arrayIndexes, arrayIndex];
       const path = [...(options.path ?? []), arrayIndex];
@@ -237,21 +253,7 @@ export const generators = {
     const { keyType, valueType } = schema;
     const { checks = [] } = schema.def;
 
-    let { min, max } = config.map;
-
-    for (const check of checks) {
-      if (check instanceof z.core.$ZodCheckMinSize) {
-        min = Math.max(min, check._zod.def.minimum);
-      }
-      if (check instanceof z.core.$ZodCheckMaxSize) {
-        max = Math.min(max, check._zod.def.maximum);
-      }
-    }
-
-    // Ensure min <= max (schema min may exceed config max)
-    max = Math.max(min, max);
-
-    const length = faker.number.int({ min, max });
+    const length = calcLengthFromChecks(checks, faker, config.map);
     return new Map(
       Array.from({ length }, () => {
         const k = generator(keyType, options);
@@ -273,21 +275,7 @@ export const generators = {
     const { faker, config } = options;
     const { valueType, checks = [] } = schema.def;
 
-    let { min, max } = config.set;
-
-    for (const check of checks) {
-      if (check instanceof z.core.$ZodCheckMinSize) {
-        min = Math.max(min, check._zod.def.minimum);
-      }
-      if (check instanceof z.core.$ZodCheckMaxSize) {
-        max = Math.min(max, check._zod.def.maximum);
-      }
-    }
-
-    // Ensure min <= max (schema min may exceed config max)
-    max = Math.max(min, max);
-
-    const length = faker.number.int({ min, max });
+    const length = calcLengthFromChecks(checks, faker, config.set);
     return new Set(
       Array.from({ length }, (_, i) => {
         const path = [...(options.path ?? []), i];
