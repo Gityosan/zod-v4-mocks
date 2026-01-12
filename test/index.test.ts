@@ -638,6 +638,56 @@ describe('initGenerator (functional base API)', () => {
           expect(typeof result.field).toBe('number');
         }
       });
+
+      it('top-level exactOptional returns actual value, not symbol', () => {
+        const schema = z.string().exactOptional();
+        const gen = initGenerator({ seed: 42, optionalProbability: 1 });
+        const result = gen.generate(schema);
+        // Should return string, not Symbol
+        expect(typeof result).toBe('string');
+      });
+
+      it('exactOptional in record value does not produce symbol', () => {
+        const schema = z.record(z.string(), z.number().exactOptional());
+        const gen = initGenerator({ seed: 42, optionalProbability: 0.5 });
+        const result = gen.generate(schema) as Record<string, unknown>;
+        // All values should be numbers, not symbols
+        Object.values(result).forEach((v) => {
+          expect(typeof v).toBe('number');
+        });
+      });
+
+      it('exactOptional in union does not produce symbol', () => {
+        const schema = z.union([z.string().exactOptional(), z.number()]);
+        for (let i = 0; i < 10; i++) {
+          const gen = initGenerator({ seed: i, optionalProbability: 0.5 });
+          const result = gen.generate(schema);
+          // Should be string or number, not symbol
+          expect(['string', 'number']).toContain(typeof result);
+        }
+      });
+
+      it('exactOptional in array does not produce symbol', () => {
+        const schema = z.array(z.string().exactOptional());
+        const gen = initGenerator({ seed: 42, optionalProbability: 0.5 });
+        const result = gen.generate(schema) as unknown[];
+        // Array should not contain symbols
+        result.forEach((v) => {
+          expect(typeof v).not.toBe('symbol');
+        });
+      });
+
+      it('nested exactOptional works correctly', () => {
+        const schema = z.object({
+          outer: z.string(),
+          nested: z.object({
+            inner: z.string().exactOptional(),
+          }),
+        });
+        const gen = initGenerator({ seed: 42, optionalProbability: 0.5 });
+        const result = gen.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+      });
     });
 
     describe('slugify', () => {

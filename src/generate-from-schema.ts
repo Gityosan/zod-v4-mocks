@@ -150,7 +150,12 @@ function generateFromSchema(
     return generators.optional(schema, options, generateMocks);
   }
   if (schema instanceof z.ZodExactOptional) {
-    return generators.exactOptional(schema, options, generateMocks);
+    const result = generators.exactOptional(schema, options, generateMocks);
+    // If at top level and result is omit symbol, unwrap and generate actual value
+    if (result === Symbol.for('zod-v4-mocks:omit')) {
+      return generateMocks(schema.unwrap(), options);
+    }
+    return result;
   }
   if (schema instanceof z.ZodNullable) {
     return generators.nullable(schema, options, generateMocks);
