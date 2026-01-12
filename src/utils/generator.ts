@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { CustomGeneratorType, GeneraterOptions } from '../type';
 
 // Symbol used to indicate a key should be omitted (for exactOptional)
-const OMIT_SYMBOL = Symbol.for('zod-v4-mocks:omit');
+export const OMIT_SYMBOL = Symbol.for('zod-v4-mocks:omit');
 
 function calcMinMaxString(minLength: number | null, maxLength: number | null) {
   if (typeof minLength === 'number') {
