@@ -462,10 +462,8 @@ export const generators = {
     const { optionalProbability: probability } = config;
     if (faker.datatype.boolean({ probability })) {
       // When optional, choose between omitting key or setting undefined
-      if (faker.datatype.boolean({ probability: 0.5 })) {
-        return OMIT_SYMBOL;  // Omit key
-      }
-      return undefined;  // Set undefined value
+      if (faker.datatype.boolean({ probability: 0.5 })) return OMIT_SYMBOL;
+      else return undefined;
     }
     return generator(schema.unwrap(), options);
   },
