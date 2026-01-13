@@ -171,18 +171,17 @@ export const generators = {
     const { checks = [] } = schema.def;
 
     const length = calcLengthFromChecks(checks, faker, config.map);
-    return new Map(
-      Array.from({ length }, () => {
-        const k = generator(keyType, options);
-        const childPath = [...(options.path ?? []), '(map)'];
-        const value = generator(valueType, {
-          ...options,
-          key: '(map)',
-          path: childPath,
-        });
-        return [k, value];
-      }),
-    );
+    const entries = Array.from({ length }, () => {
+      const k = generator(keyType, options);
+      const childPath = [...(options.path ?? []), '(map)'];
+      const value = generator(valueType, {
+        ...options,
+        key: '(map)',
+        path: childPath,
+      });
+      return [k, value] as const;
+    }).filter(([, v]) => v !== OMIT_SYMBOL);
+    return new Map(entries);
   },
   set: (
     schema: z.ZodSet,
@@ -193,12 +192,11 @@ export const generators = {
     const { valueType, checks = [] } = schema.def;
 
     const length = calcLengthFromChecks(checks, faker, config.set);
-    return new Set(
-      Array.from({ length }, (_, i) => {
-        const path = [...(options.path ?? []), i];
-        return generator(valueType, { ...options, key: i, path });
-      }),
-    );
+    const values = Array.from({ length }, (_, i) => {
+      const path = [...(options.path ?? []), i];
+      return generator(valueType, { ...options, key: i, path });
+    }).filter((v) => v !== OMIT_SYMBOL);
+    return new Set(values);
   },
   object: (
     schema: z.ZodObject,
