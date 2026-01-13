@@ -140,11 +140,17 @@ function generateFromSchema(
   if (schema instanceof z.ZodDiscriminatedUnion) {
     return generators.discriminatedUnion(schema, options, generateMocks);
   }
+  if (schema instanceof z.ZodXor) {
+    return generators.xor(schema, options, generateMocks);
+  }
   if (schema instanceof z.ZodIntersection) {
     return generators.intersection(schema, options, generateMocks);
   }
   if (schema instanceof z.ZodOptional) {
     return generators.optional(schema, options, generateMocks);
+  }
+  if (schema instanceof z.ZodExactOptional) {
+    return generators.exactOptional(schema, options, generateMocks);
   }
   if (schema instanceof z.ZodNullable) {
     return generators.nullable(schema, options, generateMocks);
@@ -156,7 +162,7 @@ function generateFromSchema(
     return generators.default(schema);
   }
   if (schema instanceof z.ZodReadonly) {
-    return generateMocks(schema.def.innerType, options);
+    return generateMocks(schema.unwrap(), options);
   }
   if (schema instanceof z.ZodLazy) {
     return generators.lazy(schema, options, generateMocks);

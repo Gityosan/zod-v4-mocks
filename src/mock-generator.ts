@@ -5,6 +5,7 @@ import type { CustomGeneratorType, GeneraterOptions, MockConfig } from './type';
 import {
   createMockConfig,
   getLocales,
+  regenInOmitSymbol,
   outputToFile,
   type OutputOptions,
 } from './utils';
@@ -83,7 +84,8 @@ class MockGenerator {
   generate<T extends z.ZodFunction>(schema: T): unknown;
   generate<T extends z.ZodType>(schema: T): z.infer<T>;
   generate(schema: z.ZodType): unknown {
-    return generateMocks(schema, this.options);
+    const result = generateMocks(schema, this.options);
+    return regenInOmitSymbol(result, schema, this.options, generateMocks);
   }
 
   multiGenerate<T extends Record<string, z.ZodType>>(

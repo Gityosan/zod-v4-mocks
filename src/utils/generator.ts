@@ -3,75 +3,22 @@ import { intersection as intersectionES, merge } from 'es-toolkit';
 import RandExp from 'randexp';
 import { z } from 'zod';
 import type { CustomGeneratorType, GeneraterOptions } from '../type';
-
-function calcMinMaxString(minLength: number | null, maxLength: number | null) {
-  if (typeof minLength === 'number') {
-    if (maxLength === null) return { length: minLength };
-    return { length: { min: minLength, max: maxLength } };
-  }
-  if (typeof maxLength === 'number') {
-    if (minLength === null) return { length: maxLength };
-    return { length: { min: minLength, max: maxLength } };
-  }
-  return { length: undefined };
-}
-
-function compareMin(leftMin: number | null, rightMin: number | null) {
-  if (typeof leftMin === 'number' && typeof rightMin === 'number')
-    return Math.max(leftMin, rightMin);
-  if (typeof leftMin === 'number') return leftMin;
-  if (typeof rightMin === 'number') return rightMin;
-  return null;
-}
-
-function compareMax(leftMax: number | null, rightMax: number | null) {
-  if (typeof leftMax === 'number' && typeof rightMax === 'number')
-    return Math.min(leftMax, rightMax);
-  if (typeof leftMax === 'number') return leftMax;
-  if (typeof rightMax === 'number') return rightMax;
-  return null;
-}
-
-function calcMinMaxInt(minValue: number | null, maxValue: number | null) {
-  const min =
-    minValue === -Infinity || minValue === null ? undefined : minValue;
-  const max = maxValue === Infinity || maxValue === null ? undefined : maxValue;
-  if (min === undefined && max !== undefined) return { min: max - 100, max };
-  if (min !== undefined && max === undefined) return { min, max: min + 100 };
-  return { min, max };
-}
-
-function calcMinMaxBigInt(minValue: bigint | null, maxValue: bigint | null) {
-  const min = minValue === null ? undefined : minValue;
-  const max = maxValue === null ? undefined : maxValue;
-  if (min === undefined && max !== undefined) return { min: max - 100n, max };
-  if (min !== undefined && max === undefined) return { min, max: min + 100n };
-  return { min, max };
-}
-
-function calcMinMaxFloat(minValue: number | null, maxValue: number | null) {
-  const min =
-    minValue === null
-      ? undefined
-      : minValue === Number.MIN_VALUE
-        ? Number.MIN_SAFE_INTEGER
-        : minValue;
-  const max =
-    maxValue === null
-      ? undefined
-      : maxValue === Number.MAX_VALUE
-        ? Number.MAX_SAFE_INTEGER
-        : maxValue;
-  if (min === undefined && max !== undefined) return { min: max - 100, max };
-  if (min !== undefined && max === undefined) return { min, max: min + 100 };
-  return { min, max };
-}
+import {
+  calcLengthFromChecks,
+  calcMinMaxBigInt,
+  calcMinMaxFloat,
+  calcMinMaxInt,
+  calcMinMaxString,
+  compareMax,
+  compareMin,
+} from './calc-values';
+import { OMIT_SYMBOL, regenInOmitSymbol } from './exact-optional';
 
 function unwrapSchema(schema: z.core.$ZodType) {
   if (schema instanceof z.ZodOptional) return schema.unwrap();
   if (schema instanceof z.ZodNullable) return schema.unwrap();
   if (schema instanceof z.ZodDefault) return schema.unwrap();
-  if (schema instanceof z.ZodReadonly) return schema.def.innerType;
+  if (schema instanceof z.ZodReadonly) return schema.unwrap();
   if (schema instanceof z.ZodLazy) return schema.unwrap();
   return schema;
 }
@@ -167,7 +114,9 @@ export const generators = {
       if (typeof v === 'number') return v.toString();
       if (typeof v === 'bigint') return v.toString();
       if (typeof v === 'boolean') return v.toString();
-      const value = generator(v, options);
+      let value = generator(v, options);
+      // Template literals cannot have omitted parts, unwrap if OMIT_SYMBOL
+      value = regenInOmitSymbol(value, v, options, generator);
       if (value === undefined) return 'undefined';
       if (value === null) return 'null';
       if (typeof value === 'number') return value.toString();
@@ -187,13 +136,15 @@ export const generators = {
     generator: CustomGeneratorType,
   ) => {
     const { faker, config } = options;
-    const length = faker.number.int(config.array);
+    const { checks = [] } = schema.def;
+
+    const length = calcLengthFromChecks(checks, faker, config.array);
     return Array.from({ length }, (_, arrayIndex) => {
       const arrayIndexes = [...options.arrayIndexes, arrayIndex];
       const path = [...(options.path ?? []), arrayIndex];
       const key = arrayIndex;
       return generator(schema.element, { ...options, arrayIndexes, path, key });
-    });
+    }).filter((v) => v !== OMIT_SYMBOL);
   },
   tuple: (
     schema: z.ZodTuple,
@@ -203,9 +154,7 @@ export const generators = {
     const { faker, config } = options;
     const length = faker.number.int(config.array);
     return Array.from({ length }, (_, arrayIndex) => {
-      const randomOption = faker.helpers.arrayElement<z.core.$ZodType>(
-        schema.def.items,
-      );
+      const randomOption = faker.helpers.arrayElement(schema.def.items);
       const arrayIndexes = [...options.arrayIndexes, arrayIndex];
       const path = [...(options.path ?? []), arrayIndex];
       const key = arrayIndex;
@@ -219,19 +168,20 @@ export const generators = {
   ) => {
     const { faker, config } = options;
     const { keyType, valueType } = schema;
-    const length = faker.number.int(config.map);
-    return new Map(
-      Array.from({ length }, () => {
-        const k = generator(keyType, options);
-        const childPath = [...(options.path ?? []), '(map)'];
-        const value = generator(valueType, {
-          ...options,
-          key: '(map)',
-          path: childPath,
-        });
-        return [k, value];
-      }),
-    );
+    const { checks = [] } = schema.def;
+
+    const length = calcLengthFromChecks(checks, faker, config.map);
+    const entries = Array.from({ length }, () => {
+      const k = generator(keyType, options);
+      const childPath = [...(options.path ?? []), '(map)'];
+      const value = generator(valueType, {
+        ...options,
+        key: '(map)',
+        path: childPath,
+      });
+      return [k, value] as const;
+    }).filter(([, v]) => v !== OMIT_SYMBOL);
+    return new Map(entries);
   },
   set: (
     schema: z.ZodSet,
@@ -239,14 +189,14 @@ export const generators = {
     generator: CustomGeneratorType,
   ) => {
     const { faker, config } = options;
-    const { valueType } = schema.def;
-    const length = faker.number.int(config.set);
-    return new Set(
-      Array.from({ length }, (_, i) => {
-        const path = [...(options.path ?? []), i];
-        return generator(valueType, { ...options, key: i, path });
-      }),
-    );
+    const { valueType, checks = [] } = schema.def;
+
+    const length = calcLengthFromChecks(checks, faker, config.set);
+    const values = Array.from({ length }, (_, i) => {
+      const path = [...(options.path ?? []), i];
+      return generator(valueType, { ...options, key: i, path });
+    }).filter((v) => v !== OMIT_SYMBOL);
+    return new Set(values);
   },
   object: (
     schema: z.ZodObject,
@@ -258,7 +208,11 @@ export const generators = {
 
     for (const [key, value] of Object.entries(shape)) {
       const path = [...(options.path ?? []), key];
-      result[key] = generator(value, { ...options, key, path });
+      const generated = generator(value, { ...options, key, path });
+      // Skip keys that should be omitted (from exactOptional)
+      if (generated !== OMIT_SYMBOL) {
+        result[key] = generated;
+      }
     }
     return result;
   },
@@ -278,6 +232,10 @@ export const generators = {
         const keyStr = typeof k === 'symbol' ? String(k) : k;
         const path = [...(options.path ?? []), keyStr];
         const value = generator(valueType, { ...options, key: keyStr, path });
+        // Skip keys with omit symbol value (from exactOptional)
+        if (value === OMIT_SYMBOL) {
+          return acc;
+        }
         return { ...acc, [keyStr]: value };
       }
       throw new Error('Invalid record key type');
@@ -289,10 +247,9 @@ export const generators = {
     generator: CustomGeneratorType,
   ) => {
     const { faker } = options;
-    const randomOption = faker.helpers.arrayElement<z.core.$ZodType>(
-      schema.options,
-    );
-    return generator(randomOption, options);
+    const randomOption = faker.helpers.arrayElement(schema.options);
+    const result = generator(randomOption, options);
+    return regenInOmitSymbol(result, randomOption, options, generator);
   },
   discriminatedUnion: (
     schema: z.ZodDiscriminatedUnion,
@@ -300,10 +257,44 @@ export const generators = {
     generator: CustomGeneratorType,
   ) => {
     const { faker } = options;
-    const randomOption = faker.helpers.arrayElement<z.core.$ZodType>(
-      schema.options,
-    );
-    return generator(randomOption, options);
+    const randomOption = faker.helpers.arrayElement(schema.options);
+    const result = generator(randomOption, options);
+    return regenInOmitSymbol(result, randomOption, options, generator);
+  },
+  xor: (
+    schema: z.ZodXor,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    const { faker } = options;
+    const allOptions = schema.options;
+
+    // Shuffle options to try different ones if needed
+    const shuffledIndices = faker.helpers.shuffle(allOptions.map((_, i) => i));
+
+    // Try each option until we find one that satisfies exactly one schema
+    for (const selectedIndex of shuffledIndices) {
+      const selectedOption = allOptions[selectedIndex];
+      let value = generator(selectedOption, options);
+      value = regenInOmitSymbol(value, selectedOption, options, generator);
+
+      // Check that the value satisfies exactly one schema (the selected one)
+      // and fails all other schemas
+      const otherOptions = allOptions.filter((_, i) => i !== selectedIndex);
+      const failsAllOthers = otherOptions.every((otherSchema) => {
+        const result = (otherSchema as z.ZodType).safeParse(value);
+        return !result.success;
+      });
+
+      if (failsAllOthers) {
+        return value;
+      }
+    }
+
+    // Fallback: if we couldn't find an exclusive value, just return from the first option
+    const fallbackOption = faker.helpers.arrayElement(allOptions);
+    const fallbackValue = generator(fallbackOption, options);
+    return regenInOmitSymbol(fallbackValue, fallbackOption, options, generator);
   },
   intersection: (
     schema: z.ZodIntersection,
@@ -467,7 +458,26 @@ export const generators = {
   ) => {
     const { faker, config } = options;
     const { optionalProbability: probability } = config;
-    if (faker.datatype.boolean({ probability })) return undefined;
+    if (faker.datatype.boolean({ probability })) {
+      // When optional, choose between omitting key or setting undefined
+      if (faker.datatype.boolean({ probability: 0.5 })) return OMIT_SYMBOL;
+      else return undefined;
+    }
+    return generator(schema.unwrap(), options);
+  },
+  exactOptional: (
+    schema: z.ZodExactOptional,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    // exactOptional allows key to be omitted but doesn't accept explicit undefined
+    // For mock generation, we use OMIT_SYMBOL to indicate "omit this key"
+    // or generate the actual value
+    const { faker, config } = options;
+    const { optionalProbability: probability } = config;
+    if (faker.datatype.boolean({ probability })) {
+      return OMIT_SYMBOL;
+    }
     return generator(schema.unwrap(), options);
   },
   nonoptional: (
@@ -567,6 +577,14 @@ export const generators = {
       schema.def.in instanceof z.ZodString &&
       schema.def.out instanceof z.ZodBoolean
     ) {
+      const { reverseTransform } = schema.def;
+      if (reverseTransform) {
+        // Use reverseTransform to get valid truthy/falsy values
+        const boolValue = options.faker.datatype.boolean();
+        const ctx: z.core.ParsePayload = { value: boolValue, issues: [] };
+        return reverseTransform(boolValue, ctx);
+      }
+      // Fallback to default values if reverseTransform is not available
       const validValues = [
         'true',
         '1',
