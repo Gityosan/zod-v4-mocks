@@ -677,6 +677,26 @@ describe('initGenerator (functional base API)', () => {
         });
       });
 
+      it('exactOptional in map value does not produce symbol', () => {
+        const schema = z.map(z.string(), z.number().exactOptional());
+        const gen = initGenerator({ seed: 42, optionalProbability: 0.5 });
+        const result = gen.generate(schema) as Map<string, unknown>;
+        // Map values should not contain symbols
+        result.forEach((v) => {
+          expect(typeof v).not.toBe('symbol');
+        });
+      });
+
+      it('exactOptional in set does not produce symbol', () => {
+        const schema = z.set(z.string().exactOptional());
+        const gen = initGenerator({ seed: 42, optionalProbability: 0.5 });
+        const result = gen.generate(schema) as Set<unknown>;
+        // Set values should not contain symbols
+        result.forEach((v) => {
+          expect(typeof v).not.toBe('symbol');
+        });
+      });
+
       it('nested exactOptional works correctly', () => {
         const schema = z.object({
           outer: z.string(),
