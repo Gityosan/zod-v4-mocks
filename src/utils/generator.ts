@@ -14,6 +14,21 @@ import {
 } from './calc-values';
 import { OMIT_SYMBOL, regenerateIfOmitted } from './exact-optional';
 
+const validValues = [
+  'true',
+  '1',
+  'yes',
+  'on',
+  'y',
+  'enabled',
+  'false',
+  '0',
+  'no',
+  'off',
+  'n',
+  'disabled',
+] as const;
+
 function unwrapSchema(schema: z.core.$ZodType) {
   if (schema instanceof z.ZodOptional) return schema.unwrap();
   if (schema instanceof z.ZodNullable) return schema.unwrap();
@@ -115,7 +130,6 @@ export const generators = {
       if (typeof v === 'bigint') return v.toString();
       if (typeof v === 'boolean') return v.toString();
       let value = generator(v, options);
-      // Template literals cannot have omitted parts, unwrap if OMIT_SYMBOL
       value = regenerateIfOmitted(value, v, options, generator);
       if (value === undefined) return 'undefined';
       if (value === null) return 'null';
@@ -141,9 +155,7 @@ export const generators = {
     const length = calcLengthFromChecks(checks, faker, config.array);
     return Array.from({ length }, (_, arrayIndex) => {
       const arrayIndexes = [...options.arrayIndexes, arrayIndex];
-      const path = [...(options.path ?? []), arrayIndex];
-      const key = arrayIndex;
-      return generator(schema.element, { ...options, arrayIndexes, path, key });
+      return generator(schema.element, { ...options, arrayIndexes });
     }).filter((v) => v !== OMIT_SYMBOL);
   },
   tuple: (
@@ -156,9 +168,7 @@ export const generators = {
     return Array.from({ length }, (_, arrayIndex) => {
       const randomOption = faker.helpers.arrayElement(schema.def.items);
       const arrayIndexes = [...options.arrayIndexes, arrayIndex];
-      const path = [...(options.path ?? []), arrayIndex];
-      const key = arrayIndex;
-      return generator(randomOption, { ...options, arrayIndexes, path, key });
+      return generator(randomOption, { ...options, arrayIndexes });
     });
   },
   map: (
@@ -173,12 +183,7 @@ export const generators = {
     const length = calcLengthFromChecks(checks, faker, config.map);
     const entries = Array.from({ length }, () => {
       const k = generator(keyType, options);
-      const childPath = [...(options.path ?? []), '(map)'];
-      const value = generator(valueType, {
-        ...options,
-        key: '(map)',
-        path: childPath,
-      });
+      const value = generator(valueType, options);
       return [k, value] as const;
     }).filter(([, v]) => v !== OMIT_SYMBOL);
     return new Map(entries);
@@ -192,9 +197,8 @@ export const generators = {
     const { valueType, checks = [] } = schema.def;
 
     const length = calcLengthFromChecks(checks, faker, config.set);
-    const values = Array.from({ length }, (_, i) => {
-      const path = [...(options.path ?? []), i];
-      return generator(valueType, { ...options, key: i, path });
+    const values = Array.from({ length }, () => {
+      return generator(valueType, options);
     }).filter((v) => v !== OMIT_SYMBOL);
     return new Set(values);
   },
@@ -207,9 +211,7 @@ export const generators = {
     const result: { [key: string]: unknown } = {};
 
     for (const [key, value] of Object.entries(shape)) {
-      const path = [...(options.path ?? []), key];
-      const generated = generator(value, { ...options, key, path });
-      // Skip keys that should be omitted (from exactOptional)
+      const generated = generator(value, options);
       if (generated !== OMIT_SYMBOL) {
         result[key] = generated;
       }
@@ -230,12 +232,8 @@ export const generators = {
         typeof k === 'string' || typeof k === 'number' || typeof k === 'symbol';
       if (keyIsValid) {
         const keyStr = typeof k === 'symbol' ? String(k) : k;
-        const path = [...(options.path ?? []), keyStr];
-        const value = generator(valueType, { ...options, key: keyStr, path });
-        // Skip keys with omit symbol value (from exactOptional)
-        if (value === OMIT_SYMBOL) {
-          return acc;
-        }
+        const value = generator(valueType, options);
+        if (value === OMIT_SYMBOL) return acc;
         return { ...acc, [keyStr]: value };
       }
       throw new Error('Invalid record key type');
@@ -266,35 +264,18 @@ export const generators = {
     options: GeneraterOptions,
     generator: CustomGeneratorType,
   ) => {
-    const { faker } = options;
-    const allOptions = schema.options;
-
-    // Shuffle options to try different ones if needed
-    const shuffledIndices = faker.helpers.shuffle(allOptions.map((_, i) => i));
-
-    // Try each option until we find one that satisfies exactly one schema
-    for (const selectedIndex of shuffledIndices) {
-      const selectedOption = allOptions[selectedIndex];
+    for (const selectedOption of schema.options) {
       let value = generator(selectedOption, options);
       value = regenerateIfOmitted(value, selectedOption, options, generator);
 
-      // Check that the value satisfies exactly one schema (the selected one)
-      // and fails all other schemas
-      const otherOptions = allOptions.filter((_, i) => i !== selectedIndex);
-      const failsAllOthers = otherOptions.every((otherSchema) => {
-        const result = (otherSchema as z.ZodType).safeParse(value);
-        return !result.success;
-      });
-
-      if (failsAllOthers) {
-        return value;
-      }
+      const result = schema.safeParse(value);
+      if (result.success) return value;
     }
 
-    // Fallback: if we couldn't find an exclusive value, just return from the first option
-    const fallbackOption = faker.helpers.arrayElement(allOptions);
-    const fallbackValue = generator(fallbackOption, options);
-    return regenerateIfOmitted(fallbackValue, fallbackOption, options, generator);
+    throw new Error(
+      'Could not generate a value that satisfies exactly one schema in XOR. ' +
+        'This may happen when schemas overlap (e.g., z.xor([z.string(), z.any()]))',
+    );
   },
   intersection: (
     schema: z.ZodIntersection,
@@ -459,7 +440,6 @@ export const generators = {
     const { faker, config } = options;
     const { optionalProbability: probability } = config;
     if (faker.datatype.boolean({ probability })) {
-      // When optional, choose between omitting key or setting undefined
       if (faker.datatype.boolean({ probability: 0.5 })) return OMIT_SYMBOL;
       else return undefined;
     }
@@ -470,9 +450,6 @@ export const generators = {
     options: GeneraterOptions,
     generator: CustomGeneratorType,
   ) => {
-    // exactOptional allows key to be omitted but doesn't accept explicit undefined
-    // For mock generation, we use OMIT_SYMBOL to indicate "omit this key"
-    // or generate the actual value
     const { faker, config } = options;
     const { optionalProbability: probability } = config;
     if (faker.datatype.boolean({ probability })) {
@@ -579,26 +556,10 @@ export const generators = {
     ) {
       const { reverseTransform } = schema.def;
       if (reverseTransform) {
-        // Use reverseTransform to get valid truthy/falsy values
         const boolValue = options.faker.datatype.boolean();
         const ctx: z.core.ParsePayload = { value: boolValue, issues: [] };
         return reverseTransform(boolValue, ctx);
       }
-      // Fallback to default values if reverseTransform is not available
-      const validValues = [
-        'true',
-        '1',
-        'yes',
-        'on',
-        'y',
-        'enabled',
-        'false',
-        '0',
-        'no',
-        'off',
-        'n',
-        'disabled',
-      ];
       return options.faker.helpers.arrayElement(validValues);
     }
 

@@ -13,8 +13,6 @@ export type GeneraterOptions = {
   arrayIndexes: number[];
   pinnedHierarchy: Map<string, number>;
   lazyDepth?: number;
-  path: (string | number)[];
-  key?: string | number;
 };
 
 export type CustomGeneratorType = (
