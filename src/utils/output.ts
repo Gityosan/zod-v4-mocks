@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { z } from 'zod';
 
-const outputExtSchema = z.enum(['json', 'js', 'ts']);
+const outputExtSchema = z.literal(['json', 'js', 'ts']);
 type OutputExt = z.infer<typeof outputExtSchema>;
 
 export type OutputOptions = {

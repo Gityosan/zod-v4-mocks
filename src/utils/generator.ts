@@ -12,7 +12,7 @@ import {
   compareMax,
   compareMin,
 } from './calc-values';
-import { OMIT_SYMBOL, regenInOmitSymbol } from './exact-optional';
+import { OMIT_SYMBOL, regenerateIfOmitted } from './exact-optional';
 
 function unwrapSchema(schema: z.core.$ZodType) {
   if (schema instanceof z.ZodOptional) return schema.unwrap();
@@ -116,7 +116,7 @@ export const generators = {
       if (typeof v === 'boolean') return v.toString();
       let value = generator(v, options);
       // Template literals cannot have omitted parts, unwrap if OMIT_SYMBOL
-      value = regenInOmitSymbol(value, v, options, generator);
+      value = regenerateIfOmitted(value, v, options, generator);
       if (value === undefined) return 'undefined';
       if (value === null) return 'null';
       if (typeof value === 'number') return value.toString();
@@ -249,7 +249,7 @@ export const generators = {
     const { faker } = options;
     const randomOption = faker.helpers.arrayElement(schema.options);
     const result = generator(randomOption, options);
-    return regenInOmitSymbol(result, randomOption, options, generator);
+    return regenerateIfOmitted(result, randomOption, options, generator);
   },
   discriminatedUnion: (
     schema: z.ZodDiscriminatedUnion,
@@ -259,7 +259,7 @@ export const generators = {
     const { faker } = options;
     const randomOption = faker.helpers.arrayElement(schema.options);
     const result = generator(randomOption, options);
-    return regenInOmitSymbol(result, randomOption, options, generator);
+    return regenerateIfOmitted(result, randomOption, options, generator);
   },
   xor: (
     schema: z.ZodXor,
@@ -276,7 +276,7 @@ export const generators = {
     for (const selectedIndex of shuffledIndices) {
       const selectedOption = allOptions[selectedIndex];
       let value = generator(selectedOption, options);
-      value = regenInOmitSymbol(value, selectedOption, options, generator);
+      value = regenerateIfOmitted(value, selectedOption, options, generator);
 
       // Check that the value satisfies exactly one schema (the selected one)
       // and fails all other schemas
@@ -294,7 +294,7 @@ export const generators = {
     // Fallback: if we couldn't find an exclusive value, just return from the first option
     const fallbackOption = faker.helpers.arrayElement(allOptions);
     const fallbackValue = generator(fallbackOption, options);
-    return regenInOmitSymbol(fallbackValue, fallbackOption, options, generator);
+    return regenerateIfOmitted(fallbackValue, fallbackOption, options, generator);
   },
   intersection: (
     schema: z.ZodIntersection,

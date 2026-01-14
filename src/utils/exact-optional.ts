@@ -2,9 +2,9 @@ import { z } from 'zod';
 import type { CustomGeneratorType, GeneraterOptions } from '../type';
 
 // Symbol used to indicate a key should be omitted (for exactOptional)
-export const OMIT_SYMBOL = Symbol.for('zod-v4-mocks:omit');
+export const OMIT_SYMBOL = Symbol.for('zod-v4-mocks:optional-key-omit');
 
-export function regenInOmitSymbol(
+export function regenerateIfOmitted(
   value: unknown,
   schema: z.core.$ZodType,
   options: GeneraterOptions,
