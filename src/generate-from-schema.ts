@@ -1,6 +1,6 @@
 import { z } from 'zod/v4';
 import type { GeneraterOptions } from './type';
-import { generators } from './util';
+import { generators } from './utils';
 
 function generateFromSchema(
   schema: z.core.$ZodType,
@@ -17,8 +17,8 @@ function generateFromSchema(
   if (schema instanceof z.ZodULID) return generators.ulid(faker);
   if (schema instanceof z.ZodIPv4) return generators.ipv4(faker);
   if (schema instanceof z.ZodIPv6) return generators.ipv6(faker);
-  if (schema instanceof z.ZodCIDRv6) return generators.cidrv6();
-  if (schema instanceof z.ZodBase64URL) return generators.base64url();
+  if (schema instanceof z.ZodCIDRv6) return generators.cidrv6(faker);
+  if (schema instanceof z.ZodBase64URL) return generators.base64url(faker);
   if (schema instanceof z.ZodDate) return generators.date(faker);
   if (schema instanceof z.ZodISODateTime) return generators.isoDateTime(faker);
   if (schema instanceof z.ZodISODate) return generators.isoDate(faker);
@@ -46,6 +46,10 @@ function generateFromSchema(
     return generators.regex(faker, schema);
   }
 
+  if (schema instanceof z.ZodCustomStringFormat) {
+    return generators.regex(faker, schema);
+  }
+
   if (schema instanceof z.ZodString) {
     const { def, format } = schema;
     const { checks } = def;
@@ -56,8 +60,8 @@ function generateFromSchema(
     else if (format === 'emoji') stringResult = generators.emoji(faker);
     else if (format === 'ipv4') stringResult = generators.ipv4(faker);
     else if (format === 'ipv6') stringResult = generators.ipv6(faker);
-    else if (format === 'cidrv6') stringResult = generators.cidrv6();
-    else if (format === 'base64url') stringResult = generators.base64url();
+    else if (format === 'cidrv6') stringResult = generators.cidrv6(faker);
+    else if (format === 'base64url') stringResult = generators.base64url(faker);
     else if (format === 'datetime') {
       stringResult = generators.isoDateTime(faker);
     } else if (format === 'date') stringResult = generators.isoDate(faker);
@@ -105,6 +109,9 @@ function generateFromSchema(
   if (schema instanceof z.ZodLiteral) {
     return generators.literal(schema, options);
   }
+  if (schema instanceof z.ZodTemplateLiteral) {
+    return generators.templateLiteral(schema, options, generateMocks);
+  }
   if (schema instanceof z.ZodEnum) {
     return generators.enum(schema, options);
   }
@@ -129,6 +136,9 @@ function generateFromSchema(
   if (schema instanceof z.ZodUnion) {
     return generators.union(schema, options, generateMocks);
   }
+  if (schema instanceof z.ZodDiscriminatedUnion) {
+    return generators.discriminatedUnion(schema, options, generateMocks);
+  }
   if (schema instanceof z.ZodIntersection) {
     return generators.intersection(schema, options, generateMocks);
   }
@@ -138,8 +148,11 @@ function generateFromSchema(
   if (schema instanceof z.ZodNullable) {
     return generators.nullable(schema, options, generateMocks);
   }
+  if (schema instanceof z.ZodNonOptional) {
+    return generators.nonoptional(schema, options, generateMocks);
+  }
   if (schema instanceof z.ZodDefault || schema instanceof z.ZodPrefault) {
-    return generators.default(schema, options, generateMocks);
+    return generators.default(schema);
   }
   if (schema instanceof z.ZodReadonly) {
     return generateMocks(schema.def.innerType, options);
@@ -147,11 +160,12 @@ function generateFromSchema(
   if (schema instanceof z.ZodLazy) {
     return generators.lazy(schema, options, generateMocks);
   }
+  // ZodPipe series
   if (schema instanceof z.ZodPipe) {
     return generators.pipe(schema, options, generateMocks);
   }
-  if (schema instanceof z.ZodTransform) {
-    return generators.transform(schema);
+  if (schema instanceof z.ZodSuccess) {
+    return generators.success(schema, options, generateMocks);
   }
   if (schema instanceof z.ZodCatch) {
     return generators.catch(schema, options, generateMocks);
@@ -164,18 +178,12 @@ function generateFromSchema(
     return null;
   }
 
-  if (schema instanceof z.core.$ZodCheckStringFormat)
-    return generators.regex(faker, schema);
-
   console.warn(
     `Unhandled Zod schema type: ${schema.constructor.name}. Returning dummy value.`,
   );
   return faker.lorem.word();
 }
 
-/**
- * @package
- */
 export function generateMocks(
   schema: z.core.$ZodType,
   options: GeneraterOptions,
