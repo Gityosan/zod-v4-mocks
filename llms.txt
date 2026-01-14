@@ -73,12 +73,7 @@ Defines a custom generator function. Return `undefined` to fall back to default 
 import { type CustomGeneratorType } from 'zod-v4-mocks';
 
 const customGenerator: CustomGeneratorType = (schema, options) => {
-  const { faker, path, key } = options;
-
-  // Override specific field by path
-  if (path.join('.') === 'user.id') {
-    return 'custom-user-id';
-  }
+  const { faker } = options;
 
   // Override by schema type
   if (schema instanceof z.ZodEmail) {
@@ -97,8 +92,10 @@ const mock = initGenerator().override(customGenerator).generate(schema);
 | Property | Type | Description |
 |----------|------|-------------|
 | faker | Faker | Seeded Faker instance |
-| path | (string \| number)[] | Path from root to current field |
-| key | string \| number | Immediate key/index of current field |
+| config | MockConfig | Configuration object |
+| customGenerator | CustomGeneratorType \| undefined | Previously defined custom generator |
+| registry | ZodRegistry \| null | Registry for consistent value generation |
+| arrayIndexes | number[] | Array of indices tracking nested array positions |
 
 ### generator.register(schemas)
 
