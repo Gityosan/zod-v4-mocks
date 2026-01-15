@@ -8,21 +8,16 @@ import {
   calcMinMaxBigInt,
   calcMinMaxFloat,
   calcMinMaxInt,
-  calcMinMaxString,
   compareMax,
   compareMin,
-} from './calc-values';
+} from './calculation';
+import { unwrapSchema } from './schema';
 
-function unwrapSchema(schema: z.core.$ZodType) {
-  if (schema instanceof z.ZodOptional) return schema.unwrap();
-  if (schema instanceof z.ZodNullable) return schema.unwrap();
-  if (schema instanceof z.ZodDefault) return schema.unwrap();
-  if (schema instanceof z.ZodReadonly) return schema.def.innerType;
-  if (schema instanceof z.ZodLazy) return schema.unwrap();
-  return schema;
-}
+export type StringLengthOptions = {
+  length?: number | { min: number; max: number };
+};
 
-export const generators = {
+export const generateUtils = {
   file: () => new File([], 'test.txt'),
   email: (faker: Faker) => faker.internet.email(),
   url: (faker: Faker) => faker.internet.url(),
@@ -53,18 +48,20 @@ export const generators = {
     return `PT${hours}H${minutes}M${seconds}S`;
   },
   regex: (faker: Faker, check: z.core.$ZodCheckStringFormat) => {
-    const { pattern } = check._zod.def;
+    const { pattern, format } = check._zod.def;
     if (pattern !== undefined) {
       const randexp = new RandExp(pattern);
       randexp.randInt = (a: number, b: number) =>
         faker.number.int({ min: a, max: b });
       return randexp.gen();
     }
+    console.warn(
+      `z.stringFormat("${format}") has no regex pattern. Generating a random word instead. Consider providing a regex: z.stringFormat("${format}", /your-pattern/)`,
+    );
     return faker.lorem.word();
   },
-  string: (faker: Faker, schema: z.ZodString) => {
-    const { minLength, maxLength } = schema;
-    return faker.lorem.word(calcMinMaxString(minLength, maxLength));
+  string: (faker: Faker, options: StringLengthOptions) => {
+    return faker.lorem.word(options);
   },
   int: (faker: Faker, schema: z.ZodNumber) => {
     const { minValue, maxValue } = schema;
@@ -100,6 +97,10 @@ export const generators = {
     const { faker } = options;
     return faker.helpers.arrayElement([...schema.values]);
   },
+  enum: (schema: z.ZodEnum, options: GeneraterOptions) => {
+    const { faker } = options;
+    return faker.helpers.arrayElement(schema.options);
+  },
   templateLiteral: (
     schema: z.ZodTemplateLiteral,
     options: GeneraterOptions,
@@ -122,10 +123,6 @@ export const generators = {
     });
     return result.join('');
   },
-  enum: (schema: z.ZodEnum, options: GeneraterOptions) => {
-    const { faker } = options;
-    return faker.helpers.arrayElement(schema.options);
-  },
   array: (
     schema: z.ZodArray,
     options: GeneraterOptions,
@@ -145,12 +142,10 @@ export const generators = {
     options: GeneraterOptions,
     generator: CustomGeneratorType,
   ) => {
-    const { faker, config } = options;
-    const length = faker.number.int(config.array);
-    return Array.from({ length }, (_, arrayIndex) => {
-      const randomOption = faker.helpers.arrayElement(schema.def.items);
+    const { items } = schema.def;
+    return items.map((item, arrayIndex) => {
       const arrayIndexes = [...options.arrayIndexes, arrayIndex];
-      return generator(randomOption, { ...options, arrayIndexes });
+      return generator(item, { ...options, arrayIndexes });
     });
   },
   map: (
@@ -421,8 +416,17 @@ export const generators = {
     if (faker.datatype.boolean({ probability })) return null;
     return generator(schema.unwrap(), options);
   },
-  default: (schema: z.ZodDefault | z.ZodPrefault) => {
-    return schema.def.defaultValue;
+  default: (
+    schema: z.ZodDefault | z.ZodPrefault,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    const { faker, config } = options;
+    const { defaultProbability: probability } = config;
+    if (faker.datatype.boolean({ probability })) {
+      return schema.def.defaultValue;
+    }
+    return generator(schema.unwrap(), options);
   },
   lazy: (
     schema: z.ZodLazy,
@@ -431,24 +435,6 @@ export const generators = {
   ) => {
     const { lazyDepth = 1, config } = options;
     const innerSchema = schema.unwrap();
-
-    // for z.json
-    if (innerSchema instanceof z.ZodUnion) {
-      const unionTypes = innerSchema.options;
-      const hasJsonTypes = unionTypes.some(
-        (type) =>
-          type instanceof z.ZodString ||
-          type instanceof z.ZodNumber ||
-          type instanceof z.ZodBoolean ||
-          type instanceof z.ZodNull ||
-          type instanceof z.ZodArray ||
-          type instanceof z.ZodRecord,
-      );
-
-      if (hasJsonTypes && unionTypes.length >= 4) {
-        return {};
-      }
-    }
 
     if (lazyDepth < config.lazyDepthLimit) {
       const newOptions = { ...options, lazyDepth: lazyDepth + 1 };
@@ -461,6 +447,9 @@ export const generators = {
     if (innerSchema instanceof z.ZodMap) return new Map();
     if (innerSchema instanceof z.ZodSet) return new Set();
     throw new Error('Unsupported lazy schema type');
+  },
+  json: () => {
+    return {};
   },
   pipe: (
     schema: z.ZodPipe,
@@ -485,15 +474,14 @@ export const generators = {
     options: GeneraterOptions,
     generator: CustomGeneratorType,
   ) => {
-    return generator(schema.def.innerType, options);
+    return generator(schema.unwrap(), options);
   },
   catch: (
     schema: z.ZodCatch,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
   ) => {
-    const innerType = schema.unwrap();
-    const value = generator(innerType, options);
+    const value = generator(schema.unwrap(), options);
     const parsedValue = schema.safeParse(value);
     return parsedValue.data;
   },
