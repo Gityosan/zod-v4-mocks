@@ -1,5 +1,5 @@
-export { createMockConfig, getLocales } from './config';
+export * from './config';
 export * from './exact-optional';
-export { generators } from './generator';
-export { outputToFile } from './output';
-export type { OutputOptions } from './output';
+export * from './generator';
+export * from './output';
+export * from './schema';

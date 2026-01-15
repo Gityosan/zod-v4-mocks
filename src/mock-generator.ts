@@ -5,8 +5,8 @@ import type { CustomGeneratorType, GeneraterOptions, MockConfig } from './type';
 import {
   createMockConfig,
   getLocales,
-  regenerateIfOmitted,
   outputToFile,
+  regenerateIfOmitted,
   type OutputOptions,
 } from './utils';
 

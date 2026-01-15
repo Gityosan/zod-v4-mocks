@@ -506,19 +506,21 @@ describe('initGenerator (functional base API)', () => {
     });
 
     it('default', () => {
+      const gen = initGenerator({ seed: 1, defaultProbability: 1 });
       const schema = z.string().default('test');
-      const result = generator.generate(schema);
+      const result = gen.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
       expect(result).toBe('test');
     });
 
     it('prefault', () => {
+      const gen = initGenerator({ seed: 1, defaultProbability: 1 });
       const schema = z
         .string()
         .transform((value) => value + '!')
         .prefault('test');
-      const result = generator.generate(schema);
+      const result = gen.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');
       expect(result).toBe('test');

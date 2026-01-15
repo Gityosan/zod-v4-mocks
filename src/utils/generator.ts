@@ -11,8 +11,9 @@ import {
   calcMinMaxString,
   compareMax,
   compareMin,
-} from './calc-values';
+} from './calculation';
 import { OMIT_SYMBOL, regenerateIfOmitted } from './exact-optional';
+import { unwrapSchema } from './schema';
 
 const validValues = [
   'true',
@@ -29,16 +30,7 @@ const validValues = [
   'disabled',
 ] as const;
 
-function unwrapSchema(schema: z.core.$ZodType) {
-  if (schema instanceof z.ZodOptional) return schema.unwrap();
-  if (schema instanceof z.ZodNullable) return schema.unwrap();
-  if (schema instanceof z.ZodDefault) return schema.unwrap();
-  if (schema instanceof z.ZodReadonly) return schema.unwrap();
-  if (schema instanceof z.ZodLazy) return schema.unwrap();
-  return schema;
-}
-
-export const generators = {
+export const generateUtils = {
   file: () => new File([], 'test.txt'),
   email: (faker: Faker) => faker.internet.email(),
   url: (faker: Faker) => faker.internet.url(),
@@ -117,6 +109,10 @@ export const generators = {
     const { faker } = options;
     return faker.helpers.arrayElement([...schema.values]);
   },
+  enum: (schema: z.ZodEnum, options: GeneraterOptions) => {
+    const { faker } = options;
+    return faker.helpers.arrayElement(schema.options);
+  },
   templateLiteral: (
     schema: z.ZodTemplateLiteral,
     options: GeneraterOptions,
@@ -140,10 +136,6 @@ export const generators = {
     });
     return result.join('');
   },
-  enum: (schema: z.ZodEnum, options: GeneraterOptions) => {
-    const { faker } = options;
-    return faker.helpers.arrayElement(schema.options);
-  },
   array: (
     schema: z.ZodArray,
     options: GeneraterOptions,
@@ -163,12 +155,10 @@ export const generators = {
     options: GeneraterOptions,
     generator: CustomGeneratorType,
   ) => {
-    const { faker, config } = options;
-    const length = faker.number.int(config.array);
-    return Array.from({ length }, (_, arrayIndex) => {
-      const randomOption = faker.helpers.arrayElement(schema.def.items);
+    const { items } = schema.def;
+    return items.map((item, arrayIndex) => {
       const arrayIndexes = [...options.arrayIndexes, arrayIndex];
-      return generator(randomOption, { ...options, arrayIndexes });
+      return generator(item, { ...options, arrayIndexes });
     });
   },
   map: (
@@ -478,8 +468,17 @@ export const generators = {
     if (faker.datatype.boolean({ probability })) return null;
     return generator(schema.unwrap(), options);
   },
-  default: (schema: z.ZodDefault | z.ZodPrefault) => {
-    return schema.def.defaultValue;
+  default: (
+    schema: z.ZodDefault | z.ZodPrefault,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    const { faker, config } = options;
+    const { defaultProbability: probability } = config;
+    if (faker.datatype.boolean({ probability })) {
+      return schema.def.defaultValue;
+    }
+    return generator(schema.unwrap(), options);
   },
   lazy: (
     schema: z.ZodLazy,
@@ -488,24 +487,6 @@ export const generators = {
   ) => {
     const { lazyDepth = 1, config } = options;
     const innerSchema = schema.unwrap();
-
-    // for z.json
-    if (innerSchema instanceof z.ZodUnion) {
-      const unionTypes = innerSchema.options;
-      const hasJsonTypes = unionTypes.some(
-        (type) =>
-          type instanceof z.ZodString ||
-          type instanceof z.ZodNumber ||
-          type instanceof z.ZodBoolean ||
-          type instanceof z.ZodNull ||
-          type instanceof z.ZodArray ||
-          type instanceof z.ZodRecord,
-      );
-
-      if (hasJsonTypes && unionTypes.length >= 4) {
-        return {};
-      }
-    }
 
     if (lazyDepth < config.lazyDepthLimit) {
       const newOptions = { ...options, lazyDepth: lazyDepth + 1 };
@@ -518,6 +499,25 @@ export const generators = {
     if (innerSchema instanceof z.ZodMap) return new Map();
     if (innerSchema instanceof z.ZodSet) return new Set();
     throw new Error('Unsupported lazy schema type');
+  },
+  json: () => {
+    return {};
+  },
+  codec: (
+    schema: z.ZodCodec,
+    options: GeneraterOptions,
+    generator: CustomGeneratorType,
+  ) => {
+    return generator(schema.def.in, options);
+  },
+  stringbool: (schema: z.ZodCodec, options: GeneraterOptions) => {
+    const { reverseTransform } = schema.def;
+    if (reverseTransform) {
+      const boolValue = options.faker.datatype.boolean();
+      const ctx: z.core.ParsePayload = { value: boolValue, issues: [] };
+      return reverseTransform(boolValue, ctx);
+    }
+    return options.faker.helpers.arrayElement(validValues);
   },
   pipe: (
     schema: z.ZodPipe,
@@ -542,28 +542,7 @@ export const generators = {
     options: GeneraterOptions,
     generator: CustomGeneratorType,
   ) => {
-    return generator(schema.def.innerType, options);
-  },
-  codec: (
-    schema: z.ZodCodec,
-    options: GeneraterOptions,
-    generator: CustomGeneratorType,
-  ) => {
-    // for z.stringbool
-    if (
-      schema.def.in instanceof z.ZodString &&
-      schema.def.out instanceof z.ZodBoolean
-    ) {
-      const { reverseTransform } = schema.def;
-      if (reverseTransform) {
-        const boolValue = options.faker.datatype.boolean();
-        const ctx: z.core.ParsePayload = { value: boolValue, issues: [] };
-        return reverseTransform(boolValue, ctx);
-      }
-      return options.faker.helpers.arrayElement(validValues);
-    }
-
-    return generator(schema.def.in, options);
+    return generator(schema.unwrap(), options);
   },
   catch: (
     schema: z.ZodCatch,
