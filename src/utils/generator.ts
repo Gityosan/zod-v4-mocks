@@ -44,6 +44,7 @@ export const generateUtils = {
   ulid: (faker: Faker) => faker.string.ulid(),
   ipv4: (faker: Faker) => faker.internet.ipv4(),
   ipv6: (faker: Faker) => faker.internet.ipv6(),
+  mac: (faker: Faker) => faker.internet.mac(),
   date: (faker: Faker) => faker.date.anytime(),
   cidrv6: (faker: Faker) => {
     const randexp = new RandExp(

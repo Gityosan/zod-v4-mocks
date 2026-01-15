@@ -134,6 +134,7 @@ function generateFromSchema(
   if (s instanceof z.ZodULID) return u.ulid(f);
   if (s instanceof z.ZodIPv4) return u.ipv4(f);
   if (s instanceof z.ZodIPv6) return u.ipv6(f);
+  if (s instanceof z.ZodMAC) return u.mac(f);
   if (s instanceof z.ZodCIDRv6) return u.cidrv6(f);
   if (s instanceof z.ZodBase64URL) return u.base64url(f);
   if (s instanceof z.ZodDate) return u.date(f);
@@ -173,6 +174,7 @@ function generateFromSchema(
     if (format === 'emoji') return u.emoji(f);
     if (format === 'ipv4') return u.ipv4(f);
     if (format === 'ipv6') return u.ipv6(f);
+    if (format === 'mac') return u.mac(f);
     if (format === 'cidrv6') return u.cidrv6(f);
     if (format === 'base64url') return u.base64url(f);
     if (format === 'datetime') return u.isoDateTime(f);
