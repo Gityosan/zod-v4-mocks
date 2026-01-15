@@ -19,11 +19,11 @@
     "mock",
     "generator"
   ],
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/index.mjs",
+  "types": "dist/index.d.mts",
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
+    "build": "tsup",
+    "dev": "tsup --watch",
     "test": "vitest",
     "test:run": "vitest run",
     "prepare": "pnpm run build"
@@ -41,6 +41,7 @@
   "devDependencies": {
     "@types/node": "24.0.7",
     "prettier": "3.6.1",
+    "tsup": "8.5.1",
     "typescript": "5.8.3",
     "vitest": "3.2.4"
   }
