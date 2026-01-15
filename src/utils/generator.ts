@@ -11,7 +11,7 @@ import {
   calcMinMaxString,
   compareMax,
   compareMin,
-} from './calc-values';
+} from './calculation';
 
 function unwrapSchema(schema: z.core.$ZodType) {
   if (schema instanceof z.ZodOptional) return schema.unwrap();
@@ -53,13 +53,16 @@ export const generators = {
     return `PT${hours}H${minutes}M${seconds}S`;
   },
   regex: (faker: Faker, check: z.core.$ZodCheckStringFormat) => {
-    const { pattern } = check._zod.def;
+    const { pattern, format } = check._zod.def;
     if (pattern !== undefined) {
       const randexp = new RandExp(pattern);
       randexp.randInt = (a: number, b: number) =>
         faker.number.int({ min: a, max: b });
       return randexp.gen();
     }
+    console.warn(
+      `z.stringFormat("${format}") has no regex pattern. Generating a random word instead. Consider providing a regex: z.stringFormat("${format}", /your-pattern/)`,
+    );
     return faker.lorem.word();
   },
   string: (faker: Faker, schema: z.ZodString) => {
@@ -498,3 +501,5 @@ export const generators = {
     return parsedValue.data;
   },
 };
+
+export const generateUtils = generators;

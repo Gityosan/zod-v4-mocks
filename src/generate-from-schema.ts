@@ -1,187 +1,253 @@
+import type { Faker } from '@faker-js/faker';
 import { z } from 'zod/v4';
 import type { GeneraterOptions } from './type';
-import { generators } from './utils';
+import {
+  calcMinMaxString,
+  isZodCheckEndsWith,
+  isZodCheckIncludes,
+  isZodCheckLengthEquals,
+  isZodCheckLowerCase,
+  isZodCheckOverwrite,
+  isZodCheckRegex,
+  isZodCheckStartsWith,
+  isZodCheckUpperCase,
+  isZodJsonSchema,
+  isZodStringbool,
+  generateUtils as u,
+  warnCaseMismatch,
+  warnFixedLengthExceedsConstraint,
+  warnMultipleChecks,
+} from './utils';
+
+function generateStringWithChecks(faker: Faker, schema: z.ZodString): string {
+  const { def } = schema;
+  const { checks = [] } = def;
+
+  const lengthEqualsChecks = checks.filter(isZodCheckLengthEquals);
+  const startsWithChecks = checks.filter(isZodCheckStartsWith);
+  const endsWithChecks = checks.filter(isZodCheckEndsWith);
+  const includesChecks = checks.filter(isZodCheckIncludes);
+  const regexChecks = checks.filter(isZodCheckRegex);
+
+  warnMultipleChecks({
+    length: lengthEqualsChecks.map((c) => c._zod.def.length),
+    startsWith: startsWithChecks.map((c) => c._zod.def.prefix),
+    endsWith: endsWithChecks.map((c) => c._zod.def.suffix),
+    regex: regexChecks.map((c) => c._zod.def.pattern.toString()),
+  });
+
+  const lengthEqualsCheck = lengthEqualsChecks.at(-1);
+  const startsWithCheck = startsWithChecks.at(-1);
+  const endsWithCheck = endsWithChecks.at(-1);
+
+  const prefix = startsWithCheck?._zod.def.prefix || '';
+  const suffix = endsWithCheck?._zod.def.suffix || '';
+  const includesLength = includesChecks.reduce(
+    (sum, check) => sum + check._zod.def.includes.length,
+    0,
+  );
+  const fixedLength = prefix.length + suffix.length + includesLength;
+
+  let res = '';
+  if (lengthEqualsCheck) {
+    const targetLength = lengthEqualsCheck._zod.def.length;
+    const additionalLength = targetLength - fixedLength;
+    if (additionalLength <= 0) {
+      warnFixedLengthExceedsConstraint(fixedLength, 'length', targetLength);
+    } else {
+      res = u.string(faker, { length: additionalLength });
+    }
+  } else {
+    const { minLength, maxLength } = schema;
+    if (maxLength !== null && fixedLength > maxLength) {
+      warnFixedLengthExceedsConstraint(fixedLength, 'max', maxLength);
+    } else {
+      const adjustedMinLength =
+        minLength !== null ? Math.max(0, minLength - fixedLength) : null;
+      const adjustedMaxLength =
+        maxLength !== null ? Math.max(0, maxLength - fixedLength) : null;
+      const options = calcMinMaxString(adjustedMinLength, adjustedMaxLength);
+      res = u.string(faker, options);
+    }
+  }
+
+  const regexCheck = regexChecks.at(-1);
+  if (regexCheck) res = u.regex(faker, regexCheck);
+
+  const caseChecks = checks.filter(
+    (v) => isZodCheckUpperCase(v) || isZodCheckLowerCase(v),
+  );
+  if (caseChecks.length > 1) {
+    console.warn(
+      `Multiple uppercase/lowercase checks detected. Using the last one. This may cause validation failures.`,
+    );
+  }
+  const caseCheck = caseChecks.at(-1);
+  if (caseCheck) res = u.regex(faker, caseCheck);
+
+  const overwriteChecks = checks.filter(isZodCheckOverwrite);
+
+  const overwriteFnStrings = overwriteChecks.map((c) =>
+    c._zod.def.tx.toString(),
+  );
+  const hasToLowerCase =
+    (caseCheck && isZodCheckLowerCase(caseCheck)) ||
+    overwriteFnStrings.some((s) => s.includes('toLowerCase()'));
+  const hasToUpperCase =
+    (caseCheck && isZodCheckUpperCase(caseCheck)) ||
+    overwriteFnStrings.some((s) => s.includes('toUpperCase()'));
+
+  for (const check of overwriteChecks) {
+    const { tx } = check._zod.def;
+    res = tx(res);
+  }
+
+  warnCaseMismatch(hasToLowerCase, 'LowerCase', startsWithCheck);
+  warnCaseMismatch(hasToLowerCase, 'LowerCase', endsWithCheck);
+  warnCaseMismatch(hasToUpperCase, 'UpperCase', startsWithCheck);
+  warnCaseMismatch(hasToUpperCase, 'UpperCase', endsWithCheck);
+
+  for (const check of includesChecks) {
+    res = res + check._zod.def.includes;
+  }
+  if (startsWithCheck) res = prefix + res;
+  if (endsWithCheck) res = res + suffix;
+
+  return res;
+}
 
 function generateFromSchema(
   schema: z.core.$ZodType,
   options: GeneraterOptions,
-): unknown {
-  const { faker } = options;
-  if (schema instanceof z.ZodFile) return generators.file();
-  if (schema instanceof z.ZodEmail) return generators.email(faker);
-  if (schema instanceof z.ZodURL) return generators.url(faker);
-  if (schema instanceof z.ZodJWT) return generators.jwt(faker);
-  if (schema instanceof z.ZodEmoji) return generators.emoji(faker);
-  if (schema instanceof z.ZodGUID) return generators.uuidv4(faker);
-  if (schema instanceof z.ZodNanoID) return generators.nanoid(faker);
-  if (schema instanceof z.ZodULID) return generators.ulid(faker);
-  if (schema instanceof z.ZodIPv4) return generators.ipv4(faker);
-  if (schema instanceof z.ZodIPv6) return generators.ipv6(faker);
-  if (schema instanceof z.ZodCIDRv6) return generators.cidrv6(faker);
-  if (schema instanceof z.ZodBase64URL) return generators.base64url(faker);
-  if (schema instanceof z.ZodDate) return generators.date(faker);
-  if (schema instanceof z.ZodISODateTime) return generators.isoDateTime(faker);
-  if (schema instanceof z.ZodISODate) return generators.isoDate(faker);
-  if (schema instanceof z.ZodISOTime) return generators.isoTime(faker);
-  if (schema instanceof z.ZodISODuration) return generators.isoDuration(faker);
+) {
+  const s = schema;
+  const o = options;
+  const g = generateMocks;
+  const { faker: f } = o;
+  if (s instanceof z.ZodFile) return u.file();
+  if (s instanceof z.ZodEmail) return u.email(f);
+  if (s instanceof z.ZodURL) return u.url(f);
+  if (s instanceof z.ZodJWT) return u.jwt(f);
+  if (s instanceof z.ZodEmoji) return u.emoji(f);
+  if (s instanceof z.ZodGUID) return u.uuidv4(f);
+  if (s instanceof z.ZodNanoID) return u.nanoid(f);
+  if (s instanceof z.ZodULID) return u.ulid(f);
+  if (s instanceof z.ZodIPv4) return u.ipv4(f);
+  if (s instanceof z.ZodIPv6) return u.ipv6(f);
+  if (s instanceof z.ZodCIDRv6) return u.cidrv6(f);
+  if (s instanceof z.ZodBase64URL) return u.base64url(f);
+  if (s instanceof z.ZodDate) return u.date(f);
+  if (s instanceof z.ZodISODateTime) return u.isoDateTime(f);
+  if (s instanceof z.ZodISODate) return u.isoDate(f);
+  if (s instanceof z.ZodISOTime) return u.isoTime(f);
+  if (s instanceof z.ZodISODuration) return u.isoDuration(f);
 
-  if (schema instanceof z.ZodUUID) {
-    const { def } = schema;
+  if (s instanceof z.ZodUUID) {
+    const { def } = s;
     if ('version' in def) {
-      if (def.version === 'v6') return generators.regex(faker, schema);
-      if (def.version === 'v7') return generators.regex(faker, schema);
+      if (def.version === 'v6') return u.regex(f, s);
+      if (def.version === 'v7') return u.regex(f, s);
     }
-    return generators.uuidv4(faker);
+    return u.uuidv4(f);
   }
 
-  if (
-    schema instanceof z.ZodCUID ||
-    schema instanceof z.ZodCUID2 ||
-    schema instanceof z.ZodXID ||
-    schema instanceof z.ZodKSUID ||
-    schema instanceof z.ZodCIDRv4 ||
-    schema instanceof z.ZodBase64 ||
-    schema instanceof z.ZodE164
-  ) {
-    return generators.regex(faker, schema);
+  if (s instanceof z.ZodCUID) return u.regex(f, s);
+  if (s instanceof z.ZodCUID2) return u.regex(f, s);
+  if (s instanceof z.ZodXID) return u.regex(f, s);
+  if (s instanceof z.ZodKSUID) return u.regex(f, s);
+  if (s instanceof z.ZodCIDRv4) return u.regex(f, s);
+  if (s instanceof z.ZodBase64) return u.regex(f, s);
+  if (s instanceof z.ZodE164) return u.regex(f, s);
+
+  if (s instanceof z.ZodCustomStringFormat) {
+    if (s.format === 'hostname') return u.hostname(f);
+    return u.regex(f, s);
   }
 
-  if (schema instanceof z.ZodCustomStringFormat) {
-    return generators.regex(faker, schema);
-  }
+  if (s instanceof z.ZodString) {
+    const { format } = s;
 
-  if (schema instanceof z.ZodString) {
-    const { def, format } = schema;
-    const { checks } = def;
-    let stringResult: unknown = generators.string(faker, schema);
-    if (format === 'email') stringResult = generators.email(faker);
-    else if (format === 'url') stringResult = generators.url(faker);
-    else if (format === 'jwt') stringResult = generators.jwt(faker);
-    else if (format === 'emoji') stringResult = generators.emoji(faker);
-    else if (format === 'ipv4') stringResult = generators.ipv4(faker);
-    else if (format === 'ipv6') stringResult = generators.ipv6(faker);
-    else if (format === 'cidrv6') stringResult = generators.cidrv6(faker);
-    else if (format === 'base64url') stringResult = generators.base64url(faker);
-    else if (format === 'datetime') {
-      stringResult = generators.isoDateTime(faker);
-    } else if (format === 'date') stringResult = generators.isoDate(faker);
-    else if (format === 'time') stringResult = generators.isoTime(faker);
-    else if (format === 'duration') {
-      stringResult = generators.isoDuration(faker);
-    } else {
-      const regexCheck = checks?.find((v) => 'pattern' in v._zod.def);
-      if (regexCheck instanceof z.core.$ZodCheckStringFormat) {
-        stringResult = generators.regex(faker, regexCheck);
-      }
+    if (format === 'email') return u.email(f);
+    if (format === 'url') return u.url(f);
+    if (format === 'jwt') return u.jwt(f);
+    if (format === 'emoji') return u.emoji(f);
+    if (format === 'ipv4') return u.ipv4(f);
+    if (format === 'ipv6') return u.ipv6(f);
+    if (format === 'cidrv6') return u.cidrv6(f);
+    if (format === 'base64url') return u.base64url(f);
+    if (format === 'datetime') return u.isoDateTime(f);
+    if (format === 'date') return u.isoDate(f);
+    if (format === 'time') return u.isoTime(f);
+    if (format === 'duration') return u.isoDuration(f);
+
+    return generateStringWithChecks(f, s);
+  }
+  if (s instanceof z.ZodBigInt) return u.bigInt(f, s);
+  if (s instanceof z.ZodNumber) {
+    if (s instanceof z.ZodNumberFormat) {
+      const { format } = s;
+      if (format === 'float32') return u.float(f, s);
+      if (format === 'float64') return u.float(f, s);
     }
-
-    const overwriteChecks =
-      checks?.filter((v) => v._zod.def.check === 'overwrite') ?? [];
-    for (const check of overwriteChecks) {
-      if (check instanceof z.core.$ZodCheckOverwrite) {
-        const { tx } = check._zod.def;
-        stringResult = tx(stringResult);
-      }
-    }
-
-    return stringResult;
-  }
-  if (schema instanceof z.ZodBigInt) return generators.bigInt(faker, schema);
-
-  if (schema instanceof z.ZodNumber) {
-    if (schema instanceof z.ZodNumberFormat) {
-      const { format } = schema;
-      if (format === 'float32') return generators.float(faker, schema);
-      if (format === 'float64') return generators.float(faker, schema);
-    }
-    return generators.int(faker, schema);
+    return u.int(f, s);
   }
 
-  if (schema instanceof z.ZodNaN) return NaN;
-  if (schema instanceof z.ZodBoolean) return faker.datatype.boolean();
-  if (schema instanceof z.ZodNull) return null;
-  if (schema instanceof z.ZodUndefined) return undefined;
-  if (schema instanceof z.ZodAny) return faker.lorem.word();
-  if (schema instanceof z.ZodUnknown) return faker.lorem.word();
-  if (schema instanceof z.ZodVoid) return undefined;
-  if (schema instanceof z.ZodSymbol) return Symbol(faker.lorem.word());
+  if (s instanceof z.ZodNaN) return NaN;
+  if (s instanceof z.ZodBoolean) return f.datatype.boolean();
+  if (s instanceof z.ZodNull) return null;
+  if (s instanceof z.ZodUndefined) return undefined;
+  if (s instanceof z.ZodAny) return f.lorem.word();
+  if (s instanceof z.ZodUnknown) return f.lorem.word();
+  if (s instanceof z.ZodVoid) return undefined;
+  if (s instanceof z.ZodSymbol) return Symbol(f.lorem.word());
 
-  if (schema instanceof z.ZodLiteral) {
-    return generators.literal(schema, options);
+  if (s instanceof z.ZodLiteral) return u.literal(s, o);
+  if (s instanceof z.ZodEnum) return u.enum(s, o);
+  if (s instanceof z.ZodTemplateLiteral) return u.templateLiteral(s, o, g);
+  if (s instanceof z.ZodArray) return u.array(s, o, g);
+  if (s instanceof z.ZodTuple) return u.tuple(s, o, g);
+  if (s instanceof z.ZodObject) return u.object(s, o, g);
+  if (s instanceof z.ZodRecord) return u.record(s, o, g);
+  if (s instanceof z.ZodMap) return u.map(s, o, g);
+  if (s instanceof z.ZodSet) return u.set(s, o, g);
+  if (s instanceof z.ZodUnion) return u.union(s, o, g);
+  if (s instanceof z.ZodDiscriminatedUnion)
+    return u.discriminatedUnion(s, o, g);
+  if (s instanceof z.ZodXor) return u.xor(s, o, g);
+  if (s instanceof z.ZodIntersection) return u.intersection(s, o, g);
+
+  if (s instanceof z.ZodOptional) return u.optional(s, o, g);
+  if (s instanceof z.ZodExactOptional) return u.exactOptional(s, o, g);
+  if (s instanceof z.ZodNullable) return u.nullable(s, o, g);
+  if (s instanceof z.ZodNonOptional) return u.nonoptional(s, o, g);
+  if (s instanceof z.ZodDefault) return u.default(s, o, g);
+  if (s instanceof z.ZodPrefault) return u.default(s, o, g);
+  if (s instanceof z.ZodReadonly) return g(s.unwrap(), o);
+  if (s instanceof z.ZodLazy) {
+    if (isZodJsonSchema(s, s.unwrap())) return u.json();
+    return u.lazy(s, o, g);
   }
-  if (schema instanceof z.ZodTemplateLiteral) {
-    return generators.templateLiteral(schema, options, generateMocks);
+  if (s instanceof z.ZodCodec) {
+    if (isZodStringbool(s)) return u.stringbool(s, o);
+    return u.codec(s, o, g);
   }
-  if (schema instanceof z.ZodEnum) {
-    return generators.enum(schema, options);
-  }
-  if (schema instanceof z.ZodArray) {
-    return generators.array(schema, options, generateMocks);
-  }
-  if (schema instanceof z.ZodTuple) {
-    return generators.tuple(schema, options, generateMocks);
-  }
-  if (schema instanceof z.ZodObject) {
-    return generators.object(schema, options, generateMocks);
-  }
-  if (schema instanceof z.ZodRecord) {
-    return generators.record(schema, options, generateMocks);
-  }
-  if (schema instanceof z.ZodMap) {
-    return generators.map(schema, options, generateMocks);
-  }
-  if (schema instanceof z.ZodSet) {
-    return generators.set(schema, options, generateMocks);
-  }
-  if (schema instanceof z.ZodUnion) {
-    return generators.union(schema, options, generateMocks);
-  }
-  if (schema instanceof z.ZodDiscriminatedUnion) {
-    return generators.discriminatedUnion(schema, options, generateMocks);
-  }
-  if (schema instanceof z.ZodIntersection) {
-    return generators.intersection(schema, options, generateMocks);
-  }
-  if (schema instanceof z.ZodOptional) {
-    return generators.optional(schema, options, generateMocks);
-  }
-  if (schema instanceof z.ZodNullable) {
-    return generators.nullable(schema, options, generateMocks);
-  }
-  if (schema instanceof z.ZodNonOptional) {
-    return generators.nonoptional(schema, options, generateMocks);
-  }
-  if (schema instanceof z.ZodDefault || schema instanceof z.ZodPrefault) {
-    return generators.default(schema);
-  }
-  if (schema instanceof z.ZodReadonly) {
-    return generateMocks(schema.def.innerType, options);
-  }
-  if (schema instanceof z.ZodLazy) {
-    return generators.lazy(schema, options, generateMocks);
-  }
+
   // ZodPipe series
-  if (schema instanceof z.ZodPipe) {
-    return generators.pipe(schema, options, generateMocks);
-  }
-  if (schema instanceof z.ZodSuccess) {
-    return generators.success(schema, options, generateMocks);
-  }
-  if (schema instanceof z.ZodCatch) {
-    return generators.catch(schema, options, generateMocks);
-  }
+  if (s instanceof z.ZodPipe) return u.pipe(s, o, g);
+  if (s instanceof z.ZodSuccess) return u.success(s, o, g);
+  if (s instanceof z.ZodCatch) return u.catch(s, o, g);
 
-  if (schema instanceof z.ZodNever) {
+  if (s instanceof z.ZodNever) {
     console.warn(
-      'ZodNever schema encountered. Returning null for mock data as no valid value can exist.',
+      'ZodNever s encountered. Returning null for mock data as no valid value can exist.',
     );
     return null;
   }
 
   console.warn(
-    `Unhandled Zod schema type: ${schema.constructor.name}. Returning dummy value.`,
+    `Unhandled Zod s type: ${s.constructor.name}. Returning dummy value.`,
   );
-  return faker.lorem.word();
+  return f.lorem.word();
 }
 
 export function generateMocks(
