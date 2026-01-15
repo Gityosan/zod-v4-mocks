@@ -8,7 +8,6 @@ import {
   calcMinMaxBigInt,
   calcMinMaxFloat,
   calcMinMaxInt,
-  calcMinMaxString,
   compareMax,
   compareMin,
 } from './calculation';
@@ -29,6 +28,10 @@ const validValues = [
   'n',
   'disabled',
 ] as const;
+
+export type StringLengthOptions = {
+  length?: number | { min: number; max: number };
+};
 
 export const generateUtils = {
   file: () => new File([], 'test.txt'),
@@ -71,9 +74,8 @@ export const generateUtils = {
     }
     return faker.lorem.word();
   },
-  string: (faker: Faker, schema: z.ZodString) => {
-    const { minLength, maxLength } = schema;
-    return faker.lorem.word(calcMinMaxString(minLength, maxLength));
+  string: (faker: Faker, schema: z.ZodString, options: StringLengthOptions) => {
+    return faker.lorem.word(options);
   },
   int: (faker: Faker, schema: z.ZodNumber) => {
     const { minValue, maxValue } = schema;

@@ -1,11 +1,120 @@
+import type { Faker } from '@faker-js/faker';
 import { z } from 'zod';
 import type { GeneraterOptions } from './type';
 import {
+  calcMinMaxString,
+  isZodCheckEndsWith,
+  isZodCheckIncludes,
+  isZodCheckLengthEquals,
+  isZodCheckLowerCase,
   isZodCheckOverwrite,
+  isZodCheckRegex,
+  isZodCheckStartsWith,
+  isZodCheckUpperCase,
   isZodJsonSchema,
   isZodStringbool,
+  warnCaseMismatch,
+  warnFixedLengthExceedsConstraint,
+  warnMultipleChecks,
   generateUtils as u,
 } from './utils';
+
+function generateStringWithChecks(faker: Faker, schema: z.ZodString): string {
+  const { def } = schema;
+  const { checks = [] } = def;
+
+  const lengthEqualsChecks = checks.filter(isZodCheckLengthEquals);
+  const startsWithChecks = checks.filter(isZodCheckStartsWith);
+  const endsWithChecks = checks.filter(isZodCheckEndsWith);
+  const includesChecks = checks.filter(isZodCheckIncludes);
+  const regexChecks = checks.filter(isZodCheckRegex);
+
+  warnMultipleChecks({
+    length: lengthEqualsChecks.map((c) => c._zod.def.length),
+    startsWith: startsWithChecks.map((c) => c._zod.def.prefix),
+    endsWith: endsWithChecks.map((c) => c._zod.def.suffix),
+    regex: regexChecks.map((c) => c._zod.def.pattern.toString()),
+  });
+
+  const lengthEqualsCheck = lengthEqualsChecks.at(-1);
+  const startsWithCheck = startsWithChecks.at(-1);
+  const endsWithCheck = endsWithChecks.at(-1);
+
+  const prefix = startsWithCheck?._zod.def.prefix || '';
+  const suffix = endsWithCheck?._zod.def.suffix || '';
+  const includesLength = includesChecks.reduce(
+    (sum, check) => sum + check._zod.def.includes.length,
+    0,
+  );
+  const fixedLength = prefix.length + suffix.length + includesLength;
+
+  let res = '';
+  if (lengthEqualsCheck) {
+    const targetLength = lengthEqualsCheck._zod.def.length;
+    const additionalLength = targetLength - fixedLength;
+    if (additionalLength <= 0) {
+      warnFixedLengthExceedsConstraint(fixedLength, 'length', targetLength);
+    } else {
+      res = u.string(faker, schema, { length: additionalLength });
+    }
+  } else {
+    const { minLength, maxLength } = schema;
+    if (maxLength !== null && fixedLength > maxLength) {
+      warnFixedLengthExceedsConstraint(fixedLength, 'max', maxLength);
+    } else {
+      const adjustedMinLength =
+        minLength !== null ? Math.max(0, minLength - fixedLength) : null;
+      const adjustedMaxLength =
+        maxLength !== null ? Math.max(0, maxLength - fixedLength) : null;
+      const options = calcMinMaxString(adjustedMinLength, adjustedMaxLength);
+      res = u.string(faker, schema, options);
+    }
+  }
+
+  const regexCheck = regexChecks.at(-1);
+  if (regexCheck) res = u.regex(faker, regexCheck);
+
+  const caseChecks = checks.filter(
+    (v) => isZodCheckUpperCase(v) || isZodCheckLowerCase(v),
+  );
+  if (caseChecks.length > 1) {
+    console.warn(
+      `Multiple uppercase/lowercase checks detected. Using the last one. This may cause validation failures.`,
+    );
+  }
+  const caseCheck = caseChecks.at(-1);
+  if (caseCheck) res = u.regex(faker, caseCheck);
+
+  const overwriteChecks = checks.filter(isZodCheckOverwrite);
+
+  const overwriteFnStrings = overwriteChecks.map((c) =>
+    c._zod.def.tx.toString(),
+  );
+  const hasToLowerCase =
+    (caseCheck && isZodCheckLowerCase(caseCheck)) ||
+    overwriteFnStrings.some((s) => s.includes('toLowerCase()'));
+  const hasToUpperCase =
+    (caseCheck && isZodCheckUpperCase(caseCheck)) ||
+    overwriteFnStrings.some((s) => s.includes('toUpperCase()'));
+
+  for (const check of overwriteChecks) {
+    const { tx } = check._zod.def;
+    res = tx(res);
+  }
+
+  warnCaseMismatch(hasToLowerCase, 'LowerCase', startsWithCheck);
+  warnCaseMismatch(hasToLowerCase, 'LowerCase', endsWithCheck);
+  warnCaseMismatch(hasToUpperCase, 'UpperCase', startsWithCheck);
+  warnCaseMismatch(hasToUpperCase, 'UpperCase', endsWithCheck);
+
+  for (const check of includesChecks) {
+    res = res + check._zod.def.includes;
+  }
+  if (startsWithCheck) res = prefix + res;
+  if (endsWithCheck) res = res + suffix;
+
+  return res;
+}
 
 function generateFromSchema(
   schema: z.core.$ZodType,
@@ -56,35 +165,22 @@ function generateFromSchema(
   }
 
   if (s instanceof z.ZodString) {
-    const { def, format } = s;
-    const { checks = [] } = def;
-    let stringResult: string = u.string(f, s);
-    if (format === 'email') stringResult = u.email(f);
-    else if (format === 'url') stringResult = u.url(f);
-    else if (format === 'jwt') stringResult = u.jwt(f);
-    else if (format === 'emoji') stringResult = u.emoji(f);
-    else if (format === 'ipv4') stringResult = u.ipv4(f);
-    else if (format === 'ipv6') stringResult = u.ipv6(f);
-    else if (format === 'cidrv6') stringResult = u.cidrv6(f);
-    else if (format === 'base64url') stringResult = u.base64url(f);
-    else if (format === 'datetime') stringResult = u.isoDateTime(f);
-    else if (format === 'date') stringResult = u.isoDate(f);
-    else if (format === 'time') stringResult = u.isoTime(f);
-    else if (format === 'duration') stringResult = u.isoDuration(f);
-    else {
-      const regexCheck = checks.find((v) => 'pattern' in v._zod.def);
-      if (regexCheck instanceof z.core.$ZodCheckStringFormat) {
-        stringResult = u.regex(f, regexCheck);
-      }
-    }
+    const { format } = s;
 
-    const overwriteChecks = checks.filter(isZodCheckOverwrite);
-    for (const check of overwriteChecks) {
-      const { tx } = check._zod.def;
-      stringResult = tx(stringResult);
-    }
+    if (format === 'email') return u.email(f);
+    if (format === 'url') return u.url(f);
+    if (format === 'jwt') return u.jwt(f);
+    if (format === 'emoji') return u.emoji(f);
+    if (format === 'ipv4') return u.ipv4(f);
+    if (format === 'ipv6') return u.ipv6(f);
+    if (format === 'cidrv6') return u.cidrv6(f);
+    if (format === 'base64url') return u.base64url(f);
+    if (format === 'datetime') return u.isoDateTime(f);
+    if (format === 'date') return u.isoDate(f);
+    if (format === 'time') return u.isoTime(f);
+    if (format === 'duration') return u.isoDuration(f);
 
-    return stringResult;
+    return generateStringWithChecks(f, s);
   }
   if (s instanceof z.ZodBigInt) return u.bigInt(f, s);
   if (s instanceof z.ZodNumber) {

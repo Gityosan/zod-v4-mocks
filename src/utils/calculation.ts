@@ -1,13 +1,12 @@
 import type { Faker } from '@faker-js/faker';
 import { z } from 'zod';
 
-/**
- * @package
- */
 export function calcMinMaxString(
   minLength: number | null,
   maxLength: number | null,
+  length?: number,
 ) {
+  if (typeof length === 'number') return { length };
   if (typeof minLength === 'number') {
     if (maxLength === null) return { length: minLength };
     return { length: { min: minLength, max: maxLength } };
@@ -93,6 +92,7 @@ export function calcMinMaxFloat(
   if (min !== undefined && max === undefined) return { min, max: min + 100 };
   return { min, max };
 }
+
 /**
  * @package
  */
