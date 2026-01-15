@@ -22,7 +22,7 @@ function unwrapSchema(schema: z.core.$ZodType) {
   return schema;
 }
 
-export const generateUtils = {
+export const generators = {
   file: () => new File([], 'test.txt'),
   email: (faker: Faker) => faker.internet.email(),
   url: (faker: Faker) => faker.internet.url(),
