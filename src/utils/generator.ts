@@ -78,7 +78,7 @@ export const generateUtils = {
     );
     return faker.lorem.word();
   },
-  string: (faker: Faker, schema: z.ZodString, options: StringLengthOptions) => {
+  string: (faker: Faker, options: StringLengthOptions) => {
     return faker.lorem.word(options);
   },
   int: (faker: Faker, schema: z.ZodNumber) => {

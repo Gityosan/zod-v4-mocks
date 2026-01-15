@@ -13,10 +13,10 @@ import {
   isZodCheckUpperCase,
   isZodJsonSchema,
   isZodStringbool,
+  generateUtils as u,
   warnCaseMismatch,
   warnFixedLengthExceedsConstraint,
   warnMultipleChecks,
-  generateUtils as u,
 } from './utils';
 
 function generateStringWithChecks(faker: Faker, schema: z.ZodString): string {
@@ -55,7 +55,7 @@ function generateStringWithChecks(faker: Faker, schema: z.ZodString): string {
     if (additionalLength <= 0) {
       warnFixedLengthExceedsConstraint(fixedLength, 'length', targetLength);
     } else {
-      res = u.string(faker, schema, { length: additionalLength });
+      res = u.string(faker, { length: additionalLength });
     }
   } else {
     const { minLength, maxLength } = schema;
@@ -67,7 +67,7 @@ function generateStringWithChecks(faker: Faker, schema: z.ZodString): string {
       const adjustedMaxLength =
         maxLength !== null ? Math.max(0, maxLength - fixedLength) : null;
       const options = calcMinMaxString(adjustedMinLength, adjustedMaxLength);
-      res = u.string(faker, schema, options);
+      res = u.string(faker, options);
     }
   }
 
