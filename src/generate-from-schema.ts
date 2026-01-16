@@ -166,21 +166,80 @@ function generateFromSchema(
   }
 
   if (s instanceof z.ZodString) {
-    const { format } = s;
+    const { checks = [] } = s.def;
 
-    if (format === 'email') return u.email(f);
-    if (format === 'url') return u.url(f);
-    if (format === 'jwt') return u.jwt(f);
-    if (format === 'emoji') return u.emoji(f);
-    if (format === 'ipv4') return u.ipv4(f);
-    if (format === 'ipv6') return u.ipv6(f);
-    if (format === 'mac') return u.mac(f);
-    if (format === 'cidrv6') return u.cidrv6(f);
-    if (format === 'base64url') return u.base64url(f);
-    if (format === 'datetime') return u.isoDateTime(f);
-    if (format === 'date') return u.isoDate(f);
-    if (format === 'time') return u.isoTime(f);
-    if (format === 'duration') return u.isoDuration(f);
+    const emailSchema = checks.find((v) => v instanceof z.ZodEmail);
+    if (emailSchema) return u.email(f);
+
+    const urlSchema = checks.find((v) => v instanceof z.ZodURL);
+    if (urlSchema) return u.url(f);
+
+    const jwtSchema = checks.find((v) => v instanceof z.ZodJWT);
+    if (jwtSchema) return u.jwt(f);
+
+    const emojiSchema = checks.find((v) => v instanceof z.ZodEmoji);
+    if (emojiSchema) return u.emoji(f);
+
+    const guidSchema = checks.find((v) => v instanceof z.ZodGUID);
+    if (guidSchema) return u.uuidv4(f);
+
+    const uuidSchema = checks.find((v) => v instanceof z.ZodUUID);
+    if (uuidSchema) {
+      const { version } = uuidSchema?._zod.def;
+      if (version === 'v4') return u.uuidv4(f);
+      return u.regex(f, uuidSchema);
+    }
+
+    const nanoidSchema = checks.find((v) => v instanceof z.ZodNanoID);
+    if (nanoidSchema) return u.nanoid(f);
+
+    const ulidSchema = checks.find((v) => v instanceof z.ZodULID);
+    if (ulidSchema) return u.ulid(f);
+
+    const ipv4Schema = checks.find((v) => v instanceof z.ZodIPv4);
+    if (ipv4Schema) return u.ipv4(f);
+
+    const ipv6Schema = checks.find((v) => v instanceof z.ZodIPv6);
+    if (ipv6Schema) return u.ipv6(f);
+
+    const cidrv6Schema = checks.find((v) => v instanceof z.ZodCIDRv6);
+    if (cidrv6Schema) return u.cidrv6(f);
+
+    const base64urlSchema = checks.find((v) => v instanceof z.ZodBase64URL);
+    if (base64urlSchema) return u.base64url(f);
+
+    const isoDateTimeSchema = checks.find((v) => v instanceof z.ZodISODateTime);
+    if (isoDateTimeSchema) return u.isoDateTime(f);
+
+    const isoDateSchema = checks.find((v) => v instanceof z.ZodISODate);
+    if (isoDateSchema) return u.isoDate(f);
+
+    const isoTimeSchema = checks.find((v) => v instanceof z.ZodISOTime);
+    if (isoTimeSchema) return u.isoTime(f);
+
+    const isoDurationSchema = checks.find((v) => v instanceof z.ZodISODuration);
+    if (isoDurationSchema) return u.isoDuration(f);
+
+    const cuidSchema = checks.find((v) => v instanceof z.ZodCUID);
+    if (cuidSchema) return u.regex(f, cuidSchema);
+
+    const cuid2Schema = checks.find((v) => v instanceof z.ZodCUID2);
+    if (cuid2Schema) return u.regex(f, cuid2Schema);
+
+    const xidSchema = checks.find((v) => v instanceof z.ZodXID);
+    if (xidSchema) return u.regex(f, xidSchema);
+
+    const ksuidSchema = checks.find((v) => v instanceof z.ZodKSUID);
+    if (ksuidSchema) return u.regex(f, ksuidSchema);
+
+    const cidrv4Schema = checks.find((v) => v instanceof z.ZodCIDRv4);
+    if (cidrv4Schema) return u.regex(f, cidrv4Schema);
+
+    const base64Schema = checks.find((v) => v instanceof z.ZodBase64);
+    if (base64Schema) return u.regex(f, base64Schema);
+
+    const e164Schema = checks.find((v) => v instanceof z.ZodE164);
+    if (e164Schema) return u.regex(f, e164Schema);
 
     return generateStringWithChecks(f, s);
   }
