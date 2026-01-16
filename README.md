@@ -2,6 +2,17 @@
 
 Mock generator for zod v4
 
+## Version Guide
+
+This library has different versions for different Zod versions:
+
+- **If you're using Zod v4.0.0+**: Use `zod-v4-mocks@2.0.0` (this version)
+- **If you're using Zod v3.25.76 (v4 preview)**: Use `zod-v4-mocks@1.1.0`
+
+**Migration from v1.0.x:**
+- If you were using `v1.0.15` (latest v1.0.x), upgrade to `v2.0.0`
+- If you were using `v1.0.11` or earlier, upgrade to `v1.1.0`
+
 ## Installation
 
 ```bash
