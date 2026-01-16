@@ -1,10 +1,8 @@
-import { Faker } from '@faker-js/faker';
 import { z } from 'zod';
 import { generateMocks } from './generate-from-schema';
 import type { CustomGeneratorType, GeneraterOptions, MockConfig } from './type';
 import {
-  createMockConfig,
-  getLocales,
+  createGeneraterOptions,
   outputToFile,
   regenerateIfOmitted,
   type OutputOptions,
@@ -14,18 +12,14 @@ class MockGenerator {
   protected options: GeneraterOptions;
 
   constructor(config?: Partial<MockConfig>) {
-    const mergedConfig = createMockConfig(config);
-    const { locale, randomizer, seed, consistentKey } = mergedConfig;
-    this.options = {
-      faker: new Faker({ locale: getLocales(locale), randomizer, seed }),
-      config: mergedConfig,
-      registry: consistentKey
-        ? z.registry<{ [consistentKey]: string }>()
-        : null,
-      valueStore: new Map(),
-      arrayIndexes: [],
-      pinnedHierarchy: new Map(),
-    };
+    this.options = createGeneraterOptions(config);
+  }
+
+  updateConfig(newConfig?: Partial<MockConfig>): MockGenerator {
+    const { customGenerator, config } = this.options;
+    this.options = createGeneraterOptions({ ...config, ...newConfig });
+    this.options.customGenerator = customGenerator;
+    return this;
   }
 
   /**
