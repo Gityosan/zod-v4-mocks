@@ -43,15 +43,22 @@ export function compareMax(leftMax: number | null, rightMax: number | null) {
 /**
  * @package
  */
-export function calcMinMaxInt(
+export function calcMinMaxNumber(
   minValue: number | null,
   maxValue: number | null,
 ) {
-  const min =
-    minValue === -Infinity || minValue === null ? undefined : minValue;
-  const max = maxValue === Infinity || maxValue === null ? undefined : maxValue;
-  if (min === undefined && max !== undefined) return { min: max - 100, max };
-  if (min !== undefined && max === undefined) return { min, max: min + 100 };
+  let min = minValue === null ? undefined : minValue;
+  let max = maxValue === null ? undefined : maxValue;
+  if (min !== undefined && min < Number.MIN_SAFE_INTEGER) {
+    min = Number.MIN_SAFE_INTEGER;
+  }
+  if (max !== undefined && max > Number.MAX_SAFE_INTEGER) {
+    max = Number.MAX_SAFE_INTEGER;
+  }
+  if (min !== undefined && max !== undefined && min > max) {
+    console.warn('Min value should be less than max value');
+    max = Math.max(min, max);
+  }
   return { min, max };
 }
 
@@ -64,32 +71,6 @@ export function calcMinMaxBigInt(
 ) {
   const min = minValue === null ? undefined : minValue;
   const max = maxValue === null ? undefined : maxValue;
-  if (min === undefined && max !== undefined) return { min: max - 100n, max };
-  if (min !== undefined && max === undefined) return { min, max: min + 100n };
-  return { min, max };
-}
-
-/**
- * @package
- */
-export function calcMinMaxFloat(
-  minValue: number | null,
-  maxValue: number | null,
-) {
-  const min =
-    minValue === null
-      ? undefined
-      : minValue === Number.MIN_VALUE
-        ? Number.MIN_SAFE_INTEGER
-        : minValue;
-  const max =
-    maxValue === null
-      ? undefined
-      : maxValue === Number.MAX_VALUE
-        ? Number.MAX_SAFE_INTEGER
-        : maxValue;
-  if (min === undefined && max !== undefined) return { min: max - 100, max };
-  if (min !== undefined && max === undefined) return { min, max: min + 100 };
   return { min, max };
 }
 

@@ -115,3 +115,31 @@ export function isZodCheckLengthEquals(
 ): check is z.core.$ZodCheckLengthEquals {
   return check._zod.def.check === 'length_equals';
 }
+
+function isZodCheckMultipleOf(
+  check: z.core.$ZodCheck<never>,
+): check is z.core.$ZodCheckMultipleOf {
+  return check._zod.def.check === 'multiple_of';
+}
+
+/**
+ * @package
+ */
+export function isZodCheckMultipleOfNumber(
+  check: z.core.$ZodCheck<never>,
+): check is z.core.$ZodCheckMultipleOf<number> {
+  return (
+    isZodCheckMultipleOf(check) && typeof check._zod.def.value === 'number'
+  );
+}
+
+/**
+ * @package
+ */
+export function isZodCheckMultipleOfBigInt(
+  check: z.core.$ZodCheck<never>,
+): check is z.core.$ZodCheckMultipleOf<bigint> {
+  return (
+    isZodCheckMultipleOf(check) && typeof check._zod.def.value === 'bigint'
+  );
+}
