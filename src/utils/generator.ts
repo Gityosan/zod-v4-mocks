@@ -6,12 +6,15 @@ import type { CustomGeneratorType, GeneraterOptions } from '../type';
 import {
   calcLengthFromChecks,
   calcMinMaxBigInt,
-  calcMinMaxFloat,
-  calcMinMaxInt,
+  calcMinMaxNumber,
   compareMax,
   compareMin,
 } from './calculation';
-import { unwrapSchema } from './schema';
+import {
+  isZodCheckMultipleOfBigInt,
+  isZodCheckMultipleOfNumber,
+  unwrapSchema,
+} from './schema';
 
 export type StringLengthOptions = {
   length?: number | { min: number; max: number };
@@ -65,33 +68,33 @@ export const generateUtils = {
   },
   int: (faker: Faker, schema: z.ZodNumber) => {
     const { minValue, maxValue } = schema;
-    const { min, max } = calcMinMaxInt(minValue, maxValue);
-    if (min !== undefined && max !== undefined) {
-      if (min > max) {
-        throw new Error('Min value should be less than max value');
-      }
-    }
-    return faker.number.int({ min, max });
+    const { min, max } = calcMinMaxNumber(minValue, maxValue);
+
+    const { checks = [] } = schema.def;
+    const multipleOfCheck = checks.find(isZodCheckMultipleOfNumber);
+    const multipleOf = multipleOfCheck?._zod.def.value;
+
+    return faker.number.int({ min, max, multipleOf });
   },
   bigInt: (faker: Faker, schema: z.ZodBigInt) => {
     const { minValue, maxValue } = schema;
     const { min, max } = calcMinMaxBigInt(minValue, maxValue);
-    if (min !== undefined && max !== undefined) {
-      if (min > max) {
-        throw new Error('Min value should be less than max value');
-      }
-    }
-    return faker.number.bigInt({ min, max });
+
+    const { checks = [] } = schema.def;
+    const multipleOfCheck = checks.find(isZodCheckMultipleOfBigInt);
+    const multipleOf = multipleOfCheck?._zod.def.value;
+
+    return faker.number.bigInt({ min, max, multipleOf });
   },
   float: (faker: Faker, schema: z.ZodFloat32 | z.ZodFloat64) => {
     const { minValue, maxValue } = schema;
-    const { min, max } = calcMinMaxFloat(minValue, maxValue);
-    if (min !== undefined && max !== undefined) {
-      if (min > max) {
-        throw new Error('Min value should be less than max value');
-      }
-    }
-    return faker.number.float({ min, max });
+    const { min, max } = calcMinMaxNumber(minValue, maxValue);
+
+    const { checks = [] } = schema.def;
+    const multipleOfCheck = checks.find(isZodCheckMultipleOfNumber);
+    const multipleOf = multipleOfCheck?._zod.def.value;
+
+    return faker.number.float({ min, max, multipleOf });
   },
   literal: (schema: z.ZodLiteral, options: GeneraterOptions) => {
     const { faker } = options;

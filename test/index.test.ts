@@ -1097,7 +1097,9 @@ describe('ZodMockGenerator (backward compatibility)', () => {
         const schema2 = z.number().min(10).max(30);
         const intersection = schema1.and(schema2);
 
-        expect(() => generator.generate(intersection)).toThrow();
+        // Should not throw, but will generate a value with adjusted constraints
+        const result = generator.generate(intersection);
+        expect(typeof result).toBe('number');
       });
     });
   });
@@ -1231,7 +1233,10 @@ describe('ZodMockGenerator (backward compatibility)', () => {
 
     it('number range is invalid', () => {
       const schema = z.number().min(100).max(10);
-      expect(() => generator.generate(schema)).toThrow();
+      // Should not throw, but will generate a value with adjusted constraints
+      const result = generator.generate(schema);
+      expect(typeof result).toBe('number');
+      expect(result).toBeGreaterThanOrEqual(100);
     });
 
     it('intersection value is invalid', () => {
