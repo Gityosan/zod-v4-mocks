@@ -1,5 +1,6 @@
-import { type LocaleDefinition, allLocales } from '@faker-js/faker';
-import type { LocaleType, MockConfig } from '../type';
+import { Faker, type LocaleDefinition, allLocales } from '@faker-js/faker';
+import { z } from 'zod/v4';
+import type { GeneraterOptions, LocaleType, MockConfig } from '../type';
 
 export function getLocales(
   locales?: LocaleType | LocaleType[],
@@ -39,5 +40,22 @@ export function createMockConfig(config?: Partial<MockConfig>): MockConfig {
     defaultProbability,
     lazyDepthLimit,
     ...rest,
+  };
+}
+
+export function createGeneraterOptions(
+  config?: Partial<MockConfig>,
+): GeneraterOptions {
+  const mergedConfig = createMockConfig(config);
+  const { locale, randomizer, seed, consistentKey } = mergedConfig;
+  return {
+    faker: new Faker({ locale: getLocales(locale), randomizer, seed }),
+    config: mergedConfig,
+    registry: consistentKey
+      ? z.registry<{ [consistentKey]: string }>()
+      : null,
+    valueStore: new Map(),
+    arrayIndexes: [],
+    pinnedHierarchy: new Map(),
   };
 }
