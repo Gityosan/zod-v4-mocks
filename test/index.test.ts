@@ -1225,10 +1225,10 @@ describe('ZodMockGenerator (backward compatibility)', () => {
   });
 
   describe('error handling', () => {
-    it('ZodNever schema returns null', () => {
+    it('ZodNever schema returns OMIT_SYMBOL', () => {
       const schema = z.never();
       const result = generator.generate(schema);
-      expect(result).toBeNull();
+      expect(typeof result).toBe('symbol');
     });
 
     it('number range is invalid', () => {

@@ -16,6 +16,9 @@ import {
   unwrapSchema,
 } from './schema';
 
+// Symbol used to indicate a value should be omitted (for ZodNever)
+export const OMIT_SYMBOL = Symbol.for('zod-v4-mocks:omit');
+
 export type StringLengthOptions = {
   length?: number | { min: number; max: number };
 };
@@ -138,7 +141,7 @@ export const generateUtils = {
     return Array.from({ length }, (_, arrayIndex) => {
       const arrayIndexes = [...options.arrayIndexes, arrayIndex];
       return generator(schema.element, { ...options, arrayIndexes });
-    });
+    }).filter((v) => v !== OMIT_SYMBOL);
   },
   tuple: (
     schema: z.ZodTuple,
@@ -146,10 +149,20 @@ export const generateUtils = {
     generator: CustomGeneratorType,
   ) => {
     const { items } = schema.def;
-    return items.map((item, arrayIndex) => {
+    const result = items.map((item, arrayIndex) => {
       const arrayIndexes = [...options.arrayIndexes, arrayIndex];
       return generator(item, { ...options, arrayIndexes });
     });
+
+    // Handle case where ZodNever returns OMIT_SYMBOL
+    // However, since tuples have fixed length, warn if OMIT_SYMBOL is present
+    if (result.includes(OMIT_SYMBOL)) {
+      console.warn(
+        'OMIT_SYMBOL found in tuple. Tuple has fixed length, so OMIT_SYMBOL cannot be filtered out. This may cause validation errors.',
+      );
+    }
+
+    return result;
   },
   map: (
     schema: z.ZodMap,
@@ -165,7 +178,7 @@ export const generateUtils = {
       const key = generator(keyType, options);
       const value = generator(valueType, options);
       return [key, value] as const;
-    });
+    }).filter(([k, v]) => k !== OMIT_SYMBOL && v !== OMIT_SYMBOL);
     return new Map(entries);
   },
   set: (
@@ -205,6 +218,10 @@ export const generateUtils = {
     const length = faker.number.int(config.record);
     return [...Array(length)].reduce((acc) => {
       const k = generator(keyType, options);
+
+      // Handle case where ZodNever returns OMIT_SYMBOL, skip this entry
+      if (k === OMIT_SYMBOL) return acc;
+
       const keyIsValid =
         typeof k === 'string' || typeof k === 'number' || typeof k === 'symbol';
       if (keyIsValid) {
@@ -487,5 +504,8 @@ export const generateUtils = {
     const value = generator(schema.unwrap(), options);
     const parsedValue = schema.safeParse(value);
     return parsedValue.data;
+  },
+  never: () => {
+    return OMIT_SYMBOL;
   },
 };
