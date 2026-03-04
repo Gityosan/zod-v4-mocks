@@ -10,9 +10,9 @@ describe('initGenerator (functional base API)', () => {
         const schema = z.xor([z.string(), z.number()]);
         const result = generator.generate(schema);
         expect(() => schema.parse(result)).not.toThrow();
-        expect(
-          typeof result === 'string' || typeof result === 'number',
-        ).toBe(true);
+        expect(typeof result === 'string' || typeof result === 'number').toBe(
+          true,
+        );
       });
 
       it('xor with objects', () => {
@@ -197,7 +197,8 @@ describe('initGenerator (functional base API)', () => {
 
     describe('apply (schema transformation helper)', () => {
       it('apply with min/max constraints', () => {
-        const setConstraints = <T extends z.ZodNumber>(s: T) => s.min(0).max(100);
+        const setConstraints = <T extends z.ZodNumber>(s: T) =>
+          s.min(0).max(100);
         const schema = z.number().apply(setConstraints);
         const result = generator.generate(schema);
         expect(() => schema.parse(result)).not.toThrow();
@@ -234,7 +235,9 @@ describe('initGenerator (functional base API)', () => {
       });
 
       it('check applies multiple checks with trim', () => {
-        const schema = z.string().check(z.minLength(5), z.trim(), z.toLowerCase());
+        const schema = z
+          .string()
+          .check(z.minLength(5), z.trim(), z.toLowerCase());
         const result = generator.generate(schema);
         expect(() => schema.parse(result)).not.toThrow();
         expect(typeof result).toBe('string');
@@ -332,11 +335,17 @@ describe('initGenerator (functional base API)', () => {
         const schema = z.discriminatedUnion('kind', [
           z.object({ kind: z.literal('circle'), radius: z.number() }),
           z.object({ kind: z.literal('square'), side: z.number() }),
-          z.object({ kind: z.literal('rectangle'), width: z.number(), height: z.number() }),
+          z.object({
+            kind: z.literal('rectangle'),
+            width: z.number(),
+            height: z.number(),
+          }),
         ]);
         const result = generator.generate(schema);
         expect(() => schema.parse(result)).not.toThrow();
-        expect(['circle', 'square', 'rectangle']).toContain((result as any).kind);
+        expect(['circle', 'square', 'rectangle']).toContain(
+          (result as any).kind,
+        );
       });
 
       it('discriminatedUnion works after generating other schemas', () => {
@@ -405,7 +414,9 @@ describe('initGenerator (functional base API)', () => {
         const result = generator.generate(schema);
         expect(() => schema.parse(result)).not.toThrow();
         expect(typeof result).toBe('string');
-        expect(result as string).toMatch(/^Status: active - ID: -?\d+(\.\d+)?$/);
+        expect(result as string).toMatch(
+          /^Status: active - ID: -?\d+(\.\d+)?$/,
+        );
       });
 
       it('with boolean', () => {
@@ -457,6 +468,84 @@ describe('initGenerator (functional base API)', () => {
         expect(() => schema.parse(result)).not.toThrow();
         expect(typeof result).toBe('string');
         expect(result as string).toMatch(/^Message: (.*)$/);
+      });
+    });
+
+    describe('ZodNever handling', () => {
+      it('handles ZodNever in partialRecord correctly', () => {
+        const keys = ['id', 'name', 'email'];
+        const schema = z.partialRecord(z.enum(keys), z.string());
+
+        for (let i = 0; i < 100; i++) {
+          const gen = initGenerator({ seed: i });
+          const result = gen.generate(schema);
+          expect(() => schema.parse(result)).not.toThrow();
+          expect(typeof result).toBe('object');
+
+          // Verify all keys are valid
+          for (const key of Object.keys(result)) {
+            expect(keys).toContain(key);
+          }
+        }
+      });
+
+      it('can generate empty object with partialRecord', () => {
+        const schema = z.partialRecord(z.enum(['a', 'b']), z.number());
+        const gen = initGenerator({ seed: 42, record: { min: 0, max: 0 } });
+        const result = gen.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+        expect(Object.keys(result)).toHaveLength(0);
+      });
+
+      it('works with real-world partialRecord use case', () => {
+        const keys = ['id', 'name', 'email'];
+        const CommonModuleType = z.enum(keys);
+        const ModuleStatus = z.object({
+          status: z.string(),
+          timestamp: z.number(),
+        });
+
+        const schema = z.partialRecord(
+          CommonModuleType,
+          ModuleStatus.optional(),
+        );
+
+        for (let i = 0; i < 50; i++) {
+          const gen = initGenerator({ seed: i });
+          const result = gen.generate(schema);
+          expect(() => schema.parse(result)).not.toThrow();
+
+          // Verify all keys are from the enum
+          for (const key of Object.keys(result)) {
+            expect(keys).toContain(key);
+          }
+        }
+      });
+
+      it('handles ZodNever in union correctly', () => {
+        // This schema is not practical, but test as an edge case
+        const schema = z.union([z.string(), z.never()]);
+        const gen = initGenerator({ seed: 42 });
+        const result = gen.generate(schema);
+
+        // regenerateIfOmitted will select z.string()
+        expect(typeof result).toBe('string');
+      });
+
+      it('filters ZodNever in array correctly', () => {
+        // Not typical, but technically possible
+        const schema = z.object({
+          items: z.array(z.union([z.string(), z.never()])),
+        });
+
+        const gen = initGenerator({ seed: 42 });
+        const result = gen.generate(schema);
+        expect(() => schema.parse(result)).not.toThrow();
+
+        // Verify all array elements are strings
+        for (const item of result.items) {
+          expect(typeof item).toBe('string');
+        }
       });
     });
   });

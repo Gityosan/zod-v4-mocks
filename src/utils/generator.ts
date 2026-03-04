@@ -165,10 +165,20 @@ export const generateUtils = {
     generator: CustomGeneratorType,
   ) => {
     const { items } = schema.def;
-    return items.map((item, arrayIndex) => {
+    const result = items.map((item, arrayIndex) => {
       const arrayIndexes = [...options.arrayIndexes, arrayIndex];
       return generator(item, { ...options, arrayIndexes });
     });
+
+    // Handle case where ZodNever returns OMIT_SYMBOL
+    // However, since tuples have fixed length, warn if OMIT_SYMBOL is present
+    if (result.includes(OMIT_SYMBOL)) {
+      console.warn(
+        'OMIT_SYMBOL found in tuple. Tuple has fixed length, so OMIT_SYMBOL cannot be filtered out. This may cause validation errors.',
+      );
+    }
+
+    return result;
   },
   map: (
     schema: z.ZodMap,
@@ -184,7 +194,7 @@ export const generateUtils = {
       const k = generator(keyType, options);
       const value = generator(valueType, options);
       return [k, value] as const;
-    }).filter(([, v]) => v !== OMIT_SYMBOL);
+    }).filter(([k, v]) => k !== OMIT_SYMBOL && v !== OMIT_SYMBOL);
     return new Map(entries);
   },
   set: (
@@ -227,6 +237,10 @@ export const generateUtils = {
     const length = faker.number.int(config.record);
     return [...Array(length)].reduce((acc) => {
       const k = generator(keyType, options);
+
+      // If keyType is ZodNever, skip this entry.
+      if (k === OMIT_SYMBOL) return acc;
+
       const keyIsValid =
         typeof k === 'string' || typeof k === 'number' || typeof k === 'symbol';
       if (keyIsValid) {
@@ -562,5 +576,8 @@ export const generateUtils = {
     const value = generator(innerType, options);
     const parsedValue = schema.safeParse(value);
     return parsedValue.data;
+  },
+  never: () => {
+    return OMIT_SYMBOL;
   },
 };

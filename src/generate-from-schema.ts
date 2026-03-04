@@ -299,10 +299,7 @@ function generateFromSchema(
   if (s instanceof z.ZodCatch) return u.catch(s, o, g);
 
   if (s instanceof z.ZodNever) {
-    console.warn(
-      'ZodNever s encountered. Returning null for mock data as no valid value can exist.',
-    );
-    return null;
+    return u.never();
   }
 
   console.warn(
