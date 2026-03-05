@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.4] - 2026-03-05
+
+### Changed
+- Separated zod/v4 preview support into [zod-v4-preview-mocks](https://www.npmjs.com/package/zod-v4-preview-mocks) package
+- Deprecated v1.x series (use `zod-v4-preview-mocks` for zod v3.25.76 preview)
+- Updated README and keywords to clarify package scope
+
 ## [2.0.3] - 2026-03-04
 
 ### Fixed

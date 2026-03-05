@@ -2,16 +2,13 @@
 
 Mock generator for zod v4
 
+> **Note**: If you're using `zod@3.25.76` with `import from 'zod/v4'` (preview), please use [zod-v4-preview-mocks](https://www.npmjs.com/package/zod-v4-preview-mocks) instead. It is compatible with `zod-v4-mocks@1.2.1`.
+
 ## Version Guide
 
-This library has different versions for different Zod versions:
+This library supports **Zod v4.0.0+** only (v2.x).
 
-- **If you're using Zod v4.0.0+**: Use `zod-v4-mocks@2.0.0` (this version)
-- **If you're using Zod v3.25.76 (v4 preview)**: Use `zod-v4-mocks@1.1.0`
-
-**Migration from v1.0.x:**
-- If you were using `v1.0.15` (latest v1.0.x), upgrade to `v2.0.0`
-- If you were using `v1.0.11` or earlier, upgrade to `v1.1.0`
+For Zod v3.25.76 (v4 preview), use [zod-v4-preview-mocks](https://www.npmjs.com/package/zod-v4-preview-mocks).
 
 ## Installation
 
