@@ -26,9 +26,11 @@ export function createMockConfig(config?: Partial<MockConfig>): MockConfig {
     optionalProbability = 0.5,
     nullableProbability = 0.5,
     defaultProbability = 0.5,
-    lazyDepthLimit = 5,
+    lazyDepthLimit,
+    recursiveDepthLimit,
     ...rest
   } = config || {};
+  const depthLimit = recursiveDepthLimit ?? lazyDepthLimit ?? 5;
   return {
     seed,
     array: { min: arrayMin, max: arrayMax },
@@ -38,7 +40,8 @@ export function createMockConfig(config?: Partial<MockConfig>): MockConfig {
     optionalProbability,
     nullableProbability,
     defaultProbability,
-    lazyDepthLimit,
+    lazyDepthLimit: depthLimit,
+    recursiveDepthLimit: depthLimit,
     ...rest,
   };
 }
@@ -57,5 +60,6 @@ export function createGeneraterOptions(
     valueStore: new Map(),
     arrayIndexes: [],
     pinnedHierarchy: new Map(),
+    circularRefs: new Map(),
   };
 }

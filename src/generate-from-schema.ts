@@ -116,6 +116,29 @@ function generateStringWithChecks(faker: Faker, schema: z.ZodString): string {
   return res;
 }
 
+const CIRCULAR_SCHEMA_TYPES = new Set([
+  'object',
+  'record',
+  'array',
+  'tuple',
+  'map',
+  'set',
+]);
+
+function isCircularRefSchema(schema: z.core.$ZodType): boolean {
+  return CIRCULAR_SCHEMA_TYPES.has(schema._zod.def.type);
+}
+
+function getEmptyValueForSchema(schema: z.core.$ZodType): unknown {
+  if (schema instanceof z.ZodObject) return {};
+  if (schema instanceof z.ZodRecord) return {};
+  if (schema instanceof z.ZodArray) return [];
+  if (schema instanceof z.ZodTuple) return [];
+  if (schema instanceof z.ZodMap) return new Map();
+  if (schema instanceof z.ZodSet) return new Set();
+  return undefined;
+}
+
 function generateFromSchema(
   schema: z.core.$ZodType,
   options: GeneraterOptions,
@@ -348,6 +371,17 @@ export function generateMocks(
   if (customGenerator) {
     const res = customGenerator(schema, options);
     if (res !== undefined) return res;
+  }
+
+  if (isCircularRefSchema(schema)) {
+    const { circularRefs } = options;
+    const depth = circularRefs.get(schema) ?? 1;
+    if (depth >= (config.recursiveDepthLimit ?? config.lazyDepthLimit)) {
+      return getEmptyValueForSchema(schema);
+    }
+    const newCircularRefs = new Map(circularRefs);
+    newCircularRefs.set(schema, depth + 1);
+    return generateFromSchema(schema, { ...options, circularRefs: newCircularRefs });
   }
 
   return generateFromSchema(schema, options);

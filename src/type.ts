@@ -12,7 +12,7 @@ export type GeneraterOptions = {
   valueStore?: Map<string, unknown[]>;
   arrayIndexes: number[];
   pinnedHierarchy: Map<string, number>;
-  lazyDepth?: number;
+  circularRefs: Map<z.core.$ZodType, number>;
 };
 
 export type CustomGeneratorType = (
@@ -63,8 +63,14 @@ export interface MockConfig {
   defaultProbability: number;
   /**
    * @default 5
+   * @deprecated Use `recursiveDepthLimit` instead. Both control the same depth limit for recursive schemas.
    */
   lazyDepthLimit: number;
+  /**
+   * @default 5
+   * @description Maximum depth for recursive schemas (z.lazy() and getter-based circular references).
+   */
+  recursiveDepthLimit?: number;
   /**
    * @description meta's attribute name which is used to generate consistent property value
    */

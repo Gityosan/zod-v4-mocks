@@ -508,20 +508,8 @@ export const generateUtils = {
     options: GeneraterOptions,
     generator: CustomGeneratorType,
   ) => {
-    const { lazyDepth = 1, config } = options;
     const innerSchema = schema.unwrap();
-
-    if (lazyDepth < config.lazyDepthLimit) {
-      const newOptions = { ...options, lazyDepth: lazyDepth + 1 };
-      return generator(innerSchema, newOptions);
-    }
-    if (innerSchema instanceof z.ZodObject) return {};
-    if (innerSchema instanceof z.ZodRecord) return {};
-    if (innerSchema instanceof z.ZodArray) return [];
-    if (innerSchema instanceof z.ZodTuple) return [];
-    if (innerSchema instanceof z.ZodMap) return new Map();
-    if (innerSchema instanceof z.ZodSet) return new Set();
-    throw new Error('Unsupported lazy schema type');
+    return generator(innerSchema, options);
   },
   json: () => {
     return {};
