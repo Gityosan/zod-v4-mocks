@@ -41,7 +41,7 @@
     "@faker-js/faker": "9.8.0",
     "es-toolkit": "1.44.0",
     "randexp": "0.5.3",
-    "zod": "4.3.5"
+    "zod": "4.3.6"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "5.5.0",
