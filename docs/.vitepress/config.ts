@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress';
 export default defineConfig({
   title: 'zod-v4-mocks',
   description: 'Mock generator for Zod v4',
-  base: '/',
+  base: '/zod-v4-mocks/',
 
   locales: {
     root: {
