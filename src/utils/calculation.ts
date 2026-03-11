@@ -1,6 +1,9 @@
 import type { Faker } from '@faker-js/faker';
 import { z } from 'zod';
 
+/**
+ * @package
+ */
 export function calcMinMaxString(
   minLength: number | null,
   maxLength: number | null,

@@ -1,7 +1,9 @@
-export { calcMinMaxString } from './calculation';
+export * from './calculation';
+export * from './circular';
 export * from './config';
 export * from './exact-optional';
 export * from './generator';
 export * from './output';
 export * from './schema';
+export * from './string';
 export * from './warning';

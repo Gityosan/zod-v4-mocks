@@ -38,7 +38,15 @@ export type StringLengthOptions = {
 
 export const generateUtils = {
   file: () => new File([], 'test.txt'),
-  email: (faker: Faker) => faker.internet.email(),
+  email: (faker: Faker, schema?: z.ZodEmail) => {
+    const email = faker.internet.email();
+    const pattern = schema?._zod.def.pattern;
+    if (!pattern || pattern.test(email)) return email;
+    const randexp = new RandExp(pattern);
+    randexp.randInt = (a: number, b: number) =>
+      faker.number.int({ min: a, max: b });
+    return randexp.gen();
+  },
   url: (faker: Faker) => faker.internet.url(),
   jwt: (faker: Faker) => faker.internet.jwt(),
   emoji: (faker: Faker) => faker.internet.emoji(),

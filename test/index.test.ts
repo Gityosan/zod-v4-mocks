@@ -321,6 +321,14 @@ describe('initGenerator (functional base API)', () => {
       expect(result).toMatch(/^[0-9a-fA-F]{32}$/);
     });
 
+    it('hash sha1', () => {
+      const schema = z.hash('sha1');
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/^[0-9a-fA-F]{40}$/);
+    });
+
     it('hash sha256', () => {
       const schema = z.hash('sha256');
       const result = generator.generate(schema);
@@ -329,8 +337,70 @@ describe('initGenerator (functional base API)', () => {
       expect(result).toMatch(/^[0-9a-fA-F]{64}$/);
     });
 
+    it('hash sha384', () => {
+      const schema = z.hash('sha384');
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/^[0-9a-fA-F]{96}$/);
+    });
+
+    it('hash sha512', () => {
+      const schema = z.hash('sha512');
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/^[0-9a-fA-F]{128}$/);
+    });
+
+    it('hash sha256 with base64 encoding', () => {
+      const schema = z.hash('sha256', { enc: 'base64' });
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+
+    it('hash sha256 with base64url encoding', () => {
+      const schema = z.hash('sha256', { enc: 'base64url' });
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+
     it('email', () => {
       const schema = z.email();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/@/);
+    });
+
+    it('email with html5Email pattern', () => {
+      const schema = z.email({ pattern: z.regexes.html5Email });
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/@/);
+    });
+
+    it('email with rfc5322Email pattern', () => {
+      const schema = z.email({ pattern: z.regexes.rfc5322Email });
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/@/);
+    });
+
+    it('email with unicodeEmail pattern', () => {
+      const schema = z.email({ pattern: z.regexes.unicodeEmail });
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/@/);
+    });
+
+    it('email with default regexes.email pattern', () => {
+      const schema = z.email({ pattern: z.regexes.email });
       const result = generator.generate(schema);
       expect(() => schema.parse(result)).not.toThrow();
       expect(typeof result).toBe('string');

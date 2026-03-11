@@ -60,6 +60,9 @@ export function isZodStringbool(schema: z.ZodCodec): boolean {
   );
 }
 
+/**
+ * @package
+ */
 export function isZodCheckOverwrite<T>(
   check: z.core.$ZodCheck<T>,
 ): check is z.core.$ZodCheckOverwrite<T> {
@@ -72,24 +75,45 @@ function isZodCheckStringFormat(
   return check._zod.def.check === 'string_format';
 }
 
+/**
+ * @package
+ */
+export function isZodCheckEmail(
+  check: z.core.$ZodCheck<string>,
+): check is z.ZodEmail {
+  return isZodCheckStringFormat(check) && check._zod.def.format === 'email';
+}
+
+/**
+ * @package
+ */
 export function isZodCheckRegex(
   check: z.core.$ZodCheck<string>,
 ): check is z.core.$ZodCheckRegex {
   return isZodCheckStringFormat(check) && check._zod.def.format === 'regex';
 }
 
+/**
+ * @package
+ */
 export function isZodCheckUpperCase(
   check: z.core.$ZodCheck<string>,
 ): check is z.core.$ZodCheckUpperCase {
   return isZodCheckStringFormat(check) && check._zod.def.format === 'uppercase';
 }
 
+/**
+ * @package
+ */
 export function isZodCheckLowerCase(
   check: z.core.$ZodCheck<string>,
 ): check is z.core.$ZodCheckLowerCase {
   return isZodCheckStringFormat(check) && check._zod.def.format === 'lowercase';
 }
 
+/**
+ * @package
+ */
 export function isZodCheckStartsWith(
   check: z.core.$ZodCheck<string>,
 ): check is z.core.$ZodCheckStartsWith {
@@ -98,18 +122,27 @@ export function isZodCheckStartsWith(
   );
 }
 
+/**
+ * @package
+ */
 export function isZodCheckEndsWith(
   check: z.core.$ZodCheck<string>,
 ): check is z.core.$ZodCheckEndsWith {
   return isZodCheckStringFormat(check) && check._zod.def.format === 'ends_with';
 }
 
+/**
+ * @package
+ */
 export function isZodCheckIncludes(
   check: z.core.$ZodCheck<string>,
 ): check is z.core.$ZodCheckIncludes {
   return isZodCheckStringFormat(check) && check._zod.def.format === 'includes';
 }
 
+/**
+ * @package
+ */
 export function isZodCheckLengthEquals(
   check: z.core.$ZodCheck<string>,
 ): check is z.core.$ZodCheckLengthEquals {

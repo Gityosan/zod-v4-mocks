@@ -349,4 +349,34 @@ describe('ZodString - Comprehensive Tests', () => {
       expect(parseResult.success).toBe(true);
     });
   });
+
+  describe('z.string().email() with pattern', () => {
+    it('z.string().email() generates valid email', () => {
+      const schema = z.string().email();
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(result).toMatch(/@/);
+    });
+
+    it('z.string().email({ pattern: z.regexes.html5Email }) generates valid email', () => {
+      const schema = z.string().email({ pattern: z.regexes.html5Email });
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(result).toMatch(/@/);
+    });
+
+    it('z.string().email({ pattern: z.regexes.rfc5322Email }) generates valid email', () => {
+      const schema = z.string().email({ pattern: z.regexes.rfc5322Email });
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(result).toMatch(/@/);
+    });
+
+    it('z.string().email({ pattern: z.regexes.unicodeEmail }) generates valid email', () => {
+      const schema = z.string().email({ pattern: z.regexes.unicodeEmail });
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(result).toMatch(/@/);
+    });
+  });
 });

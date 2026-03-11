@@ -2,6 +2,9 @@ import { camelCase } from 'es-toolkit';
 import { z } from 'zod';
 import { isZodCheckStartsWith } from './schema';
 
+/**
+ * @package
+ */
 export function warnMultipleChecks(
   checks: Record<string, string[] | number[]>,
 ) {
@@ -14,6 +17,9 @@ export function warnMultipleChecks(
   }
 }
 
+/**
+ * @package
+ */
 export function warnFixedLengthExceedsConstraint(
   fixedLength: number,
   constraintType: 'length' | 'max',
@@ -24,6 +30,9 @@ export function warnFixedLengthExceedsConstraint(
   );
 }
 
+/**
+ * @package
+ */
 export function warnCaseMismatch(
   hasCaseTransform: boolean,
   caseType: 'LowerCase' | 'UpperCase',
