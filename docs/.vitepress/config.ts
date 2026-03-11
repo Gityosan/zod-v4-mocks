@@ -1,9 +1,9 @@
-import { defineConfig } from 'vitepress'
+import { defineConfig } from 'vitepress';
 
 export default defineConfig({
   title: 'zod-v4-mocks',
   description: 'Mock generator for Zod v4',
-  base: '/zod-v4-mocks/',
+  base: '/',
 
   locales: {
     root: {
@@ -30,9 +30,7 @@ export default defineConfig({
           '/api/': [
             {
               text: 'API Reference',
-              items: [
-                { text: 'Overview', link: '/api/' },
-              ],
+              items: [{ text: 'Overview', link: '/api/' }],
             },
           ],
         },
@@ -54,7 +52,10 @@ export default defineConfig({
               items: [
                 { text: 'はじめに', link: '/ja/guide/getting-started' },
                 { text: '設定', link: '/ja/guide/configuration' },
-                { text: 'カスタムジェネレータ', link: '/ja/guide/custom-generator' },
+                {
+                  text: 'カスタムジェネレータ',
+                  link: '/ja/guide/custom-generator',
+                },
                 { text: 'スキーマ対応状況', link: '/ja/guide/schema-support' },
               ],
             },
@@ -62,9 +63,7 @@ export default defineConfig({
           '/ja/api/': [
             {
               text: 'API リファレンス',
-              items: [
-                { text: '概要', link: '/ja/api/' },
-              ],
+              items: [{ text: '概要', link: '/ja/api/' }],
             },
           ],
         },
@@ -94,9 +93,7 @@ export default defineConfig({
           '/zh/api/': [
             {
               text: 'API 参考',
-              items: [
-                { text: '概述', link: '/zh/api/' },
-              ],
+              items: [{ text: '概述', link: '/zh/api/' }],
             },
           ],
         },
@@ -126,9 +123,7 @@ export default defineConfig({
           '/hi/api/': [
             {
               text: 'API संदर्भ',
-              items: [
-                { text: 'अवलोकन', link: '/hi/api/' },
-              ],
+              items: [{ text: 'अवलोकन', link: '/hi/api/' }],
             },
           ],
         },
@@ -150,4 +145,4 @@ export default defineConfig({
       noExternal: ['@monaco-editor/loader'],
     },
   },
-})
+});

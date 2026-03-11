@@ -31,7 +31,8 @@
     "test:run": "vitest run",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "prepare": "pnpm run build"
+    "prepare": "pnpm run build",
+    "doc:dev": "pnpm -C docs run dev"
   },
   "files": [
     "dist"
