@@ -1,0 +1,20 @@
+{
+  "name": "zod-v4-mocks-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "docs:dev": "vitepress dev",
+    "docs:build": "vitepress build",
+    "docs:preview": "vitepress preview",
+    "build:bundles": "tsx scripts/build-browser-bundle.ts",
+    "prepare:types": "tsx scripts/prepare-types.ts",
+    "dev": "pnpm run build:bundles && pnpm run prepare:types && pnpm run docs:dev"
+  },
+  "devDependencies": {
+    "@monaco-editor/loader": "^1.5.0",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.19.0",
+    "vitepress": "^1.6.3",
+    "vue": "^3.5.13"
+  }
+}

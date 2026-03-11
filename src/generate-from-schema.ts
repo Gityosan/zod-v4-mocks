@@ -168,9 +168,8 @@ function generateFromSchema(
 
   if (s instanceof z.ZodUUID) {
     const { def } = s;
-    if ('version' in def) {
-      if (def.version === 'v6') return u.regex(f, s);
-      if (def.version === 'v7') return u.regex(f, s);
+    if ('version' in def && def.version !== 'v4') {
+      return u.regex(f, s);
     }
     return u.uuidv4(f);
   }

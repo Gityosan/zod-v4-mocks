@@ -395,6 +395,41 @@ describe('initGenerator (functional base API)', () => {
       expect(typeof result).toBe('string');
     });
 
+    it('uuid v1', () => {
+      const schema = z.uuid({ version: 'v1' });
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+
+    it('uuid v2', () => {
+      const schema = z.uuid({ version: 'v2' });
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+
+    it('uuid v3', () => {
+      const schema = z.uuid({ version: 'v3' });
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+
+    it('uuid v5', () => {
+      const schema = z.uuid({ version: 'v5' });
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+
+    it('uuid v8', () => {
+      const schema = z.uuid({ version: 'v8' });
+      const result = generator.generate(schema);
+      expect(() => schema.parse(result)).not.toThrow();
+      expect(typeof result).toBe('string');
+    });
+
     it('nanoid', () => {
       const schema = z.nanoid();
       const result = generator.generate(schema);
