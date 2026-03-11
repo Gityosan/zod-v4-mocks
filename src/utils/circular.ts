@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { safeInstanceof } from './schema';
 
 const CIRCULAR_SCHEMA_TYPES = new Set([
   'object',
@@ -14,11 +15,11 @@ export function isCircularRefSchema(schema: z.core.$ZodType): boolean {
 }
 
 export function getEmptyValueForSchema(schema: z.core.$ZodType): unknown {
-  if (schema instanceof z.ZodObject) return {};
-  if (schema instanceof z.ZodRecord) return {};
-  if (schema instanceof z.ZodArray) return [];
-  if (schema instanceof z.ZodTuple) return [];
-  if (schema instanceof z.ZodMap) return new Map();
-  if (schema instanceof z.ZodSet) return new Set();
+  if (safeInstanceof(schema, z.ZodObject)) return {};
+  if (safeInstanceof(schema, z.ZodRecord)) return {};
+  if (safeInstanceof(schema, z.ZodArray)) return [];
+  if (safeInstanceof(schema, z.ZodTuple)) return [];
+  if (safeInstanceof(schema, z.ZodMap)) return new Map();
+  if (safeInstanceof(schema, z.ZodSet)) return new Set();
   return undefined;
 }

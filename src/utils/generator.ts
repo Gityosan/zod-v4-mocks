@@ -14,6 +14,7 @@ import { OMIT_SYMBOL, regenerateIfOmitted } from './exact-optional';
 import {
   isZodCheckMultipleOfBigInt,
   isZodCheckMultipleOfNumber,
+  safeInstanceof,
   unwrapSchema,
 } from './schema';
 
@@ -90,7 +91,11 @@ export const generateUtils = {
     return faker.lorem.word();
   },
   string: (faker: Faker, options: StringLengthOptions) => {
-    return faker.lorem.word(options);
+    try {
+      return faker.lorem.word(options);
+    } catch {
+      return faker.string.alpha(options);
+    }
   },
   int: (faker: Faker, schema: z.ZodNumber) => {
     const { minValue, maxValue } = schema;
@@ -317,15 +322,15 @@ export const generateUtils = {
       return generator(intersected, options);
     }
 
-    if (left instanceof z.ZodAny || left instanceof z.ZodUnknown) {
+    if (safeInstanceof(left, z.ZodAny) || safeInstanceof(left, z.ZodUnknown)) {
       return generator(right, options);
     }
 
-    if (right instanceof z.ZodAny || right instanceof z.ZodUnknown) {
+    if (safeInstanceof(right, z.ZodAny) || safeInstanceof(right, z.ZodUnknown)) {
       return generator(left, options);
     }
 
-    if (left instanceof z.ZodMap && right instanceof z.ZodMap) {
+    if (safeInstanceof(left, z.ZodMap) && safeInstanceof(right, z.ZodMap)) {
       const { keyType: leftKeyType, valueType: leftValueType } = left;
       const { keyType: rightKeyType, valueType: rightValueType } = right;
       if (
@@ -338,13 +343,13 @@ export const generateUtils = {
       throw new Error('Incompatible Map types in intersection');
     }
 
-    if (left instanceof z.ZodLiteral && right instanceof z.ZodLiteral) {
+    if (safeInstanceof(left, z.ZodLiteral) && safeInstanceof(right, z.ZodLiteral)) {
       const intersection = intersectionES([...left.values], [...right.values]);
       const mergedSchema = z.literal(intersection);
       return generator(mergedSchema, options);
     }
 
-    if (left instanceof z.ZodSet && right instanceof z.ZodSet) {
+    if (safeInstanceof(left, z.ZodSet) && safeInstanceof(right, z.ZodSet)) {
       const { valueType: leftValueType } = left.def;
       const { valueType: rightValueType } = right.def;
       if (leftValueType.constructor === rightValueType.constructor) {
@@ -354,7 +359,7 @@ export const generateUtils = {
       throw new Error('Incompatible Set types in intersection');
     }
 
-    if (left instanceof z.ZodString && right instanceof z.ZodString) {
+    if (safeInstanceof(left, z.ZodString) && safeInstanceof(right, z.ZodString)) {
       const min = compareMin(left.minLength, right.minLength);
       const max = compareMax(left.maxLength, right.maxLength);
       if (min === null) {
@@ -366,7 +371,7 @@ export const generateUtils = {
       return generator(z.string().min(min).max(max), options);
     }
 
-    if (left instanceof z.ZodNumber && right instanceof z.ZodNumber) {
+    if (safeInstanceof(left, z.ZodNumber) && safeInstanceof(right, z.ZodNumber)) {
       const min = Math.max(
         left.minValue ?? Number.MIN_SAFE_INTEGER,
         right.minValue ?? Number.MIN_SAFE_INTEGER,
@@ -378,15 +383,15 @@ export const generateUtils = {
       return generator(z.number().min(min).max(max), options);
     }
 
-    if (left instanceof z.ZodBoolean && right instanceof z.ZodBoolean) {
+    if (safeInstanceof(left, z.ZodBoolean) && safeInstanceof(right, z.ZodBoolean)) {
       return generator(right, options);
     }
 
-    if (left instanceof z.ZodDate && right instanceof z.ZodDate) {
+    if (safeInstanceof(left, z.ZodDate) && safeInstanceof(right, z.ZodDate)) {
       return generator(right, options);
     }
 
-    if (left instanceof z.ZodBigInt && right instanceof z.ZodBigInt) {
+    if (safeInstanceof(left, z.ZodBigInt) && safeInstanceof(right, z.ZodBigInt)) {
       const leftMin = left.minValue ?? BigInt(Number.MIN_SAFE_INTEGER);
       const rightMin = right.minValue ?? BigInt(Number.MIN_SAFE_INTEGER);
       const leftMax = left.maxValue ?? BigInt(Number.MAX_SAFE_INTEGER);
@@ -398,7 +403,7 @@ export const generateUtils = {
       return generator(z.bigint().min(min).max(max), options);
     }
 
-    if (left instanceof z.ZodEnum && right instanceof z.ZodEnum) {
+    if (safeInstanceof(left, z.ZodEnum) && safeInstanceof(right, z.ZodEnum)) {
       const commonOptions = intersectionES(left.options, right.options);
 
       if (commonOptions.length === 0) {
@@ -407,7 +412,7 @@ export const generateUtils = {
       return faker.helpers.arrayElement(commonOptions);
     }
 
-    if (left instanceof z.ZodUnion && right instanceof z.ZodUnion) {
+    if (safeInstanceof(left, z.ZodUnion) && safeInstanceof(right, z.ZodUnion)) {
       const { options: leftOptions } = left;
       const { options: rightOptions } = right;
 
@@ -484,7 +489,7 @@ export const generateUtils = {
     generator: CustomGeneratorType,
   ) => {
     let innerSchema = schema.unwrap();
-    while (innerSchema instanceof z.ZodOptional) {
+    while (safeInstanceof(innerSchema, z.ZodOptional)) {
       innerSchema = innerSchema.unwrap();
     }
     return generator(innerSchema, options);
@@ -544,12 +549,12 @@ export const generateUtils = {
     generator: CustomGeneratorType,
   ) => {
     const { in: input, out } = schema;
-    if (input instanceof z.ZodTransform) {
+    if (safeInstanceof(input, z.ZodTransform)) {
       const inputValue = generator(out, options);
       const ctx: z.core.ParsePayload = { value: inputValue, issues: [] };
       return input.def.transform(inputValue, ctx);
     }
-    if (out instanceof z.ZodTransform) {
+    if (safeInstanceof(out, z.ZodTransform)) {
       const inputValue = generator(input, options);
       const ctx: z.core.ParsePayload = { value: inputValue, issues: [] };
       return out.def.transform(inputValue, ctx);

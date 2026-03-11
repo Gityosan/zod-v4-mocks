@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { CustomGeneratorType, GeneraterOptions } from '../type';
+import { safeInstanceof } from './schema';
 
 // Symbol used to indicate a key should be omitted (for exactOptional)
 export const OMIT_SYMBOL = Symbol.for('zod-v4-mocks:optional-key-omit');
@@ -13,7 +14,7 @@ export function regenerateIfOmitted(
   // If result is omit symbol, unwrap and regenerate the actual value
   if (
     value === OMIT_SYMBOL &&
-    (schema instanceof z.ZodOptional || schema instanceof z.ZodExactOptional)
+    (schema instanceof z.ZodOptional || safeInstanceof(schema, z.ZodExactOptional))
   ) {
     return generator(schema.unwrap(), options);
   }

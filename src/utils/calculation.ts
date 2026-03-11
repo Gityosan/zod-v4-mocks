@@ -1,5 +1,6 @@
 import type { Faker } from '@faker-js/faker';
 import { z } from 'zod';
+import { safeInstanceof } from './schema';
 
 /**
  * @package
@@ -89,17 +90,17 @@ export function calcLengthFromChecks(
 
   for (const check of checks) {
     // Array checks (MinLength/MaxLength)
-    if (check instanceof z.core.$ZodCheckMinLength) {
+    if (safeInstanceof(check, z.core.$ZodCheckMinLength)) {
       min = Math.max(min, check._zod.def.minimum);
     }
-    if (check instanceof z.core.$ZodCheckMaxLength) {
+    if (safeInstanceof(check, z.core.$ZodCheckMaxLength)) {
       max = Math.min(max, check._zod.def.maximum);
     }
     // Map/Set checks (MinSize/MaxSize)
-    if (check instanceof z.core.$ZodCheckMinSize) {
+    if (safeInstanceof(check, z.core.$ZodCheckMinSize)) {
       min = Math.max(min, check._zod.def.minimum);
     }
-    if (check instanceof z.core.$ZodCheckMaxSize) {
+    if (safeInstanceof(check, z.core.$ZodCheckMaxSize)) {
       max = Math.min(max, check._zod.def.maximum);
     }
   }
