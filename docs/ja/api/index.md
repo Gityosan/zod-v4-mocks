@@ -138,6 +138,29 @@ updateConfig(newConfig?: Partial<MockConfig>): MockGenerator
 generator.updateConfig({ seed: 42, array: { min: 5, max: 10 } })
 ```
 
+### serialize
+
+```ts
+serialize(data: unknown, options?: OutputOptions): string
+```
+
+モックデータをファイルに書き込まずに文字列としてシリアライズします。`output` が書き込む内容と同じ文字列を返します。出力をさらにカスタマイズしてから自分でファイルに書き込みたい場合に便利です。
+
+```ts
+const data = generator.generate(schema)
+
+// シリアライズした文字列を取得（デフォルト: TypeScript 形式）
+const content = generator.serialize(data)
+// => "export const mockData = {\n  \"id\": \"...\",\n  ...\n};\n"
+
+// エクスポート名とヘッダー/フッターをカスタマイズ
+const content = generator.serialize(data, {
+  exportName: 'generatedMockData',
+  header: "import type { User } from './types';",
+  footer: 'export type MockData = typeof generatedMockData;',
+})
+```
+
 ### output
 
 ```ts
@@ -157,14 +180,25 @@ generator.output(data)
 generator.output(data, { path: './mocks/user.json' })
 generator.output(data, { path: './mocks/user.ts' })
 generator.output(data, { path: './mocks/user.js' })
+
+// エクスポート名とヘッダー/フッターをカスタマイズ
+generator.output(data, {
+  path: './mocks/user.ts',
+  exportName: 'generatedMockData',
+  header: "import type { User } from './types';",
+  footer: 'export type MockData = typeof generatedMockData;',
+})
 ```
 
 #### OutputOptions
 
 ```ts
 type OutputOptions = {
-  path?: string    // 出力先パス（デフォルト: ./__generated__/generated-mock-data.ts）
+  path?: string                // 出力先パス（デフォルト: ./__generated__/generated-mock-data.ts）
   ext?: 'json' | 'js' | 'ts'  // 拡張子（path から推測、未指定時は 'ts'）
+  exportName?: string          // エクスポート変数名（デフォルト: 'mockData'、ts/js のみ）
+  header?: string              // 出力内容の先頭に追加する文字列（JSON では無視）
+  footer?: string              // 出力内容の末尾に追加する文字列（JSON では無視）
 }
 ```
 
@@ -172,7 +206,7 @@ type OutputOptions = {
 
 | 拡張子 | 形式 | 特殊型の扱い |
 |--------|------|-------------|
-| `.ts` / `.js` | `export const mockData = ...` | Date, BigInt, Map, Set, Symbol, File, Blob を正確にシリアライズ |
+| `.ts` / `.js` | `export const <exportName> = ...` | Date, BigInt, Map, Set, Symbol, File, Blob を正確にシリアライズ |
 | `.json` | JSON | Date は ISO文字列、BigInt は文字列化、Map/Set/Symbol は情報損失（警告あり） |
 
 ::: warning JSON 出力時のデータ損失
@@ -250,6 +284,9 @@ type GeneraterOptions = {
 type OutputOptions = {
   path?: string
   ext?: 'json' | 'js' | 'ts'
+  exportName?: string
+  header?: string
+  footer?: string
 }
 ```
 

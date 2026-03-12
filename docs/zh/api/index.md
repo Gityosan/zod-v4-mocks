@@ -138,6 +138,29 @@ updateConfig(newConfig?: Partial<MockConfig>): MockGenerator
 generator.updateConfig({ seed: 42, array: { min: 5, max: 10 } })
 ```
 
+### serialize
+
+```ts
+serialize(data: unknown, options?: OutputOptions): string
+```
+
+将 Mock 数据序列化为字符串，而不写入文件。返回与 `output` 写入的相同内容。在需要进一步自定义输出后自行写入文件时很有用。
+
+```ts
+const data = generator.generate(schema)
+
+// 获取序列化字符串（默认: TypeScript 格式）
+const content = generator.serialize(data)
+// => "export const mockData = {\n  \"id\": \"...\",\n  ...\n};\n"
+
+// 自定义导出名称和头部/尾部
+const content = generator.serialize(data, {
+  exportName: 'generatedMockData',
+  header: "import type { User } from './types';",
+  footer: 'export type MockData = typeof generatedMockData;',
+})
+```
+
 ### output
 
 ```ts
@@ -157,14 +180,25 @@ generator.output(data)
 generator.output(data, { path: './mocks/user.json' })
 generator.output(data, { path: './mocks/user.ts' })
 generator.output(data, { path: './mocks/user.js' })
+
+// 自定义导出名称和头部/尾部
+generator.output(data, {
+  path: './mocks/user.ts',
+  exportName: 'generatedMockData',
+  header: "import type { User } from './types';",
+  footer: 'export type MockData = typeof generatedMockData;',
+})
 ```
 
 #### OutputOptions
 
 ```ts
 type OutputOptions = {
-  path?: string    // 输出路径（默认: ./__generated__/generated-mock-data.ts）
+  path?: string                // 输出路径（默认: ./__generated__/generated-mock-data.ts）
   ext?: 'json' | 'js' | 'ts'  // 扩展名（从 path 推断，未指定时为 'ts'）
+  exportName?: string          // 自定义导出变量名（默认: 'mockData'，仅 ts/js）
+  header?: string              // 添加到输出内容头部的字符串（JSON 格式时忽略）
+  footer?: string              // 添加到输出内容尾部的字符串（JSON 格式时忽略）
 }
 ```
 
@@ -172,7 +206,7 @@ type OutputOptions = {
 
 | 扩展名 | 格式 | 特殊类型处理 |
 |--------|------|-------------|
-| `.ts` / `.js` | `export const mockData = ...` | 准确序列化 Date, BigInt, Map, Set, Symbol, File, Blob |
+| `.ts` / `.js` | `export const <exportName> = ...` | 准确序列化 Date, BigInt, Map, Set, Symbol, File, Blob |
 | `.json` | JSON | Date 转为 ISO 字符串，BigInt 转为字符串，Map/Set/Symbol 会丢失信息（有警告） |
 
 ::: warning JSON 输出时的数据丢失
@@ -250,6 +284,9 @@ type GeneraterOptions = {
 type OutputOptions = {
   path?: string
   ext?: 'json' | 'js' | 'ts'
+  exportName?: string
+  header?: string
+  footer?: string
 }
 ```
 

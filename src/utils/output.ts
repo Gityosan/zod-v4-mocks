@@ -32,10 +32,12 @@ export type OutputOptions = {
   /**
    * Header string prepended to the output content.
    * Useful for adding import statements or comments.
+   * Ignored for JSON format.
    */
   header?: string;
   /**
    * Footer string appended to the output content.
+   * Ignored for JSON format.
    */
   footer?: string;
 };
@@ -231,16 +233,15 @@ function getExtFromPath(path?: string) {
 
 function buildContent(data: unknown, options?: OutputOptions): string {
   const ext = options?.ext ?? getExtFromPath(options?.path) ?? 'ts';
+
+  if (ext === 'json') {
+    return serializeToJSON(data);
+  }
+
+  const exportName = options?.exportName ?? 'mockData';
   const header = options?.header ?? '';
   const footer = options?.footer ?? '';
-
-  let body: string;
-  if (ext === 'json') {
-    body = serializeToJSON(data);
-  } else {
-    const exportName = options?.exportName ?? 'mockData';
-    body = `export const ${exportName} = ${serializeToJS(data, 0)};\n`;
-  }
+  const body = `export const ${exportName} = ${serializeToJS(data, 0)};\n`;
 
   const parts: string[] = [];
   if (header) parts.push(header);
@@ -254,7 +255,7 @@ function buildContent(data: unknown, options?: OutputOptions): string {
  * Serialize data to a string without writing to a file.
  * Returns the same content that `outputToFile` would write.
  *
- * For 'json' ext: returns JSON string (header/footer/exportName are still applied if provided).
+ * For 'json' ext: returns pure JSON string (header/footer/exportName are ignored).
  * For 'ts'/'js' ext: returns `export const <exportName> = <serialized>;`
  */
 export function serializeOutput(data: unknown, options?: OutputOptions): string {

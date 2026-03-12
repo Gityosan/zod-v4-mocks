@@ -393,16 +393,22 @@ describe('output - header/footer options', () => {
     expect(content).toMatch(/export type Data = typeof generatedData;$/);
   });
 
-  it('prepends header to JSON output', () => {
+  it('ignores header and footer for JSON output', () => {
     const generator = initGenerator();
     const data = { name: 'test' };
     const outputPath = `${testOutputDir}/header.json`;
-    const header = '// Generated mock data';
 
-    generator.output(data, { path: outputPath, header });
+    generator.output(data, {
+      path: outputPath,
+      header: '// Generated mock data',
+      footer: '// end',
+    });
 
     const content = readFileSync(outputPath, 'utf-8');
-    expect(content).toMatch(/^\/\/ Generated mock data\n/);
+    expect(content).not.toContain('// Generated mock data');
+    expect(content).not.toContain('// end');
+    const parsed = JSON.parse(content);
+    expect(parsed).toEqual({ name: 'test' });
   });
 });
 

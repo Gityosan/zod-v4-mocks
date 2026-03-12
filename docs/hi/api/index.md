@@ -138,6 +138,29 @@ updateConfig(newConfig?: Partial<MockConfig>): MockGenerator
 generator.updateConfig({ seed: 42, array: { min: 5, max: 10 } })
 ```
 
+### serialize
+
+```ts
+serialize(data: unknown, options?: OutputOptions): string
+```
+
+मॉक डेटा को फ़ाइल में लिखे बिना स्ट्रिंग के रूप में सीरियलाइज़ करता है। `output` जो कंटेंट लिखता है वही स्ट्रिंग लौटाता है। जब आपको आउटपुट को और कस्टमाइज़ करके खुद फ़ाइल में लिखना हो तो यह उपयोगी है।
+
+```ts
+const data = generator.generate(schema)
+
+// सीरियलाइज़ की गई स्ट्रिंग प्राप्त करें (डिफ़ॉल्ट: TypeScript फॉर्मेट)
+const content = generator.serialize(data)
+// => "export const mockData = {\n  \"id\": \"...\",\n  ...\n};\n"
+
+// कस्टम एक्सपोर्ट नाम और हेडर/फुटर
+const content = generator.serialize(data, {
+  exportName: 'generatedMockData',
+  header: "import type { User } from './types';",
+  footer: 'export type MockData = typeof generatedMockData;',
+})
+```
+
 ### output
 
 ```ts
@@ -157,14 +180,25 @@ generator.output(data)
 generator.output(data, { path: './mocks/user.json' })
 generator.output(data, { path: './mocks/user.ts' })
 generator.output(data, { path: './mocks/user.js' })
+
+// कस्टम एक्सपोर्ट नाम और हेडर/फुटर
+generator.output(data, {
+  path: './mocks/user.ts',
+  exportName: 'generatedMockData',
+  header: "import type { User } from './types';",
+  footer: 'export type MockData = typeof generatedMockData;',
+})
 ```
 
 #### OutputOptions
 
 ```ts
 type OutputOptions = {
-  path?: string    // आउटपुट पथ (डिफ़ॉल्ट: ./__generated__/generated-mock-data.ts)
+  path?: string                // आउटपुट पथ (डिफ़ॉल्ट: ./__generated__/generated-mock-data.ts)
   ext?: 'json' | 'js' | 'ts'  // एक्सटेंशन (path से अनुमानित, निर्दिष्ट न होने पर 'ts')
+  exportName?: string          // कस्टम एक्सपोर्ट वेरिएबल नाम (डिफ़ॉल्ट: 'mockData', केवल ts/js)
+  header?: string              // आउटपुट कंटेंट के शुरू में जोड़ी जाने वाली स्ट्रिंग (JSON में अनदेखा)
+  footer?: string              // आउटपुट कंटेंट के अंत में जोड़ी जाने वाली स्ट्रिंग (JSON में अनदेखा)
 }
 ```
 
@@ -172,7 +206,7 @@ type OutputOptions = {
 
 | एक्सटेंशन | फॉर्मेट | विशेष टाइप का हैंडलिंग |
 |--------|------|-------------|
-| `.ts` / `.js` | `export const mockData = ...` | Date, BigInt, Map, Set, Symbol, File, Blob को सटीक रूप से सीरियलाइज़ करता है |
+| `.ts` / `.js` | `export const <exportName> = ...` | Date, BigInt, Map, Set, Symbol, File, Blob को सटीक रूप से सीरियलाइज़ करता है |
 | `.json` | JSON | Date ISO स्ट्रिंग के रूप में, BigInt स्ट्रिंग में, Map/Set/Symbol में जानकारी का नुकसान (चेतावनी सहित) |
 
 ::: warning JSON आउटपुट में डेटा लॉस
@@ -250,6 +284,9 @@ type GeneraterOptions = {
 type OutputOptions = {
   path?: string
   ext?: 'json' | 'js' | 'ts'
+  exportName?: string
+  header?: string
+  footer?: string
 }
 ```
 

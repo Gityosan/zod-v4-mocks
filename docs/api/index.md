@@ -138,6 +138,29 @@ Updates the configuration. Existing `supply` / `override` settings are preserved
 generator.updateConfig({ seed: 42, array: { min: 5, max: 10 } })
 ```
 
+### serialize
+
+```ts
+serialize(data: unknown, options?: OutputOptions): string
+```
+
+Serializes mock data to a string without writing to a file. Returns the same content that `output` would write. Useful when you need to customize the output further before writing it yourself.
+
+```ts
+const data = generator.generate(schema)
+
+// Get serialized string (default: TypeScript format)
+const content = generator.serialize(data)
+// => "export const mockData = {\n  \"id\": \"...\",\n  ...\n};\n"
+
+// Custom export name and header/footer
+const content = generator.serialize(data, {
+  exportName: 'generatedMockData',
+  header: "import type { User } from './types';",
+  footer: 'export type MockData = typeof generatedMockData;',
+})
+```
+
 ### output
 
 ```ts
@@ -157,14 +180,25 @@ generator.output(data)
 generator.output(data, { path: './mocks/user.json' })
 generator.output(data, { path: './mocks/user.ts' })
 generator.output(data, { path: './mocks/user.js' })
+
+// Custom export name with header/footer
+generator.output(data, {
+  path: './mocks/user.ts',
+  exportName: 'generatedMockData',
+  header: "import type { User } from './types';",
+  footer: 'export type MockData = typeof generatedMockData;',
+})
 ```
 
 #### OutputOptions
 
 ```ts
 type OutputOptions = {
-  path?: string    // output path (default: ./__generated__/generated-mock-data.ts)
+  path?: string                // output path (default: ./__generated__/generated-mock-data.ts)
   ext?: 'json' | 'js' | 'ts'  // extension (inferred from path, defaults to 'ts')
+  exportName?: string          // custom export variable name (default: 'mockData', ts/js only)
+  header?: string              // string prepended to the output content (ignored for JSON)
+  footer?: string              // string appended to the output content (ignored for JSON)
 }
 ```
 
@@ -172,7 +206,7 @@ type OutputOptions = {
 
 | Extension | Format | Special Type Handling |
 |--------|------|-------------|
-| `.ts` / `.js` | `export const mockData = ...` | Accurately serializes Date, BigInt, Map, Set, Symbol, File, Blob |
+| `.ts` / `.js` | `export const <exportName> = ...` | Accurately serializes Date, BigInt, Map, Set, Symbol, File, Blob |
 | `.json` | JSON | Date as ISO string, BigInt as string, Map/Set/Symbol lose information (with warnings) |
 
 ::: warning Data Loss in JSON Output
@@ -250,6 +284,9 @@ In custom generators for `override`, you will mainly use `faker` and `config`.
 type OutputOptions = {
   path?: string
   ext?: 'json' | 'js' | 'ts'
+  exportName?: string
+  header?: string
+  footer?: string
 }
 ```
 
