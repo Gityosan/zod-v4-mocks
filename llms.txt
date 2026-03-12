@@ -129,6 +129,26 @@ const mocks = initGenerator().multiGenerate(schemas);
 // mocks.user, mocks.post, mocks.tags are all generated
 ```
 
+### generator.serialize(data, options?)
+
+Serializes generated data to a string without writing to a file. Returns the same content that `output` would write.
+
+```ts
+const generator = initGenerator();
+const data = generator.generate(schema);
+
+// Get serialized string (default: TypeScript format)
+const content = generator.serialize(data);
+// => "export const mockData = {\n  \"id\": \"...\",\n  ...\n};\n"
+
+// Custom export name and header/footer
+const content = generator.serialize(data, {
+  exportName: 'generatedMockData',
+  header: "import type { User } from './types';",
+  footer: 'export type MockData = typeof generatedMockData;',
+});
+```
+
 ### generator.output(data, options?)
 
 Outputs generated data to a file. Supports JSON, JavaScript, and TypeScript formats.
@@ -139,6 +159,9 @@ Outputs generated data to a file. Supports JSON, JavaScript, and TypeScript form
 |--------|------|---------|-------------|
 | path | string | `./__generated__/generated-mock-data.ts` | Output file path |
 | ext | 'json' \| 'js' \| 'ts' | 'ts' (or inferred from path) | Output format |
+| exportName | string | 'mockData' | Custom export variable name (ts/js only) |
+| header | string | undefined | String prepended to output content (ignored for JSON) |
+| footer | string | undefined | String appended to output content (ignored for JSON) |
 
 ```ts
 const generator = initGenerator();
@@ -152,14 +175,20 @@ generator.output(data);
 // Output as JSON with custom path
 generator.output(data, { path: './mocks/user.json' });
 
-// Output as JavaScript
-generator.output(data, { path: './mocks/data.js', ext: 'js' });
+// Custom export name with header/footer
+generator.output(data, {
+  path: './mocks/user.ts',
+  exportName: 'generatedMockData',
+  header: "import type { User } from './types';",
+  footer: 'export type MockData = typeof generatedMockData;',
+});
 ```
 
 **Notes:**
 - BigInt values are converted to strings in JSON format (with console warning)
 - Date objects are serialized as `new Date("...")` in JS/TS format
 - Directory is created automatically if it doesn't exist
+- `header`, `footer`, `exportName` are ignored for JSON format to preserve valid JSON
 
 ## Supported Zod Types
 

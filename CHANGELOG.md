@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-03-12
+
+### Added
+- Added `serialize()` method to get serialized output as a string without file I/O
+- Added `exportName` option to customize the export variable name in `output()` and `serialize()`
+- Added `header` and `footer` options to prepend/append content in `output()` and `serialize()`
+
+### Fixed
+- Fixed `header`/`footer` being applied to JSON output, which produced invalid JSON — now ignored for JSON format
+
 ## [2.1.0] - 2026-03-12
 
 ### Added
