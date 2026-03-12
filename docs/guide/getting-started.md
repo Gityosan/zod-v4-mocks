@@ -11,7 +11,7 @@ If you're using `zod@3.25.76` with `import from 'zod/v4'`, please use [zod-v4-pr
 :::
 
 ::: warning v2.0.0–v2.0.4 Compatibility Issue
-v2.0.0–v2.0.4 had compatibility issues with Zod versions older than v4.3.0 (crashes due to missing classes: `ZodMAC`, `ZodCodec`, `ZodXor`, `ZodExactOptional`). If you use Zod v4.0.0–v4.2.x, please upgrade to **v2.1.0+**.
+v2.0.0–v2.0.4 had compatibility issues with Zod versions older than v4.3.5 (crashes due to missing classes: `ZodMAC`, `ZodCodec`, `ZodXor`, `ZodExactOptional`). If you use Zod v4.0.0–v4.3.4, please upgrade to **v2.1.0+**.
 :::
 
 ## Installation

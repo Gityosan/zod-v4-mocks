@@ -11,7 +11,7 @@
 :::
 
 ::: warning v2.0.0–v2.0.4 兼容性问题
-v2.0.0–v2.0.4 与 Zod v4.3.0 以下版本存在兼容性问题（由于缺少 `ZodMAC`、`ZodCodec`、`ZodXor`、`ZodExactOptional` 类而崩溃）。如果您使用 Zod v4.0.0–v4.2.x，请升级到 **v2.1.0+**。
+v2.0.0–v2.0.4 与 Zod v4.3.5 以下版本存在兼容性问题（由于缺少 `ZodMAC`、`ZodCodec`、`ZodXor`、`ZodExactOptional` 类而崩溃）。如果您使用 Zod v4.0.0–v4.3.4，请升级到 **v2.1.0+**。
 :::
 
 ## 安装
