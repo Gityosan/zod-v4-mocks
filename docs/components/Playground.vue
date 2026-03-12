@@ -2,6 +2,9 @@
 import { ref, shallowRef } from 'vue';
 import MonacoEditor from './MonacoEditor.vue';
 import OutputPanel from './OutputPanel.vue';
+import { usePlaygroundI18n } from '../composables/usePlaygroundI18n';
+
+const { t } = usePlaygroundI18n();
 
 const examples = [
   {
@@ -337,7 +340,7 @@ async function run() {
       fn(...argValues),
       new Promise((_, reject) =>
         setTimeout(
-          () => reject(new Error('実行タイムアウト (5秒)')),
+          () => reject(new Error(t.value.timeout)),
           timeoutMs,
         ),
       ),
@@ -389,11 +392,11 @@ async function run() {
   <div class="playground">
     <div class="playground-header">
       <h1>Playground</h1>
-      <p>Zodスキーマを入力してモックデータを生成できます。コードを編集して「Generate Mock」ボタンを押してください。</p>
+      <p>{{ t.description }}</p>
     </div>
     <div class="playground-toolbar">
       <div class="playground-examples">
-        <span class="toolbar-label">Examples:</span>
+        <span class="toolbar-label">{{ t.examples }}</span>
         <button
           v-for="(ex, i) in examples"
           :key="ex.label"
@@ -417,7 +420,7 @@ async function run() {
           :disabled="isRunning || !editorReady"
           @click="run"
         >
-          {{ isRunning ? '実行中...' : '▶ Generate Mock' }}
+          {{ isRunning ? t.running : '▶ Generate Mock' }}
         </button>
       </div>
     </div>
@@ -434,7 +437,7 @@ async function run() {
       </div>
       <div class="panel output-panel-wrapper">
         <div class="panel-header">Output</div>
-        <OutputPanel :result="result" :error="error" :is-running="isRunning" :parse-result="parseResult" />
+        <OutputPanel :result="result" :error="error" :is-running="isRunning" :parse-result="parseResult" :running-text="t.running" :placeholder-text="t.placeholder" />
       </div>
     </div>
   </div>

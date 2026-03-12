@@ -4,6 +4,8 @@ defineProps<{
   error: string | null
   isRunning: boolean
   parseResult: { success: boolean; error?: string } | null
+  runningText: string
+  placeholderText: string
 }>()
 </script>
 
@@ -11,7 +13,7 @@ defineProps<{
   <div class="output-panel">
     <div v-if="isRunning" class="output-loading">
       <span class="spinner" />
-      実行中...
+      {{ runningText }}
     </div>
     <div v-else-if="error" class="output-error">
       <div class="output-error-title">Error</div>
@@ -32,7 +34,7 @@ defineProps<{
       <pre class="output-json">{{ result }}</pre>
     </div>
     <div v-else class="output-placeholder">
-      「Generate Mock」を押すと結果がここに表示されます
+      {{ placeholderText }}
     </div>
   </div>
 </template>

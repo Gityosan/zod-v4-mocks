@@ -4,6 +4,16 @@ export default defineConfig({
   title: 'zod-v4-mocks',
   description: 'Mock generator for Zod v4',
   base: '/zod-v4-mocks/',
+  head: [
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/zod-v4-mocks/favicon.svg' }],
+    ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { property: 'og:title', content: 'zod-v4-mocks' }],
+    ['meta', { property: 'og:description', content: 'Mock generator for Zod v4' }],
+    ['meta', { property: 'og:image', content: 'https://gityosan.github.io/zod-v4-mocks/og-image.png' }],
+    ['meta', { property: 'og:url', content: 'https://gityosan.github.io/zod-v4-mocks/' }],
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
+    ['meta', { name: 'twitter:image', content: 'https://gityosan.github.io/zod-v4-mocks/og-image.png' }],
+  ],
 
   locales: {
     root: {
