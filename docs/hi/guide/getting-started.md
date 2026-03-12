@@ -10,6 +10,10 @@ Zod v4 स्कीमा से मॉक डेटा स्वचालित
 यदि आप `zod@3.25.76` में `import from 'zod/v4'` का उपयोग कर रहे हैं, तो [zod-v4-preview-mocks](https://www.npmjs.com/package/zod-v4-preview-mocks) का उपयोग करें।
 :::
 
+::: warning v2.0.0–v2.0.4 संगतता समस्या
+v2.0.0–v2.0.4 में Zod v4.3.0 से पुराने संस्करणों के साथ संगतता समस्या थी (`ZodMAC`, `ZodCodec`, `ZodXor`, `ZodExactOptional` क्लास न होने के कारण क्रैश)। यदि आप Zod v4.0.0–v4.2.x का उपयोग कर रहे हैं, तो कृपया **v2.1.0+** में अपग्रेड करें।
+:::
+
 ## इंस्टॉलेशन
 
 ::: code-group

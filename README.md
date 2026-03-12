@@ -8,6 +8,8 @@ Mock generator for zod v4
 
 This library supports **Zod v4.0.0+** only (v2.x).
 
+> **Important**: v2.0.0–v2.0.4 had compatibility issues with Zod versions older than v4.3.0. If you use Zod v4.0.0–v4.2.x, please upgrade to **v2.1.0+** which properly supports all Zod v4.0.0+ versions.
+
 For Zod v3.25.76 (v4 preview), use [zod-v4-preview-mocks](https://www.npmjs.com/package/zod-v4-preview-mocks).
 
 ## Installation

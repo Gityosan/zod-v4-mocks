@@ -10,6 +10,10 @@
 如果您在 `zod@3.25.76` 中使用 `import from 'zod/v4'`，请使用 [zod-v4-preview-mocks](https://www.npmjs.com/package/zod-v4-preview-mocks)。
 :::
 
+::: warning v2.0.0–v2.0.4 兼容性问题
+v2.0.0–v2.0.4 与 Zod v4.3.0 以下版本存在兼容性问题（由于缺少 `ZodMAC`、`ZodCodec`、`ZodXor`、`ZodExactOptional` 类而崩溃）。如果您使用 Zod v4.0.0–v4.2.x，请升级到 **v2.1.0+**。
+:::
+
 ## 安装
 
 ::: code-group
