@@ -7,13 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.1.0] - 2026-03-12
 
+### Added
+- Unified recursive depth limiting for `z.lazy()` and getter-based circular references
+- Added `recursiveDepthLimit` config option (deprecates `lazyDepthLimit`)
+- Added `z.json()` mock generation support (detected via `z.lazy()` union pattern)
+- Added `z.stringbool()` mock generation support (detected via `ZodCodec` pattern)
+- Added documentation site with interactive Playground ([gityosan.github.io/zod-v4-mocks](https://gityosan.github.io/zod-v4-mocks/))
+
 ### Fixed
 - Fixed compatibility with Zod v4.0.0–v4.2.x (v2.0.0–v2.0.4 would crash on older Zod v4 versions due to missing classes: `ZodMAC`, `ZodCodec`, `ZodXor`, `ZodExactOptional`)
-- Added `safeInstanceof` helper to safely handle classes that don't exist in older Zod versions
 
 ### Changed
 - Moved `zod` from `dependencies` to `peerDependencies` (`^4.0.0`) to avoid duplicate Zod instances and broken `instanceof` checks
-- Upgraded `@faker-js/faker` from 9.8.0 to 10.3.0 (with fallback for stricter word length validation)
+- Upgraded `@faker-js/faker` from 9.8.0 to 10.3.0
 - Upgraded `es-toolkit` from 1.44.0 to 1.45.1
 
 ## [2.0.4] - 2026-03-05
