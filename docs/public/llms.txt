@@ -47,7 +47,8 @@ Creates a mock generator instance.
 | optionalProbability | number | 0.5 | Probability of generating optional fields |
 | nullableProbability | number | 0.5 | Probability of generating null for nullable fields |
 | defaultProbability | number | 0.5 | Probability of using default value |
-| lazyDepthLimit | number | 5 | Max depth for lazy schemas |
+| lazyDepthLimit | number | 5 | (deprecated) Use recursiveDepthLimit instead |
+| recursiveDepthLimit | number | 5 | Max depth for recursive schemas (z.lazy() and getter-based circular references) |
 | consistentKey | string | undefined | Meta attribute name for consistent value generation |
 
 ### generator.generate(schema)
@@ -95,7 +96,10 @@ const mock = initGenerator().override(customGenerator).generate(schema);
 | config | MockConfig | Configuration object |
 | customGenerator | CustomGeneratorType \| undefined | Previously defined custom generator |
 | registry | ZodRegistry \| null | Registry for consistent value generation |
+| valueStore | Map\<string, unknown[]\> \| undefined | Pre-generated values from register |
 | arrayIndexes | number[] | Array of indices tracking nested array positions |
+| pinnedHierarchy | Map\<string, number\> | Hierarchy for consistent generation |
+| circularRefs | Map\<ZodType, number\> | Circular reference depth tracking |
 
 ### generator.register(schemas)
 
@@ -112,6 +116,14 @@ const postSchema = z.object({ authorId: UserId, title: z.string() });
 const mock = initGenerator({ consistentKey })
   .register([UserId])
   .generate(z.object({ user: userSchema, post: postSchema }));
+```
+
+### generator.updateConfig(newConfig?)
+
+Updates the configuration. Existing `supply` / `override` settings are preserved.
+
+```ts
+generator.updateConfig({ seed: 42, array: { min: 5, max: 10 } })
 ```
 
 ### generator.multiGenerate(schemas)
@@ -194,14 +206,16 @@ generator.output(data, {
 
 All standard Zod v4 types are supported:
 
-- Primitives: string, number, boolean, bigint, date, symbol, undefined, null, void, never, any, unknown
-- String validations: email, uuid, url, regex, min, max, length, startsWith, endsWith, includes, ip, cidr, base64, etc.
-- Number validations: min, max, int, positive, negative, finite, etc.
+- Primitives: string, number, boolean, bigint, date, symbol, undefined, null, void, never, any, unknown, nan
+- String validations: email, uuid, url, regex, min, max, length, startsWith, endsWith, includes, ip, cidr, mac, base64, base64url, jwt, emoji, guid, nanoid, ulid, cuid, cuid2, xid, ksuid, e164, hostname, isoDateTime, isoDate, isoTime, isoDuration, templateLiteral
+- Number validations: min, max, int, positive, negative, finite, multipleOf, float32, float64
 - Objects: object, record, passthrough, strict, catchall (ignored)
 - Collections: array, set, map, tuple
-- Unions: union, discriminatedUnion, enum, literal
-- Modifiers: optional, nullable, default, readonly, branded, pipe, lazy
+- Unions: union, discriminatedUnion, xor, enum, literal
+- Modifiers: optional, exactOptional, nullable, nonOptional, default, prefault, readonly, branded, pipe, lazy, catch, success
+- Special: codec, json (z.json()), stringbool (z.stringbool()), file, blob
 - Effects: transform, preprocess (refine conditions are ignored)
+- Recursive: z.lazy() and getter-based circular references (depth controlled by recursiveDepthLimit)
 
 ## Unsupported / Partially Supported
 
@@ -215,6 +229,11 @@ All standard Zod v4 types are supported:
 - z.lazy(): Errors with top-level union, tuple, or intersection
 - z.intersection(): Works with same schema types; ZodObject+ZodRecord and ZodArray+ZodTuple work
 - z.check(): Only z.overwrite() and z.trim() work; other checks (regex, minLength, etc.) are ignored
+
+## Compatibility
+
+- Requires Zod v4 as a peer dependency (`zod: ^4.0.0`)
+- Compatible with Zod v4.0.0 and above
 
 ## Determinism
 
