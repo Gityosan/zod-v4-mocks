@@ -10,8 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Unified recursive depth limiting for `z.lazy()` and getter-based circular references
 - Added `recursiveDepthLimit` config option (deprecates `lazyDepthLimit`)
-- Added `z.json()` mock generation support (detected via `z.lazy()` union pattern)
-- Added `z.stringbool()` mock generation support (detected via `ZodCodec` pattern)
 - Added documentation site with interactive Playground ([gityosan.github.io/zod-v4-mocks](https://gityosan.github.io/zod-v4-mocks/))
 
 ### Fixed
