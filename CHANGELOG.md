@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed compatibility with Zod v4.0.0–v4.2.x (v2.0.0–v2.0.4 would crash on older Zod v4 versions due to missing classes: `ZodMAC`, `ZodCodec`, `ZodXor`, `ZodExactOptional`)
+- Fixed `z.email()` with custom `pattern` — now falls back to `RandExp` when faker-generated email doesn't match the pattern
+- Fixed `z.uuid()` for all non-v4 versions (v1, v3, v5, v6, v7, v8) — previously only v6/v7 used regex fallback, now all non-v4 versions do
 
 ### Changed
 - Moved `zod` from `dependencies` to `peerDependencies` (`^4.0.0`) to avoid duplicate Zod instances and broken `instanceof` checks
