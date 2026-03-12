@@ -23,6 +23,21 @@ type OutputExt = z.infer<typeof outputExtSchema>;
 export type OutputOptions = {
   path?: string;
   ext?: OutputExt;
+  /**
+   * Custom export variable name (default: 'mockData')
+   * Only used for 'ts' and 'js' formats.
+   * @example 'generatedMockData' → export const generatedMockData = ...
+   */
+  exportName?: string;
+  /**
+   * Header string prepended to the output content.
+   * Useful for adding import statements or comments.
+   */
+  header?: string;
+  /**
+   * Footer string appended to the output content.
+   */
+  footer?: string;
 };
 
 const DEFAULT_OUTPUT_DIR = './__generated__';
@@ -214,6 +229,38 @@ function getExtFromPath(path?: string) {
   return result.success ? result.data : undefined;
 }
 
+function buildContent(data: unknown, options?: OutputOptions): string {
+  const ext = options?.ext ?? getExtFromPath(options?.path) ?? 'ts';
+  const header = options?.header ?? '';
+  const footer = options?.footer ?? '';
+
+  let body: string;
+  if (ext === 'json') {
+    body = serializeToJSON(data);
+  } else {
+    const exportName = options?.exportName ?? 'mockData';
+    body = `export const ${exportName} = ${serializeToJS(data, 0)};\n`;
+  }
+
+  const parts: string[] = [];
+  if (header) parts.push(header);
+  parts.push(body);
+  if (footer) parts.push(footer);
+
+  return parts.join('\n');
+}
+
+/**
+ * Serialize data to a string without writing to a file.
+ * Returns the same content that `outputToFile` would write.
+ *
+ * For 'json' ext: returns JSON string (header/footer/exportName are still applied if provided).
+ * For 'ts'/'js' ext: returns `export const <exportName> = <serialized>;`
+ */
+export function serializeOutput(data: unknown, options?: OutputOptions): string {
+  return buildContent(data, options);
+}
+
 export function outputToFile(data: unknown, options?: OutputOptions) {
   const ext = options?.ext ?? getExtFromPath(options?.path) ?? 'ts';
   const outputPath =
@@ -224,10 +271,7 @@ export function outputToFile(data: unknown, options?: OutputOptions) {
     mkdirSync(dir, { recursive: true });
   }
 
-  const content =
-    ext === 'json'
-      ? serializeToJSON(data)
-      : `export const mockData = ${serializeToJS(data, 0)};\n`;
+  const content = buildContent(data, options);
 
   writeFileSync(outputPath, content, 'utf-8');
   return outputPath;

@@ -5,6 +5,7 @@ import {
   createGeneraterOptions,
   outputToFile,
   regenerateIfOmitted,
+  serializeOutput,
   type OutputOptions,
 } from './utils';
 
@@ -88,6 +89,10 @@ class MockGenerator {
       result[key] = this.generate(schemas[key]);
     }
     return result as { [K in keyof T]: z.infer<T[K]> };
+  }
+
+  serialize(data: unknown, options?: OutputOptions): string {
+    return serializeOutput(data, options);
   }
 
   output(data: unknown, options?: OutputOptions): string {

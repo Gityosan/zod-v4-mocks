@@ -310,6 +310,178 @@ describe('initGenerator (functional base API)', () => {
   });
 });
 
+describe('output - exportName option', () => {
+  it('uses custom exportName in TS output', () => {
+    const generator = initGenerator();
+    const data = { name: 'test' };
+    const outputPath = `${testOutputDir}/custom-name.ts`;
+
+    generator.output(data, { path: outputPath, exportName: 'generatedMockData' });
+
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toContain('export const generatedMockData =');
+    expect(content).not.toContain('export const mockData');
+  });
+
+  it('uses custom exportName in JS output', () => {
+    const generator = initGenerator();
+    const data = { name: 'test' };
+    const outputPath = `${testOutputDir}/custom-name.js`;
+
+    generator.output(data, { path: outputPath, exportName: 'myMock' });
+
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toContain('export const myMock =');
+  });
+
+  it('ignores exportName for JSON output', () => {
+    const generator = initGenerator();
+    const data = { name: 'test' };
+    const outputPath = `${testOutputDir}/custom-name.json`;
+
+    generator.output(data, { path: outputPath, exportName: 'generatedMockData' });
+
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).not.toContain('export const');
+  });
+});
+
+describe('output - header/footer options', () => {
+  it('prepends header to TS output', () => {
+    const generator = initGenerator();
+    const data = { name: 'test' };
+    const outputPath = `${testOutputDir}/header.ts`;
+    const header = "import type { MyType } from './types';";
+
+    generator.output(data, { path: outputPath, header });
+
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toMatch(/^import type { MyType }/);
+    expect(content).toContain('export const mockData =');
+  });
+
+  it('appends footer to TS output', () => {
+    const generator = initGenerator();
+    const data = { name: 'test' };
+    const outputPath = `${testOutputDir}/footer.ts`;
+    const footer = 'export type MockType = typeof mockData;';
+
+    generator.output(data, { path: outputPath, footer });
+
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toContain('export const mockData =');
+    expect(content).toMatch(/export type MockType = typeof mockData;$/);
+  });
+
+  it('supports both header and footer together', () => {
+    const generator = initGenerator();
+    const data = { id: 1 };
+    const outputPath = `${testOutputDir}/header-footer.ts`;
+    const header = "import type { User } from './types';";
+    const footer = 'export type Data = typeof generatedData;';
+
+    generator.output(data, {
+      path: outputPath,
+      exportName: 'generatedData',
+      header,
+      footer,
+    });
+
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toMatch(/^import type { User }/);
+    expect(content).toContain('export const generatedData =');
+    expect(content).toMatch(/export type Data = typeof generatedData;$/);
+  });
+
+  it('prepends header to JSON output', () => {
+    const generator = initGenerator();
+    const data = { name: 'test' };
+    const outputPath = `${testOutputDir}/header.json`;
+    const header = '// Generated mock data';
+
+    generator.output(data, { path: outputPath, header });
+
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toMatch(/^\/\/ Generated mock data\n/);
+  });
+});
+
+describe('serialize', () => {
+  it('returns serialized string without writing file', () => {
+    const generator = initGenerator();
+    const data = { name: 'test', count: 42 };
+
+    const result = generator.serialize(data);
+
+    expect(result).toContain('export const mockData =');
+    expect(result).toContain('"name": "test"');
+    expect(result).toContain('"count": 42');
+    // No file should be created
+    expect(existsSync(`${testOutputDir}`)).toBe(false);
+  });
+
+  it('respects exportName option', () => {
+    const generator = initGenerator();
+    const data = { id: 1 };
+
+    const result = generator.serialize(data, { exportName: 'generatedMockData' });
+
+    expect(result).toContain('export const generatedMockData =');
+    expect(result).not.toContain('export const mockData');
+  });
+
+  it('respects header and footer options', () => {
+    const generator = initGenerator();
+    const data = { id: 1 };
+    const header = "import type { MyType } from './types';";
+    const footer = 'export type Data = typeof myData;';
+
+    const result = generator.serialize(data, {
+      exportName: 'myData',
+      header,
+      footer,
+    });
+
+    expect(result).toMatch(/^import type { MyType }/);
+    expect(result).toContain('export const myData =');
+    expect(result).toMatch(/export type Data = typeof myData;$/);
+  });
+
+  it('returns JSON string when ext is json', () => {
+    const generator = initGenerator();
+    const data = { name: 'test' };
+
+    const result = generator.serialize(data, { ext: 'json' });
+
+    expect(result).not.toContain('export const');
+    const parsed = JSON.parse(result);
+    expect(parsed).toEqual({ name: 'test' });
+  });
+
+  it('serializes Date correctly', () => {
+    const generator = initGenerator();
+    const data = { createdAt: new Date('2025-01-01T00:00:00.000Z') };
+
+    const result = generator.serialize(data);
+
+    expect(result).toContain('new Date("2025-01-01T00:00:00.000Z")');
+  });
+
+  it('produces same content as output writes to file', () => {
+    const generator = initGenerator();
+    const schema = z.object({ name: z.string(), count: z.number() });
+    const data = generator.generate(schema);
+    const outputPath = `${testOutputDir}/serialize-compare.ts`;
+    const options = { exportName: 'testData' as const, header: '// header' };
+
+    const serialized = generator.serialize(data, options);
+    generator.output(data, { ...options, path: outputPath });
+    const fileContent = readFileSync(outputPath, 'utf-8');
+
+    expect(serialized).toBe(fileContent);
+  });
+});
+
 describe('Output serialization - special types', () => {
   it('serializes Map correctly', () => {
     const generator = initGenerator({ seed: 123 });

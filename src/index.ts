@@ -6,3 +6,4 @@ export type {
   MockConfig,
   Randomizer,
 } from './type';
+export type { OutputOptions } from './utils/output';
