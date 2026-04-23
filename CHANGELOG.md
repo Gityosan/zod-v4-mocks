@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Added `serializeBinary(data)` method on `MockGenerator` — serializes data to a `Buffer` via `v8.serialize` (structured clone), preserving `Date`, `Map`, `Set`, `RegExp`, `BigInt`, `TypedArray`, `undefined`, and circular references with no information loss
+- Added `deserialize(input)` method on `MockGenerator` — restores data from a `Buffer`/`Uint8Array` or `.bin` file path
+- Added `'bin'` extension support to `output()` — writes a `v8.serialize` binary file (Node.js only)
+
+### Changed
+- `serialize()` now throws when `ext` is `'bin'`; use `serializeBinary()` instead so the return type stays `string`
+
 ## [2.2.0] - 2026-03-12
 
 ### Added

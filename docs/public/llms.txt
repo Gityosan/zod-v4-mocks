@@ -143,7 +143,7 @@ const mocks = initGenerator().multiGenerate(schemas);
 
 ### generator.serialize(data, options?)
 
-Serializes generated data to a string without writing to a file. Returns the same content that `output` would write.
+Serializes generated data to a string without writing to a file. Returns the same content that `output` would write. Throws if `ext` is `'bin'` — use `serializeBinary` instead.
 
 ```ts
 const generator = initGenerator();
@@ -161,19 +161,40 @@ const content = generator.serialize(data, {
 });
 ```
 
+### generator.serializeBinary(data)
+
+Serializes data to a binary `Buffer` using Node.js's `v8.serialize` (structured clone). Preserves Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, and circular references with no information loss. Node.js only.
+
+```ts
+const buf = generator.serializeBinary(data); // Buffer
+```
+
+### generator.deserialize(input)
+
+Restores a value previously produced by `serializeBinary` or `output({ ext: 'bin' })`. Accepts a `Buffer`/`Uint8Array` or a `.bin` file path.
+
+```ts
+// From a Buffer
+const restored = generator.deserialize(generator.serializeBinary(data));
+
+// From a file written by output()
+generator.output(data, { path: './mocks/user.bin' });
+const restored = generator.deserialize('./mocks/user.bin');
+```
+
 ### generator.output(data, options?)
 
-Outputs generated data to a file. Supports JSON, JavaScript, and TypeScript formats.
+Outputs generated data to a file. Supports JSON, JavaScript, TypeScript, and binary (`.bin`, v8 structured clone) formats.
 
 **Options:**
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | path | string | `./__generated__/generated-mock-data.ts` | Output file path |
-| ext | 'json' \| 'js' \| 'ts' | 'ts' (or inferred from path) | Output format |
+| ext | 'json' \| 'js' \| 'ts' \| 'bin' | 'ts' (or inferred from path) | Output format |
 | exportName | string | 'mockData' | Custom export variable name (ts/js only) |
-| header | string | undefined | String prepended to output content (ignored for JSON) |
-| footer | string | undefined | String appended to output content (ignored for JSON) |
+| header | string | undefined | String prepended to output content (ignored for json/bin) |
+| footer | string | undefined | String appended to output content (ignored for json/bin) |
 
 ```ts
 const generator = initGenerator();
@@ -186,6 +207,9 @@ generator.output(data);
 
 // Output as JSON with custom path
 generator.output(data, { path: './mocks/user.json' });
+
+// Output as binary (lossless round-trip via generator.deserialize)
+generator.output(data, { path: './mocks/user.bin' });
 
 // Custom export name with header/footer
 generator.output(data, {
@@ -200,7 +224,8 @@ generator.output(data, {
 - BigInt values are converted to strings in JSON format (with console warning)
 - Date objects are serialized as `new Date("...")` in JS/TS format
 - Directory is created automatically if it doesn't exist
-- `header`, `footer`, `exportName` are ignored for JSON format to preserve valid JSON
+- `header`, `footer`, `exportName` are ignored for JSON and binary formats
+- `.bin` is the only format that perfectly round-trips Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, and circular references; the file is Node.js-only
 
 ## Supported Zod Types
 

@@ -13,11 +13,12 @@ import {
   isSymbol,
   isUndefined,
 } from 'es-toolkit';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { deserialize as v8Deserialize, serialize as v8Serialize } from 'node:v8';
 import { z } from 'zod';
 
-const outputExtSchema = z.literal(['json', 'js', 'ts']);
+const outputExtSchema = z.literal(['json', 'js', 'ts', 'bin']);
 type OutputExt = z.infer<typeof outputExtSchema>;
 
 export type OutputOptions = {
@@ -32,12 +33,12 @@ export type OutputOptions = {
   /**
    * Header string prepended to the output content.
    * Useful for adding import statements or comments.
-   * Ignored for JSON format.
+   * Ignored for 'json' and 'bin' formats.
    */
   header?: string;
   /**
    * Footer string appended to the output content.
-   * Ignored for JSON format.
+   * Ignored for 'json' and 'bin' formats.
    */
   footer?: string;
 };
@@ -225,22 +226,25 @@ function serializeToJSON(input: unknown) {
 
 function getExtFromPath(path?: string) {
   if (!path) return undefined;
-  const match = /\.(json|js|ts)$/.exec(path);
+  const match = /\.(json|js|ts|bin)$/.exec(path);
   if (!match) return undefined;
   const result = outputExtSchema.safeParse(match[1]);
   return result.success ? result.data : undefined;
 }
 
-function buildContent(data: unknown, options?: OutputOptions): string {
-  const ext = options?.ext ?? getExtFromPath(options?.path) ?? 'ts';
+function buildContent(
+  data: unknown,
+  options: Omit<OutputOptions, 'ext'> & { ext: Exclude<OutputExt, 'bin'> },
+): string {
+  const { ext } = options;
 
   if (ext === 'json') {
     return serializeToJSON(data);
   }
 
-  const exportName = options?.exportName ?? 'mockData';
-  const header = options?.header ?? '';
-  const footer = options?.footer ?? '';
+  const exportName = options.exportName ?? 'mockData';
+  const header = options.header ?? '';
+  const footer = options.footer ?? '';
   const body = `export const ${exportName} = ${serializeToJS(data, 0)};\n`;
 
   const parts: string[] = [];
@@ -257,9 +261,40 @@ function buildContent(data: unknown, options?: OutputOptions): string {
  *
  * For 'json' ext: returns pure JSON string (header/footer/exportName are ignored).
  * For 'ts'/'js' ext: returns `export const <exportName> = <serialized>;`
+ *
+ * Throws if `ext` is 'bin' — use `serializeBinary` instead for binary output.
  */
 export function serializeOutput(data: unknown, options?: OutputOptions): string {
-  return buildContent(data, options);
+  const ext = options?.ext ?? getExtFromPath(options?.path) ?? 'ts';
+  if (ext === 'bin') {
+    throw new Error(
+      "serialize() does not support 'bin' format. Use serializeBinary() instead.",
+    );
+  }
+  return buildContent(data, { ...options, ext });
+}
+
+/**
+ * Serialize data to a binary Buffer using Node.js's structured clone algorithm
+ * (`v8.serialize`). Preserves Date, Map, Set, RegExp, BigInt, TypedArray,
+ * `undefined`, and circular references with no information loss.
+ *
+ * The resulting Buffer is only readable in a Node.js environment via
+ * `deserializeBinary` (or `v8.deserialize` directly).
+ */
+export function serializeBinary(data: unknown): Buffer {
+  return v8Serialize(data);
+}
+
+/**
+ * Deserialize a binary Buffer produced by `serializeBinary` (or `v8.serialize`)
+ * back into the original JavaScript value.
+ *
+ * Accepts either a Buffer or a path to a `.bin` file written by `outputToFile`.
+ */
+export function deserializeBinary(input: Buffer | Uint8Array | string): unknown {
+  const buffer = typeof input === 'string' ? readFileSync(input) : input;
+  return v8Deserialize(buffer);
 }
 
 export function outputToFile(data: unknown, options?: OutputOptions) {
@@ -272,8 +307,12 @@ export function outputToFile(data: unknown, options?: OutputOptions) {
     mkdirSync(dir, { recursive: true });
   }
 
-  const content = buildContent(data, options);
+  if (ext === 'bin') {
+    writeFileSync(outputPath, serializeBinary(data));
+    return outputPath;
+  }
 
+  const content = buildContent(data, { ...options, ext });
   writeFileSync(outputPath, content, 'utf-8');
   return outputPath;
 }

@@ -488,6 +488,112 @@ describe('serialize', () => {
   });
 });
 
+describe('serializeBinary / deserialize (v8 structured clone)', () => {
+  it('round-trips primitives, Date, BigInt, Map, Set, RegExp, undefined', () => {
+    const generator = initGenerator();
+    const data = {
+      str: 'hello',
+      num: 42,
+      bool: true,
+      und: undefined,
+      bi: 123456789012345678901234567890n,
+      d: new Date('2025-01-01T00:00:00.000Z'),
+      m: new Map<string, unknown>([
+        ['a', 1],
+        ['b', new Date(0)],
+      ]),
+      s: new Set([1, 2, 3]),
+      re: /abc/gi,
+      bytes: new Uint8Array([1, 2, 3, 4]),
+    };
+
+    const buf = generator.serializeBinary(data);
+    expect(Buffer.isBuffer(buf)).toBe(true);
+
+    const restored = generator.deserialize(buf) as typeof data;
+    expect(restored.str).toBe('hello');
+    expect(restored.num).toBe(42);
+    expect(restored.bool).toBe(true);
+    expect(restored.und).toBeUndefined();
+    expect(restored.bi).toBe(123456789012345678901234567890n);
+    expect(restored.d).toBeInstanceOf(Date);
+    expect(restored.d.toISOString()).toBe('2025-01-01T00:00:00.000Z');
+    expect(restored.m).toBeInstanceOf(Map);
+    expect(restored.m.get('a')).toBe(1);
+    expect((restored.m.get('b') as Date).toISOString()).toBe(new Date(0).toISOString());
+    expect(restored.s).toBeInstanceOf(Set);
+    expect([...restored.s]).toEqual([1, 2, 3]);
+    expect(restored.re).toBeInstanceOf(RegExp);
+    expect(restored.re.source).toBe('abc');
+    expect(restored.re.flags).toBe('gi');
+    expect(restored.bytes).toBeInstanceOf(Uint8Array);
+    expect(Array.from(restored.bytes)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('round-trips circular references', () => {
+    const generator = initGenerator();
+    const a: Record<string, unknown> = { name: 'a' };
+    const b: Record<string, unknown> = { name: 'b', a };
+    a.b = b;
+
+    const restored = generator.deserialize(generator.serializeBinary(a)) as typeof a;
+    expect(restored.name).toBe('a');
+    expect((restored.b as typeof b).name).toBe('b');
+    expect((restored.b as typeof b).a).toBe(restored);
+  });
+
+  it('outputs .bin file from path extension and reads it back via deserialize(path)', () => {
+    const generator = initGenerator();
+    const data = { count: 7n, when: new Date('2026-04-23T00:00:00.000Z') };
+    const outputPath = `${testOutputDir}/mock.bin`;
+
+    const result = generator.output(data, { path: outputPath });
+
+    expect(result).toBe(outputPath);
+    expect(existsSync(outputPath)).toBe(true);
+
+    const restored = generator.deserialize(outputPath) as typeof data;
+    expect(restored.count).toBe(7n);
+    expect(restored.when.toISOString()).toBe('2026-04-23T00:00:00.000Z');
+  });
+
+  it('respects ext option overriding the path extension', () => {
+    const generator = initGenerator();
+    const data = { x: 1n };
+    const outputPath = `${testOutputDir}/mock.dat`;
+
+    generator.output(data, { path: outputPath, ext: 'bin' });
+
+    const restored = generator.deserialize(outputPath) as typeof data;
+    expect(restored.x).toBe(1n);
+  });
+
+  it('serialize() throws when ext is bin', () => {
+    const generator = initGenerator();
+    expect(() => generator.serialize({ x: 1 }, { ext: 'bin' })).toThrow(
+      /serializeBinary/,
+    );
+  });
+
+  it('preserves data Zod can generate that JSON would lose', () => {
+    const generator = initGenerator({ seed: 123 });
+    const schema = z.object({
+      id: z.bigint(),
+      tags: z.set(z.string()),
+      meta: z.map(z.string(), z.number()),
+      createdAt: z.date(),
+    });
+    const data = generator.generate(schema);
+
+    const restored = generator.deserialize(generator.serializeBinary(data)) as typeof data;
+    expect(typeof restored.id).toBe('bigint');
+    expect(restored.tags).toBeInstanceOf(Set);
+    expect(restored.meta).toBeInstanceOf(Map);
+    expect(restored.createdAt).toBeInstanceOf(Date);
+    expect(schema.parse(restored)).toBeDefined();
+  });
+});
+
 describe('Output serialization - special types', () => {
   it('serializes Map correctly', () => {
     const generator = initGenerator({ seed: 123 });

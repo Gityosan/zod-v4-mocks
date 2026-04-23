@@ -161,6 +161,36 @@ const content = generator.serialize(data, {
 })
 ```
 
+### serializeBinary
+
+```ts
+serializeBinary(data: unknown): Buffer
+```
+
+Node.js の structured clone アルゴリズム (`v8.serialize`) を使ってデータをバイナリ `Buffer` にシリアライズします。`Date` / `Map` / `Set` / `RegExp` / `BigInt` / `TypedArray` / `undefined` / 循環参照を情報損失なく保持できます。復元は Node.js 環境上で `deserialize`（または `v8.deserialize`）でのみ可能です。
+
+```ts
+const data = generator.generate(schema)
+const buf = generator.serializeBinary(data) // Buffer
+```
+
+### deserialize
+
+```ts
+deserialize(input: Buffer | Uint8Array | string): unknown
+```
+
+`serializeBinary` または `output({ ext: 'bin' })` で書き出した値を復元します。`Buffer`/`Uint8Array` または `.bin` ファイルのパスを受け取れます。
+
+```ts
+// Buffer から
+const restored = generator.deserialize(generator.serializeBinary(data))
+
+// output() で書き出したファイルから
+generator.output(data, { path: './mocks/user.bin' })
+const restored = generator.deserialize('./mocks/user.bin')
+```
+
 ### output
 
 ```ts
@@ -180,6 +210,7 @@ generator.output(data)
 generator.output(data, { path: './mocks/user.json' })
 generator.output(data, { path: './mocks/user.ts' })
 generator.output(data, { path: './mocks/user.js' })
+generator.output(data, { path: './mocks/user.bin' }) // v8.serialize バイナリ
 
 // エクスポート名とヘッダー/フッターをカスタマイズ
 generator.output(data, {
@@ -194,11 +225,11 @@ generator.output(data, {
 
 ```ts
 type OutputOptions = {
-  path?: string                // 出力先パス（デフォルト: ./__generated__/generated-mock-data.ts）
-  ext?: 'json' | 'js' | 'ts'  // 拡張子（path から推測、未指定時は 'ts'）
-  exportName?: string          // エクスポート変数名（デフォルト: 'mockData'、ts/js のみ）
-  header?: string              // 出力内容の先頭に追加する文字列（JSON では無視）
-  footer?: string              // 出力内容の末尾に追加する文字列（JSON では無視）
+  path?: string                         // 出力先パス（デフォルト: ./__generated__/generated-mock-data.ts）
+  ext?: 'json' | 'js' | 'ts' | 'bin'    // 拡張子（path から推測、未指定時は 'ts'）
+  exportName?: string                   // エクスポート変数名（デフォルト: 'mockData'、ts/js のみ）
+  header?: string                       // 出力内容の先頭に追加する文字列（json/bin では無視）
+  footer?: string                       // 出力内容の末尾に追加する文字列（json/bin では無視）
 }
 ```
 
@@ -208,9 +239,14 @@ type OutputOptions = {
 |--------|------|-------------|
 | `.ts` / `.js` | `export const <exportName> = ...` | Date, BigInt, Map, Set, Symbol, File, Blob を正確にシリアライズ |
 | `.json` | JSON | Date は ISO文字列、BigInt は文字列化、Map/Set/Symbol は情報損失（警告あり） |
+| `.bin` | バイナリ（v8 structured clone）| Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, 循環参照を保持。Node.js 限定 |
 
 ::: warning JSON 出力時のデータ損失
-JSON では表現できない型（BigInt, Symbol, Map, Set, File, Blob）を含むデータを `.json` で出力すると、データの正確性が失われます。警告メッセージが出力されるので、`.ts` または `.js` 形式の使用を検討してください。
+JSON では表現できない型（BigInt, Symbol, Map, Set, File, Blob）を含むデータを `.json` で出力すると、データの正確性が失われます。警告メッセージが出力されるので、`.ts` / `.js` / `.bin` 形式の使用を検討してください。
+:::
+
+::: info バイナリ形式について
+`.bin` は Zod が生成するすべての値（循環参照を含む）を完全に往復できる唯一の形式です。代わりに、ファイルは人間可読ではなく、Node.js 上で `generator.deserialize(path)` または `v8.deserialize(buffer)` を使ってのみデシリアライズできます。
 :::
 
 ## 型定義
@@ -283,7 +319,7 @@ type GeneraterOptions = {
 ```ts
 type OutputOptions = {
   path?: string
-  ext?: 'json' | 'js' | 'ts'
+  ext?: 'json' | 'js' | 'ts' | 'bin'
   exportName?: string
   header?: string
   footer?: string

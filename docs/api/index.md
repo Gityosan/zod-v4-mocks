@@ -161,6 +161,36 @@ const content = generator.serialize(data, {
 })
 ```
 
+### serializeBinary
+
+```ts
+serializeBinary(data: unknown): Buffer
+```
+
+Serializes data to a binary `Buffer` using Node.js's structured clone algorithm (`v8.serialize`). Preserves `Date`, `Map`, `Set`, `RegExp`, `BigInt`, `TypedArray`, `undefined`, and circular references with no information loss. The result is only readable in a Node.js environment via `deserialize` (or `v8.deserialize`).
+
+```ts
+const data = generator.generate(schema)
+const buf = generator.serializeBinary(data) // Buffer
+```
+
+### deserialize
+
+```ts
+deserialize(input: Buffer | Uint8Array | string): unknown
+```
+
+Restores a value previously serialized via `serializeBinary` or `output({ ext: 'bin' })`. Pass either a `Buffer`/`Uint8Array` or a path to a `.bin` file.
+
+```ts
+// From a Buffer
+const restored = generator.deserialize(generator.serializeBinary(data))
+
+// From a file written by output()
+generator.output(data, { path: './mocks/user.bin' })
+const restored = generator.deserialize('./mocks/user.bin')
+```
+
 ### output
 
 ```ts
@@ -180,6 +210,7 @@ generator.output(data)
 generator.output(data, { path: './mocks/user.json' })
 generator.output(data, { path: './mocks/user.ts' })
 generator.output(data, { path: './mocks/user.js' })
+generator.output(data, { path: './mocks/user.bin' }) // v8.serialize binary
 
 // Custom export name with header/footer
 generator.output(data, {
@@ -194,11 +225,11 @@ generator.output(data, {
 
 ```ts
 type OutputOptions = {
-  path?: string                // output path (default: ./__generated__/generated-mock-data.ts)
-  ext?: 'json' | 'js' | 'ts'  // extension (inferred from path, defaults to 'ts')
-  exportName?: string          // custom export variable name (default: 'mockData', ts/js only)
-  header?: string              // string prepended to the output content (ignored for JSON)
-  footer?: string              // string appended to the output content (ignored for JSON)
+  path?: string                         // output path (default: ./__generated__/generated-mock-data.ts)
+  ext?: 'json' | 'js' | 'ts' | 'bin'    // extension (inferred from path, defaults to 'ts')
+  exportName?: string                   // custom export variable name (default: 'mockData', ts/js only)
+  header?: string                       // string prepended to the output content (ignored for json/bin)
+  footer?: string                       // string appended to the output content (ignored for json/bin)
 }
 ```
 
@@ -208,9 +239,14 @@ type OutputOptions = {
 |--------|------|-------------|
 | `.ts` / `.js` | `export const <exportName> = ...` | Accurately serializes Date, BigInt, Map, Set, Symbol, File, Blob |
 | `.json` | JSON | Date as ISO string, BigInt as string, Map/Set/Symbol lose information (with warnings) |
+| `.bin` | Binary (v8 structured clone) | Preserves Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, circular refs. Node.js only. |
 
 ::: warning Data Loss in JSON Output
-When outputting data containing types that cannot be represented in JSON (BigInt, Symbol, Map, Set, File, Blob) as `.json`, data accuracy is lost. Warning messages will be displayed, so consider using `.ts` or `.js` format instead.
+When outputting data containing types that cannot be represented in JSON (BigInt, Symbol, Map, Set, File, Blob) as `.json`, data accuracy is lost. Warning messages will be displayed, so consider using `.ts`, `.js`, or `.bin` format instead.
+:::
+
+::: info Binary Format
+`.bin` is the only format that perfectly round-trips every value Zod can generate (including circular references). The trade-off is that the file is not human-readable and can only be deserialized in a Node.js process via `generator.deserialize(path)` or `v8.deserialize(buffer)`.
 :::
 
 ## Type Definitions
@@ -283,7 +319,7 @@ In custom generators for `override`, you will mainly use `faker` and `config`.
 ```ts
 type OutputOptions = {
   path?: string
-  ext?: 'json' | 'js' | 'ts'
+  ext?: 'json' | 'js' | 'ts' | 'bin'
   exportName?: string
   header?: string
   footer?: string
