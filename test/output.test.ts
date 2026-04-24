@@ -594,6 +594,135 @@ describe('serializeBinary / deserialize (v8 structured clone)', () => {
   });
 });
 
+describe('tsbin / jsbin output (wrapper + .bin)', () => {
+  it('writes user.ts wrapper and user.bin with tsbin ext', () => {
+    const generator = initGenerator();
+    const schema = z.object({
+      id: z.string(),
+      createdAt: z.date(),
+      count: z.bigint(),
+      tags: z.set(z.string()),
+    });
+    const data = generator.generate(schema);
+    const outputPath = `${testOutputDir}/user.ts`;
+
+    const result = generator.output(data, {
+      path: outputPath,
+      ext: 'tsbin',
+      schema,
+    });
+
+    expect(result).toBe(outputPath);
+    expect(existsSync(outputPath)).toBe(true);
+    expect(existsSync(`${testOutputDir}/user.bin`)).toBe(true);
+
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toContain("import { readFileSync } from 'node:fs';");
+    expect(content).toContain("import { deserialize } from 'node:v8';");
+    expect(content).toContain("new URL(\"./user.bin\", import.meta.url)");
+    expect(content).toContain('export const mockData = deserialize(');
+    expect(content).toMatch(/\)\s+as\s+\{[\s\S]+id:\s+string;[\s\S]+createdAt:\s+Date;[\s\S]+count:\s+bigint;[\s\S]+tags:\s+Set<string>;/);
+  });
+
+  it('falls back to `as unknown` when schema is omitted for tsbin', () => {
+    const generator = initGenerator();
+    const data = { n: 1n };
+    const outputPath = `${testOutputDir}/noschema.ts`;
+
+    generator.output(data, { path: outputPath, ext: 'tsbin' });
+
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toMatch(/\)\s+as\s+unknown;/);
+  });
+
+  it('writes user.js wrapper and user.bin with jsbin ext, without type annotation', () => {
+    const generator = initGenerator();
+    const schema = z.object({ id: z.string(), count: z.bigint() });
+    const data = generator.generate(schema);
+    const outputPath = `${testOutputDir}/user.js`;
+
+    generator.output(data, { path: outputPath, ext: 'jsbin' });
+
+    expect(existsSync(outputPath)).toBe(true);
+    expect(existsSync(`${testOutputDir}/user.bin`)).toBe(true);
+
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toContain("import { readFileSync } from 'node:fs';");
+    expect(content).toContain("import { deserialize } from 'node:v8';");
+    expect(content).toContain("new URL(\"./user.bin\", import.meta.url)");
+    expect(content).toContain('export const mockData = deserialize(');
+    expect(content).not.toMatch(/\sas\s+/);
+  });
+
+  it('round-trips via the generated wrapper at runtime', async () => {
+    const generator = initGenerator();
+    const schema = z.object({
+      id: z.string(),
+      createdAt: z.date(),
+      count: z.bigint(),
+      tags: z.set(z.string()),
+    });
+    const data = generator.generate(schema);
+    const outputPath = `${testOutputDir}/runtime.js`;
+
+    generator.output(data, { path: outputPath, ext: 'jsbin' });
+
+    const moduleUrl = new URL(`file://${process.cwd()}/${outputPath}`).href;
+    const mod = (await import(moduleUrl)) as { mockData: typeof data };
+
+    expect(mod.mockData.id).toBe(data.id);
+    expect(mod.mockData.createdAt).toBeInstanceOf(Date);
+    expect(mod.mockData.createdAt.getTime()).toBe(data.createdAt.getTime());
+    expect(typeof mod.mockData.count).toBe('bigint');
+    expect(mod.mockData.count).toBe(data.count);
+    expect(mod.mockData.tags).toBeInstanceOf(Set);
+    expect([...mod.mockData.tags]).toEqual([...data.tags]);
+  });
+
+  it('respects exportName / header / footer in the wrapper', () => {
+    const generator = initGenerator();
+    const schema = z.object({ id: z.string() });
+    const data = generator.generate(schema);
+    const outputPath = `${testOutputDir}/custom.ts`;
+
+    generator.output(data, {
+      path: outputPath,
+      ext: 'tsbin',
+      schema,
+      exportName: 'userMock',
+      header: '// top',
+      footer: '// end',
+    });
+
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toMatch(/^\/\/ top/);
+    expect(content).toMatch(/\/\/ end\s*$/);
+    expect(content).toContain('export const userMock = deserialize(');
+  });
+
+  it('uses default wrapper path ./__generated__/generated-mock-data.ts for tsbin', () => {
+    const generator = initGenerator();
+    const schema = z.object({ id: z.string() });
+    const data = generator.generate(schema);
+
+    const result = generator.output(data, { ext: 'tsbin', schema });
+
+    expect(result).toBe('./__generated__/generated-mock-data.ts');
+    expect(existsSync(result)).toBe(true);
+    expect(existsSync('./__generated__/generated-mock-data.bin')).toBe(true);
+  });
+
+  it('serialize() throws when ext is tsbin/jsbin', () => {
+    const generator = initGenerator();
+    expect(() => generator.serialize({}, { ext: 'tsbin' })).toThrow(
+      /output\(\)/,
+    );
+    expect(() => generator.serialize({}, { ext: 'jsbin' })).toThrow(
+      /output\(\)/,
+    );
+  });
+});
+
 describe('Output serialization - special types', () => {
   it('serializes Map correctly', () => {
     const generator = initGenerator({ seed: 123 });

@@ -14,11 +14,12 @@ import {
   isUndefined,
 } from 'es-toolkit';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { basename, dirname, extname, join } from 'node:path';
 import { deserialize as v8Deserialize, serialize as v8Serialize } from 'node:v8';
 import { z } from 'zod';
+import { zodToTsType } from './zod-to-ts-type';
 
-const outputExtSchema = z.literal(['json', 'js', 'ts', 'bin']);
+const outputExtSchema = z.literal(['json', 'js', 'ts', 'bin', 'tsbin', 'jsbin']);
 type OutputExt = z.infer<typeof outputExtSchema>;
 
 export type OutputOptions = {
@@ -26,7 +27,7 @@ export type OutputOptions = {
   ext?: OutputExt;
   /**
    * Custom export variable name (default: 'mockData')
-   * Only used for 'ts' and 'js' formats.
+   * Only used for 'ts', 'js', 'tsbin', and 'jsbin' formats.
    * @example 'generatedMockData' → export const generatedMockData = ...
    */
   exportName?: string;
@@ -41,6 +42,11 @@ export type OutputOptions = {
    * Ignored for 'json' and 'bin' formats.
    */
   footer?: string;
+  /**
+   * Zod schema used to emit a TypeScript type annotation for 'tsbin'.
+   * Ignored for other formats. Falls back to `unknown` if omitted.
+   */
+  schema?: z.core.$ZodType;
 };
 
 const DEFAULT_OUTPUT_DIR = './__generated__';
@@ -232,6 +238,53 @@ function getExtFromPath(path?: string) {
   return result.success ? result.data : undefined;
 }
 
+function wrapperBinRelativeName(outputPath: string): string {
+  const base = basename(outputPath, extname(outputPath));
+  return `${base}.bin`;
+}
+
+function buildBinWrapper(
+  outputPath: string,
+  options: OutputOptions,
+  kind: 'tsbin' | 'jsbin',
+): string {
+  const exportName = options.exportName ?? 'mockData';
+  const header = options.header ?? '';
+  const footer = options.footer ?? '';
+  const binRef = wrapperBinRelativeName(outputPath);
+
+  const imports = [
+    "import { readFileSync } from 'node:fs';",
+    "import { deserialize } from 'node:v8';",
+  ].join('\n');
+
+  let body: string;
+  if (kind === 'tsbin') {
+    const typeText = options.schema ? zodToTsType(options.schema) : 'unknown';
+    body =
+      `export const ${exportName} = deserialize(\n` +
+      `  readFileSync(new URL(${JSON.stringify(`./${binRef}`)}, import.meta.url)),\n` +
+      `) as ${typeText};\n`;
+  } else {
+    body =
+      `export const ${exportName} = deserialize(\n` +
+      `  readFileSync(new URL(${JSON.stringify(`./${binRef}`)}, import.meta.url)),\n` +
+      `);\n`;
+  }
+
+  const parts: string[] = [];
+  if (header) parts.push(header);
+  parts.push(imports);
+  parts.push(body);
+  if (footer) parts.push(footer);
+  return parts.join('\n');
+}
+
+function wrapperDefaultPath(ext: 'tsbin' | 'jsbin'): string {
+  const wrapperExt = ext === 'tsbin' ? 'ts' : 'js';
+  return `${DEFAULT_OUTPUT_DIR}/${DEFAULT_OUTPUT_FILENAME}.${wrapperExt}`;
+}
+
 function buildContent(
   data: unknown,
   options: Omit<OutputOptions, 'ext'> & { ext: Exclude<OutputExt, 'bin'> },
@@ -271,6 +324,11 @@ export function serializeOutput(data: unknown, options?: OutputOptions): string 
       "serialize() does not support 'bin' format. Use serializeBinary() instead.",
     );
   }
+  if (ext === 'tsbin' || ext === 'jsbin') {
+    throw new Error(
+      `serialize() does not support '${ext}' format — it requires writing a .bin file alongside the wrapper. Use output() with the same options instead.`,
+    );
+  }
   return buildContent(data, { ...options, ext });
 }
 
@@ -300,7 +358,10 @@ export function deserializeBinary(input: Buffer | Uint8Array | string): unknown 
 export function outputToFile(data: unknown, options?: OutputOptions) {
   const ext = options?.ext ?? getExtFromPath(options?.path) ?? 'ts';
   const outputPath =
-    options?.path ?? `${DEFAULT_OUTPUT_DIR}/${DEFAULT_OUTPUT_FILENAME}.${ext}`;
+    options?.path ??
+    (ext === 'tsbin' || ext === 'jsbin'
+      ? wrapperDefaultPath(ext)
+      : `${DEFAULT_OUTPUT_DIR}/${DEFAULT_OUTPUT_FILENAME}.${ext}`);
 
   const dir = dirname(outputPath);
   if (!existsSync(dir)) {
@@ -309,6 +370,15 @@ export function outputToFile(data: unknown, options?: OutputOptions) {
 
   if (ext === 'bin') {
     writeFileSync(outputPath, serializeBinary(data));
+    return outputPath;
+  }
+
+  if (ext === 'tsbin' || ext === 'jsbin') {
+    const binName = wrapperBinRelativeName(outputPath);
+    const binPath = join(dir, binName);
+    writeFileSync(binPath, serializeBinary(data));
+    const wrapper = buildBinWrapper(outputPath, options ?? {}, ext);
+    writeFileSync(outputPath, wrapper, 'utf-8');
     return outputPath;
   }
 

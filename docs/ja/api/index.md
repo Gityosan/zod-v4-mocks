@@ -212,6 +212,12 @@ generator.output(data, { path: './mocks/user.ts' })
 generator.output(data, { path: './mocks/user.js' })
 generator.output(data, { path: './mocks/user.bin' }) // v8.serialize バイナリ
 
+// 'tsbin' / 'jsbin' — .ts (または .js) ラッパーと同名の .bin を同じディレクトリに出力し、
+// 読み込み時に v8.deserialize で復元するモジュールを作ります。すべての値を損失なく保持しつつ
+// import するだけで使えます。'tsbin' では `schema` を渡すと、そこから TS 型が合成されます。
+generator.output(data, { path: './mocks/user.ts', ext: 'tsbin', schema })
+generator.output(data, { path: './mocks/user.js', ext: 'jsbin' })
+
 // エクスポート名とヘッダー/フッターをカスタマイズ
 generator.output(data, {
   path: './mocks/user.ts',
@@ -225,11 +231,12 @@ generator.output(data, {
 
 ```ts
 type OutputOptions = {
-  path?: string                         // 出力先パス（デフォルト: ./__generated__/generated-mock-data.ts）
-  ext?: 'json' | 'js' | 'ts' | 'bin'    // 拡張子（path から推測、未指定時は 'ts'）
-  exportName?: string                   // エクスポート変数名（デフォルト: 'mockData'、ts/js のみ）
-  header?: string                       // 出力内容の先頭に追加する文字列（json/bin では無視）
-  footer?: string                       // 出力内容の末尾に追加する文字列（json/bin では無視）
+  path?: string                                             // 出力先パス（デフォルト: ./__generated__/generated-mock-data.ts）
+  ext?: 'json' | 'js' | 'ts' | 'bin' | 'tsbin' | 'jsbin'    // 拡張子（json/js/ts/bin は path から推測可、tsbin/jsbin は明示必須）
+  exportName?: string                                       // エクスポート変数名（デフォルト: 'mockData'、ts/js/tsbin/jsbin のみ）
+  header?: string                                           // 出力内容の先頭に追加する文字列（json/bin では無視）
+  footer?: string                                           // 出力内容の末尾に追加する文字列（json/bin では無視）
+  schema?: z.ZodType                                        // 'tsbin' ラッパーの TS 型注釈を合成するためのスキーマ（未指定時は `unknown`）
 }
 ```
 
@@ -240,13 +247,21 @@ type OutputOptions = {
 | `.ts` / `.js` | `export const <exportName> = ...` | Date, BigInt, Map, Set, Symbol, File, Blob を正確にシリアライズ |
 | `.json` | JSON | Date は ISO文字列、BigInt は文字列化、Map/Set/Symbol は情報損失（警告あり） |
 | `.bin` | バイナリ（v8 structured clone）| Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, 循環参照を保持。Node.js 限定 |
+| `tsbin` | `.ts` ラッパー + 同名 `.bin` | ラッパーが `v8.deserialize` で `.bin` を遅延ロード。渡された `schema` から TS 型注釈を合成。Node.js / ESM 限定 |
+| `jsbin` | `.js` ラッパー + 同名 `.bin` | `tsbin` の型注釈なし版。Node.js / ESM 限定 |
 
 ::: warning JSON 出力時のデータ損失
-JSON では表現できない型（BigInt, Symbol, Map, Set, File, Blob）を含むデータを `.json` で出力すると、データの正確性が失われます。警告メッセージが出力されるので、`.ts` / `.js` / `.bin` 形式の使用を検討してください。
+JSON では表現できない型（BigInt, Symbol, Map, Set, File, Blob）を含むデータを `.json` で出力すると、データの正確性が失われます。警告メッセージが出力されるので、`.ts` / `.js` / `.bin` / `tsbin` / `jsbin` 形式の使用を検討してください。
 :::
 
-::: info バイナリ形式について
-`.bin` は Zod が生成するすべての値（循環参照を含む）を完全に往復できる唯一の形式です。代わりに、ファイルは人間可読ではなく、Node.js 上で `generator.deserialize(path)` または `v8.deserialize(buffer)` を使ってのみデシリアライズできます。
+::: info バイナリ系形式（`bin` / `tsbin` / `jsbin`）
+いずれも Node.js の structured clone (`v8.serialize`) をベースにしているため、Zod が生成するすべての値（循環参照を含む）を完全に往復できます。違いは消費側での使い勝手です:
+
+- **`bin`** — 生の `.bin` ファイル。`generator.deserialize(path)` または `v8.deserialize(buffer)` で復元
+- **`jsbin`** — `user.js` と `user.bin` を書き出します。通常の JS モジュールのように `import { mockData } from './user'` で参照でき、ラッパーが import 時に透過的に `.bin` を復元
+- **`tsbin`** — `jsbin` と同じ仕組みで、渡された `schema` から推論した TypeScript 型注釈も付与。手書きのキャストなしで `mockData` が型付けされます
+
+生成されるラッパーは ESM (`import.meta.url`) 前提で、Node.js 限定です。
 :::
 
 ## 型定義
@@ -319,10 +334,11 @@ type GeneraterOptions = {
 ```ts
 type OutputOptions = {
   path?: string
-  ext?: 'json' | 'js' | 'ts' | 'bin'
+  ext?: 'json' | 'js' | 'ts' | 'bin' | 'tsbin' | 'jsbin'
   exportName?: string
   header?: string
   footer?: string
+  schema?: z.ZodType
 }
 ```
 

@@ -184,17 +184,18 @@ const restored = generator.deserialize('./mocks/user.bin');
 
 ### generator.output(data, options?)
 
-Outputs generated data to a file. Supports JSON, JavaScript, TypeScript, and binary (`.bin`, v8 structured clone) formats.
+Outputs generated data to a file. Supports JSON, JavaScript, TypeScript, binary (`.bin`, v8 structured clone), and binary-with-wrapper (`tsbin` / `jsbin`) formats.
 
 **Options:**
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| path | string | `./__generated__/generated-mock-data.ts` | Output file path |
-| ext | 'json' \| 'js' \| 'ts' \| 'bin' | 'ts' (or inferred from path) | Output format |
-| exportName | string | 'mockData' | Custom export variable name (ts/js only) |
-| header | string | undefined | String prepended to output content (ignored for json/bin) |
-| footer | string | undefined | String appended to output content (ignored for json/bin) |
+| path | string | `./__generated__/generated-mock-data.<ext>` | Output file path |
+| ext | 'json' \| 'js' \| 'ts' \| 'bin' \| 'tsbin' \| 'jsbin' | 'ts' (or inferred from path for json/js/ts/bin) | Output format. `tsbin`/`jsbin` must be set explicitly |
+| exportName | string | 'mockData' | Custom export variable name (ts/js/tsbin/jsbin only) |
+| header | string | undefined | String prepended to the generated wrapper/text (ignored for json/bin) |
+| footer | string | undefined | String appended to the generated wrapper/text (ignored for json/bin) |
+| schema | z.ZodType | undefined | Schema used to emit TS type annotation for `tsbin`; ignored otherwise |
 
 ```ts
 const generator = initGenerator();
@@ -211,6 +212,12 @@ generator.output(data, { path: './mocks/user.json' });
 // Output as binary (lossless round-trip via generator.deserialize)
 generator.output(data, { path: './mocks/user.bin' });
 
+// Output a .ts wrapper + sibling .bin; mockData is typed from the schema
+generator.output(data, { path: './mocks/user.ts', ext: 'tsbin', schema });
+
+// Same as above without the type annotation
+generator.output(data, { path: './mocks/user.js', ext: 'jsbin' });
+
 // Custom export name with header/footer
 generator.output(data, {
   path: './mocks/user.ts',
@@ -224,8 +231,9 @@ generator.output(data, {
 - BigInt values are converted to strings in JSON format (with console warning)
 - Date objects are serialized as `new Date("...")` in JS/TS format
 - Directory is created automatically if it doesn't exist
-- `header`, `footer`, `exportName` are ignored for JSON and binary formats
-- `.bin` is the only format that perfectly round-trips Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, and circular references; the file is Node.js-only
+- `header`, `footer`, `exportName` are ignored for JSON and binary formats (they apply to the wrapper file for tsbin/jsbin)
+- `bin` / `tsbin` / `jsbin` all perfectly round-trip Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, and circular references; the generated files are Node.js-only
+- `tsbin` / `jsbin` emit an ESM wrapper (`import.meta.url` based) that lazily loads a sibling `.bin` via `v8.deserialize`. The `.bin` basename matches the wrapper path and cannot be customized separately
 
 ## Supported Zod Types
 

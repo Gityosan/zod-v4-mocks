@@ -11,9 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `serializeBinary(data)` method on `MockGenerator` — serializes data to a `Buffer` via `v8.serialize` (structured clone), preserving `Date`, `Map`, `Set`, `RegExp`, `BigInt`, `TypedArray`, `undefined`, and circular references with no information loss
 - Added `deserialize(input)` method on `MockGenerator` — restores data from a `Buffer`/`Uint8Array` or `.bin` file path
 - Added `'bin'` extension support to `output()` — writes a `v8.serialize` binary file (Node.js only)
+- Added `'tsbin'` / `'jsbin'` extension support to `output()` — writes a `.ts` (or `.js`) ESM wrapper that lazily loads a sibling `.bin` via `v8.deserialize`, giving lossless persistence with normal `import` ergonomics
+- Added `schema` option to `OutputOptions` — when using `ext: 'tsbin'`, the passed Zod schema is converted to a TypeScript type annotation so the exported value is typed without hand-written casts
 
 ### Changed
-- `serialize()` now throws when `ext` is `'bin'`; use `serializeBinary()` instead so the return type stays `string`
+- `serialize()` now throws when `ext` is `'bin'`, `'tsbin'`, or `'jsbin'`; use `serializeBinary()` or `output()` instead so the return type stays `string`
 
 ## [2.2.0] - 2026-03-12
 
