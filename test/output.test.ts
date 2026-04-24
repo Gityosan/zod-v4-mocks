@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { initGenerator } from '../src';
@@ -542,37 +542,17 @@ describe('serializeBinary / deserialize (v8 structured clone)', () => {
     expect((restored.b as typeof b).a).toBe(restored);
   });
 
-  it('outputs .bin file from path extension and reads it back via deserialize(path)', () => {
+  it('serializeBinary Buffer can be written manually and read back via deserialize(path)', () => {
     const generator = initGenerator();
     const data = { count: 7n, when: new Date('2026-04-23T00:00:00.000Z') };
     const outputPath = `${testOutputDir}/mock.bin`;
 
-    const result = generator.output(data, { path: outputPath });
-
-    expect(result).toBe(outputPath);
-    expect(existsSync(outputPath)).toBe(true);
+    mkdirSync(testOutputDir, { recursive: true });
+    writeFileSync(outputPath, generator.serializeBinary(data));
 
     const restored = generator.deserialize(outputPath) as typeof data;
     expect(restored.count).toBe(7n);
     expect(restored.when.toISOString()).toBe('2026-04-23T00:00:00.000Z');
-  });
-
-  it('respects ext option overriding the path extension', () => {
-    const generator = initGenerator();
-    const data = { x: 1n };
-    const outputPath = `${testOutputDir}/mock.dat`;
-
-    generator.output(data, { path: outputPath, ext: 'bin' });
-
-    const restored = generator.deserialize(outputPath) as typeof data;
-    expect(restored.x).toBe(1n);
-  });
-
-  it('serialize() throws when ext is bin', () => {
-    const generator = initGenerator();
-    expect(() => generator.serialize({ x: 1 }, { ext: 'bin' })).toThrow(
-      /serializeBinary/,
-    );
   });
 
   it('preserves data Zod can generate that JSON would lose', () => {
@@ -594,8 +574,8 @@ describe('serializeBinary / deserialize (v8 structured clone)', () => {
   });
 });
 
-describe('tsbin / jsbin output (wrapper + .bin)', () => {
-  it('writes user.ts wrapper and user.bin with tsbin ext', () => {
+describe('output with useBin flag (wrapper + .bin)', () => {
+  it('writes user.ts wrapper and user.bin when ext=ts + useBin=true + schema', () => {
     const generator = initGenerator();
     const schema = z.object({
       id: z.string(),
@@ -608,7 +588,7 @@ describe('tsbin / jsbin output (wrapper + .bin)', () => {
 
     const result = generator.output(data, {
       path: outputPath,
-      ext: 'tsbin',
+      useBin: true,
       schema,
     });
 
@@ -624,24 +604,24 @@ describe('tsbin / jsbin output (wrapper + .bin)', () => {
     expect(content).toMatch(/\)\s+as\s+\{[\s\S]+id:\s+string;[\s\S]+createdAt:\s+Date;[\s\S]+count:\s+bigint;[\s\S]+tags:\s+Set<string>;/);
   });
 
-  it('falls back to `as unknown` when schema is omitted for tsbin', () => {
+  it('falls back to `as unknown` when schema is omitted for ts + useBin', () => {
     const generator = initGenerator();
     const data = { n: 1n };
     const outputPath = `${testOutputDir}/noschema.ts`;
 
-    generator.output(data, { path: outputPath, ext: 'tsbin' });
+    generator.output(data, { path: outputPath, useBin: true });
 
     const content = readFileSync(outputPath, 'utf-8');
     expect(content).toMatch(/\)\s+as\s+unknown;/);
   });
 
-  it('writes user.js wrapper and user.bin with jsbin ext, without type annotation', () => {
+  it('writes user.js wrapper and user.bin when ext=js + useBin=true, without type annotation', () => {
     const generator = initGenerator();
     const schema = z.object({ id: z.string(), count: z.bigint() });
     const data = generator.generate(schema);
     const outputPath = `${testOutputDir}/user.js`;
 
-    generator.output(data, { path: outputPath, ext: 'jsbin' });
+    generator.output(data, { path: outputPath, useBin: true });
 
     expect(existsSync(outputPath)).toBe(true);
     expect(existsSync(`${testOutputDir}/user.bin`)).toBe(true);
@@ -665,7 +645,7 @@ describe('tsbin / jsbin output (wrapper + .bin)', () => {
     const data = generator.generate(schema);
     const outputPath = `${testOutputDir}/runtime.js`;
 
-    generator.output(data, { path: outputPath, ext: 'jsbin' });
+    generator.output(data, { path: outputPath, useBin: true });
 
     const moduleUrl = new URL(`file://${process.cwd()}/${outputPath}`).href;
     const mod = (await import(moduleUrl)) as { mockData: typeof data };
@@ -687,7 +667,7 @@ describe('tsbin / jsbin output (wrapper + .bin)', () => {
 
     generator.output(data, {
       path: outputPath,
-      ext: 'tsbin',
+      useBin: true,
       schema,
       exportName: 'userMock',
       header: '// top',
@@ -700,26 +680,45 @@ describe('tsbin / jsbin output (wrapper + .bin)', () => {
     expect(content).toContain('export const userMock = deserialize(');
   });
 
-  it('uses default wrapper path ./__generated__/generated-mock-data.ts for tsbin', () => {
+  it('uses default wrapper path ./__generated__/generated-mock-data.ts for ts + useBin', () => {
     const generator = initGenerator();
     const schema = z.object({ id: z.string() });
     const data = generator.generate(schema);
 
-    const result = generator.output(data, { ext: 'tsbin', schema });
+    const result = generator.output(data, { useBin: true, schema });
 
     expect(result).toBe('./__generated__/generated-mock-data.ts');
     expect(existsSync(result)).toBe(true);
     expect(existsSync('./__generated__/generated-mock-data.bin')).toBe(true);
   });
 
-  it('serialize() throws when ext is tsbin/jsbin', () => {
+  it('ignores useBin when ext is json (plain JSON output)', () => {
     const generator = initGenerator();
-    expect(() => generator.serialize({}, { ext: 'tsbin' })).toThrow(
-      /output\(\)/,
-    );
-    expect(() => generator.serialize({}, { ext: 'jsbin' })).toThrow(
-      /output\(\)/,
-    );
+    const data = { id: 'abc' };
+    const outputPath = `${testOutputDir}/plain.json`;
+
+    const result = generator.output(data, { path: outputPath, useBin: true });
+
+    expect(result).toBe(outputPath);
+    expect(existsSync(outputPath)).toBe(true);
+    expect(existsSync(`${testOutputDir}/plain.bin`)).toBe(false);
+    expect(JSON.parse(readFileSync(outputPath, 'utf-8'))).toEqual({ id: 'abc' });
+  });
+
+  it('serialize() throws when useBin is true with ts/js', () => {
+    const generator = initGenerator();
+    expect(() =>
+      generator.serialize({}, { ext: 'ts', useBin: true }),
+    ).toThrow(/output\(\)/);
+    expect(() =>
+      generator.serialize({}, { ext: 'js', useBin: true }),
+    ).toThrow(/output\(\)/);
+  });
+
+  it('serialize() ignores useBin for json (no throw)', () => {
+    const generator = initGenerator();
+    const result = generator.serialize({ id: 1 }, { ext: 'json', useBin: true });
+    expect(JSON.parse(result)).toEqual({ id: 1 });
   });
 });
 

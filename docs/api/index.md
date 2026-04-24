@@ -180,14 +180,14 @@ const buf = generator.serializeBinary(data) // Buffer
 deserialize(input: Buffer | Uint8Array | string): unknown
 ```
 
-Restores a value previously serialized via `serializeBinary` or `output({ ext: 'bin' })`. Pass either a `Buffer`/`Uint8Array` or a path to a `.bin` file.
+Restores a value previously serialized via `serializeBinary` or `output({ useBin: true })`. Pass either a `Buffer`/`Uint8Array` or a path to a `.bin` file.
 
 ```ts
 // From a Buffer
 const restored = generator.deserialize(generator.serializeBinary(data))
 
-// From a file written by output()
-generator.output(data, { path: './mocks/user.bin' })
+// From a .bin file written next to a wrapper by output({ useBin: true })
+generator.output(data, { path: './mocks/user.ts', useBin: true, schema })
 const restored = generator.deserialize('./mocks/user.bin')
 ```
 
@@ -210,14 +210,15 @@ generator.output(data)
 generator.output(data, { path: './mocks/user.json' })
 generator.output(data, { path: './mocks/user.ts' })
 generator.output(data, { path: './mocks/user.js' })
-generator.output(data, { path: './mocks/user.bin' }) // v8.serialize binary
 
-// 'tsbin' / 'jsbin' — write a .ts (or .js) wrapper that lazily loads a sibling
-// .bin file via v8.deserialize. Preserves every value losslessly while still
-// giving you an importable module. For 'tsbin', pass `schema` so the wrapper
-// gets a TS type annotation inferred from it.
-generator.output(data, { path: './mocks/user.ts', ext: 'tsbin', schema })
-generator.output(data, { path: './mocks/user.js', ext: 'jsbin' })
+// `useBin: true` — for ts/js output, writes a thin ESM wrapper plus a sibling
+// <name>.bin produced by v8.serialize. The wrapper lazily deserializes the
+// .bin on import, so the module behaves like normal `import { mockData }`
+// but preserves Date / Map / Set / RegExp / BigInt / TypedArray / undefined /
+// circular refs losslessly. Pass `schema` with ext: 'ts' to have the wrapper
+// typed via a TypeScript type inferred from the schema.
+generator.output(data, { path: './mocks/user.ts', useBin: true, schema })
+generator.output(data, { path: './mocks/user.js', useBin: true })
 
 // Custom export name with header/footer
 generator.output(data, {
@@ -232,12 +233,13 @@ generator.output(data, {
 
 ```ts
 type OutputOptions = {
-  path?: string                                             // output path (default: ./__generated__/generated-mock-data.ts)
-  ext?: 'json' | 'js' | 'ts' | 'bin' | 'tsbin' | 'jsbin'    // extension (inferred from path for json/js/ts/bin; must be explicit for tsbin/jsbin)
-  exportName?: string                                       // custom export variable name (default: 'mockData', ts/js/tsbin/jsbin only)
-  header?: string                                           // string prepended to the output content (ignored for json/bin)
-  footer?: string                                           // string appended to the output content (ignored for json/bin)
-  schema?: z.ZodType                                        // schema used to infer TS type for 'tsbin' wrapper (falls back to `unknown`)
+  path?: string                    // output path (default: ./__generated__/generated-mock-data.<ext>)
+  ext?: 'json' | 'js' | 'ts'       // extension (inferred from path, defaults to 'ts')
+  exportName?: string              // custom export variable name (default: 'mockData', ts/js only)
+  header?: string                  // string prepended to the output content (ignored for json)
+  footer?: string                  // string appended to the output content (ignored for json)
+  useBin?: boolean                 // for ts/js, write a <name>.bin and a wrapper that deserializes it; ignored for json
+  schema?: z.ZodType               // schema used to infer the TS type annotation when ext='ts' && useBin=true (falls back to `unknown`)
 }
 ```
 
@@ -246,23 +248,20 @@ type OutputOptions = {
 | Extension | Format | Special Type Handling |
 |--------|------|-------------|
 | `.ts` / `.js` | `export const <exportName> = ...` | Accurately serializes Date, BigInt, Map, Set, Symbol, File, Blob |
-| `.json` | JSON | Date as ISO string, BigInt as string, Map/Set/Symbol lose information (with warnings) |
-| `.bin` | Binary (v8 structured clone) | Preserves Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, circular refs. Node.js only. |
-| `tsbin` | `.ts` wrapper + sibling `.bin` | Wrapper lazily loads the `.bin` via `v8.deserialize`. Uses the passed `schema` to emit a TS type annotation. Node.js / ESM only. |
-| `jsbin` | `.js` wrapper + sibling `.bin` | Same as `tsbin` without the type annotation. Node.js / ESM only. |
+| `.ts` / `.js` + `useBin: true` | ESM wrapper + sibling `.bin` (v8 structured clone) | Preserves Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, circular refs. With `ext: 'ts'`, the wrapper is typed from the passed `schema`. Node.js only. |
+| `.json` | JSON | Date as ISO string, BigInt as string, Map/Set/Symbol lose information (with warnings). `useBin` is ignored. |
 
 ::: warning Data Loss in JSON Output
-When outputting data containing types that cannot be represented in JSON (BigInt, Symbol, Map, Set, File, Blob) as `.json`, data accuracy is lost. Warning messages will be displayed, so consider using `.ts`, `.js`, `.bin`, `tsbin`, or `jsbin` format instead.
+When outputting data containing types that cannot be represented in JSON (BigInt, Symbol, Map, Set, File, Blob) as `.json`, data accuracy is lost. Warning messages will be displayed, so consider using `.ts` / `.js` (optionally with `useBin: true`) instead.
 :::
 
-::: info Binary Formats (`bin` / `tsbin` / `jsbin`)
-All three perfectly round-trip every value Zod can generate (including circular references) via Node.js's structured clone algorithm. They differ in the developer ergonomics on the consuming side:
+::: info `useBin: true` (lossless round-trip)
+With `useBin: true`, `output()` writes two files:
 
-- **`bin`** — raw `.bin` file, load via `generator.deserialize(path)` or `v8.deserialize(buffer)`.
-- **`jsbin`** — writes both `user.js` and `user.bin`. You `import { mockData } from './user'` as if it were plain JS; the wrapper transparently deserializes the `.bin` at import time.
-- **`tsbin`** — same as `jsbin` but also emits a TypeScript type annotation derived from the passed `schema`, so `mockData` is typed without hand-written casts.
+- `<name>.bin` — raw `v8.serialize` Buffer. Perfectly preserves every value Zod can generate, including circular references.
+- `<name>.ts` / `<name>.js` — a thin ESM wrapper that lazily `v8.deserialize`s the sibling `.bin` at import time, so consumers just do `import { mockData } from './user'` with no awareness of the binary representation.
 
-Generated wrappers target ESM (`import.meta.url`) and are Node.js only.
+With `ext: 'ts'`, pass the Zod `schema` to have the wrapper emit a TypeScript type annotation so `mockData` is typed without hand-written casts. The `.bin` filename is always derived from the wrapper's basename and cannot be customized separately. The wrapper targets ESM (`import.meta.url`) and is Node.js only.
 :::
 
 ## Type Definitions
@@ -335,10 +334,11 @@ In custom generators for `override`, you will mainly use `faker` and `config`.
 ```ts
 type OutputOptions = {
   path?: string
-  ext?: 'json' | 'js' | 'ts' | 'bin' | 'tsbin' | 'jsbin'
+  ext?: 'json' | 'js' | 'ts'
   exportName?: string
   header?: string
   footer?: string
+  useBin?: boolean
   schema?: z.ZodType
 }
 ```
