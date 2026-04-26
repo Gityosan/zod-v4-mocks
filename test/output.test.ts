@@ -574,8 +574,8 @@ describe('serializeBinary / deserialize (v8 structured clone)', () => {
   });
 });
 
-describe('output with useBin flag (wrapper + .bin)', () => {
-  it('writes user.ts wrapper and user.bin when ext=ts + useBin=true + schema', () => {
+describe('output with binary flag (wrapper + .bin)', () => {
+  it('writes user.ts wrapper and user.bin when ext=ts + binary=true + schema', () => {
     const generator = initGenerator();
     const schema = z.object({
       id: z.string(),
@@ -588,7 +588,7 @@ describe('output with useBin flag (wrapper + .bin)', () => {
 
     const result = generator.output(data, {
       path: outputPath,
-      useBin: true,
+      binary: true,
       schema,
     });
 
@@ -604,24 +604,24 @@ describe('output with useBin flag (wrapper + .bin)', () => {
     expect(content).toMatch(/\)\s+as\s+\{[\s\S]+id:\s+string;[\s\S]+createdAt:\s+Date;[\s\S]+count:\s+bigint;[\s\S]+tags:\s+Set<string>;/);
   });
 
-  it('falls back to `as unknown` when schema is omitted for ts + useBin', () => {
+  it('falls back to `as unknown` when schema is omitted for ts + binary', () => {
     const generator = initGenerator();
     const data = { n: 1n };
     const outputPath = `${testOutputDir}/noschema.ts`;
 
-    generator.output(data, { path: outputPath, useBin: true });
+    generator.output(data, { path: outputPath, binary: true });
 
     const content = readFileSync(outputPath, 'utf-8');
     expect(content).toMatch(/\)\s+as\s+unknown;/);
   });
 
-  it('writes user.js wrapper and user.bin when ext=js + useBin=true, without type annotation', () => {
+  it('writes user.js wrapper and user.bin when ext=js + binary=true, without type annotation', () => {
     const generator = initGenerator();
     const schema = z.object({ id: z.string(), count: z.bigint() });
     const data = generator.generate(schema);
     const outputPath = `${testOutputDir}/user.js`;
 
-    generator.output(data, { path: outputPath, useBin: true });
+    generator.output(data, { path: outputPath, binary: true });
 
     expect(existsSync(outputPath)).toBe(true);
     expect(existsSync(`${testOutputDir}/user.bin`)).toBe(true);
@@ -645,7 +645,7 @@ describe('output with useBin flag (wrapper + .bin)', () => {
     const data = generator.generate(schema);
     const outputPath = `${testOutputDir}/runtime.js`;
 
-    generator.output(data, { path: outputPath, useBin: true });
+    generator.output(data, { path: outputPath, binary: true });
 
     const moduleUrl = new URL(`file://${process.cwd()}/${outputPath}`).href;
     const mod = (await import(moduleUrl)) as { mockData: typeof data };
@@ -667,7 +667,7 @@ describe('output with useBin flag (wrapper + .bin)', () => {
 
     generator.output(data, {
       path: outputPath,
-      useBin: true,
+      binary: true,
       schema,
       exportName: 'userMock',
       header: '// top',
@@ -680,24 +680,24 @@ describe('output with useBin flag (wrapper + .bin)', () => {
     expect(content).toContain('export const userMock = deserialize(');
   });
 
-  it('uses default wrapper path ./__generated__/generated-mock-data.ts for ts + useBin', () => {
+  it('uses default wrapper path ./__generated__/generated-mock-data.ts for ts + binary', () => {
     const generator = initGenerator();
     const schema = z.object({ id: z.string() });
     const data = generator.generate(schema);
 
-    const result = generator.output(data, { useBin: true, schema });
+    const result = generator.output(data, { binary: true, schema });
 
     expect(result).toBe('./__generated__/generated-mock-data.ts');
     expect(existsSync(result)).toBe(true);
     expect(existsSync('./__generated__/generated-mock-data.bin')).toBe(true);
   });
 
-  it('ignores useBin when ext is json (plain JSON output)', () => {
+  it('ignores binary flag when ext is json (plain JSON output)', () => {
     const generator = initGenerator();
     const data = { id: 'abc' };
     const outputPath = `${testOutputDir}/plain.json`;
 
-    const result = generator.output(data, { path: outputPath, useBin: true });
+    const result = generator.output(data, { path: outputPath, binary: true });
 
     expect(result).toBe(outputPath);
     expect(existsSync(outputPath)).toBe(true);
@@ -705,19 +705,19 @@ describe('output with useBin flag (wrapper + .bin)', () => {
     expect(JSON.parse(readFileSync(outputPath, 'utf-8'))).toEqual({ id: 'abc' });
   });
 
-  it('serialize() throws when useBin is true with ts/js', () => {
+  it('serialize() throws when binary is true with ts/js', () => {
     const generator = initGenerator();
     expect(() =>
-      generator.serialize({}, { ext: 'ts', useBin: true }),
+      generator.serialize({}, { ext: 'ts', binary: true }),
     ).toThrow(/output\(\)/);
     expect(() =>
-      generator.serialize({}, { ext: 'js', useBin: true }),
+      generator.serialize({}, { ext: 'js', binary: true }),
     ).toThrow(/output\(\)/);
   });
 
-  it('serialize() ignores useBin for json (no throw)', () => {
+  it('serialize() ignores binary flag for json (no throw)', () => {
     const generator = initGenerator();
-    const result = generator.serialize({ id: 1 }, { ext: 'json', useBin: true });
+    const result = generator.serialize({ id: 1 }, { ext: 'json', binary: true });
     expect(JSON.parse(result)).toEqual({ id: 1 });
   });
 });

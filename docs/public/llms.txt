@@ -143,7 +143,7 @@ const mocks = initGenerator().multiGenerate(schemas);
 
 ### generator.serialize(data, options?)
 
-Serializes generated data to a string without writing to a file. Returns the same content that `output` would write. Throws if `useBin: true` is set with `ext: 'ts'`/`'js'` — that combination requires writing a sibling `.bin`; use `output()` or `serializeBinary()` instead. `useBin` is ignored with `ext: 'json'`.
+Serializes generated data to a string without writing to a file. Returns the same content that `output` would write. Throws if `binary: true` is set with `ext: 'ts'`/`'js'` — that combination requires writing a sibling `.bin`; use `output()` or `serializeBinary()` instead. `binary` is ignored with `ext: 'json'`.
 
 ```ts
 const generator = initGenerator();
@@ -171,20 +171,20 @@ const buf = generator.serializeBinary(data); // Buffer
 
 ### generator.deserialize(input)
 
-Restores a value previously produced by `serializeBinary` or `output({ useBin: true })`. Accepts a `Buffer`/`Uint8Array` or a `.bin` file path.
+Restores a value previously produced by `serializeBinary` or `output({ binary: true })`. Accepts a `Buffer`/`Uint8Array` or a `.bin` file path.
 
 ```ts
 // From a Buffer
 const restored = generator.deserialize(generator.serializeBinary(data));
 
 // From the .bin file written alongside a wrapper
-generator.output(data, { path: './mocks/user.ts', useBin: true, schema });
+generator.output(data, { path: './mocks/user.ts', binary: true, schema });
 const restored = generator.deserialize('./mocks/user.bin');
 ```
 
 ### generator.output(data, options?)
 
-Outputs generated data to a file. Supports JSON, JavaScript, and TypeScript formats. Set `useBin: true` with ts/js to additionally write a sibling `.bin` and turn the script into a thin ESM wrapper that `v8.deserialize`s it at import time.
+Outputs generated data to a file. Supports JSON, JavaScript, and TypeScript formats. Set `binary: true` with ts/js to additionally write a sibling `.bin` and turn the script into a thin ESM wrapper that `v8.deserialize`s it at import time.
 
 **Options:**
 
@@ -195,8 +195,8 @@ Outputs generated data to a file. Supports JSON, JavaScript, and TypeScript form
 | exportName | string | 'mockData' | Custom export variable name (ts/js only) |
 | header | string | undefined | String prepended to the generated wrapper/text (ignored for json) |
 | footer | string | undefined | String appended to the generated wrapper/text (ignored for json) |
-| useBin | boolean | false | For ts/js: also write a `<name>.bin` and make the script a v8.deserialize wrapper. Ignored for json. |
-| schema | z.ZodType | undefined | Schema used to emit the TS type annotation when `ext: 'ts'` + `useBin: true`; ignored otherwise |
+| binary | boolean | false | For ts/js: also write a `<name>.bin` and make the script a v8.deserialize wrapper. Ignored for json. |
+| schema | z.ZodType | undefined | Schema used to emit the TS type annotation when `ext: 'ts'` + `binary: true`; ignored otherwise |
 
 ```ts
 const generator = initGenerator();
@@ -211,10 +211,10 @@ generator.output(data);
 generator.output(data, { path: './mocks/user.json' });
 
 // Output a .ts wrapper + sibling .bin; mockData is typed from the schema
-generator.output(data, { path: './mocks/user.ts', useBin: true, schema });
+generator.output(data, { path: './mocks/user.ts', binary: true, schema });
 
 // Same pattern without type annotation
-generator.output(data, { path: './mocks/user.js', useBin: true });
+generator.output(data, { path: './mocks/user.js', binary: true });
 
 // Custom export name with header/footer
 generator.output(data, {
@@ -229,10 +229,10 @@ generator.output(data, {
 - BigInt values are converted to strings in JSON format (with console warning)
 - Date objects are serialized as `new Date("...")` in JS/TS format
 - Directory is created automatically if it doesn't exist
-- `header`, `footer`, `exportName` are ignored for JSON. For ts/js + `useBin`, they apply to the generated wrapper file
-- `useBin: true` perfectly round-trips Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, and circular references via `v8.serialize`. The generated wrapper targets ESM (`import.meta.url`) and is Node.js-only
+- `header`, `footer`, `exportName` are ignored for JSON. For ts/js + `binary`, they apply to the generated wrapper file
+- `binary: true` perfectly round-trips Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, and circular references via `v8.serialize`. The generated wrapper targets ESM (`import.meta.url`) and is Node.js-only
 - The sibling `.bin` basename is always derived from the wrapper path; it cannot be customized separately
-- `useBin` is silently ignored for `ext: 'json'`
+- `binary` is silently ignored for `ext: 'json'`
 
 ## Supported Zod Types
 

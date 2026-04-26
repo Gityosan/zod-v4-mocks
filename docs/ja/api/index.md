@@ -180,14 +180,14 @@ const buf = generator.serializeBinary(data) // Buffer
 deserialize(input: Buffer | Uint8Array | string): unknown
 ```
 
-`serializeBinary` または `output({ useBin: true })` で書き出した値を復元します。`Buffer`/`Uint8Array` または `.bin` ファイルのパスを受け取れます。
+`serializeBinary` または `output({ binary: true })` で書き出した値を復元します。`Buffer`/`Uint8Array` または `.bin` ファイルのパスを受け取れます。
 
 ```ts
 // Buffer から
 const restored = generator.deserialize(generator.serializeBinary(data))
 
-// output({ useBin: true }) がラッパーと同時に書き出した .bin から
-generator.output(data, { path: './mocks/user.ts', useBin: true, schema })
+// output({ binary: true }) がラッパーと同時に書き出した .bin から
+generator.output(data, { path: './mocks/user.ts', binary: true, schema })
 const restored = generator.deserialize('./mocks/user.bin')
 ```
 
@@ -211,14 +211,14 @@ generator.output(data, { path: './mocks/user.json' })
 generator.output(data, { path: './mocks/user.ts' })
 generator.output(data, { path: './mocks/user.js' })
 
-// `useBin: true` — ts/js 出力のときに、同名の <name>.bin（v8.serialize の生データ）を
+// `binary: true` — ts/js 出力のときに、同名の <name>.bin（v8.serialize の生データ）を
 // 同じディレクトリに書き出し、.ts / .js 側は import 時に `.bin` を `v8.deserialize`
 // する薄い ESM ラッパーになります。Date / Map / Set / RegExp / BigInt / TypedArray /
 // undefined / 循環参照をすべて情報損失なく保持しつつ、消費側はふつうに
 // `import { mockData } from './user'` として扱えます。`ext: 'ts'` のときは `schema`
-// を渡すと、ラッパー側の型注釈をそのスキーマから合成できます。
-generator.output(data, { path: './mocks/user.ts', useBin: true, schema })
-generator.output(data, { path: './mocks/user.js', useBin: true })
+// を渡すと、ラッパー側の型注釈をそのスキーマから合成します。
+generator.output(data, { path: './mocks/user.ts', binary: true, schema })
+generator.output(data, { path: './mocks/user.js', binary: true })
 
 // エクスポート名とヘッダー/フッターをカスタマイズ
 generator.output(data, {
@@ -238,8 +238,8 @@ type OutputOptions = {
   exportName?: string              // エクスポート変数名（デフォルト: 'mockData'、ts/js のみ）
   header?: string                  // 出力内容の先頭に追加する文字列（json では無視）
   footer?: string                  // 出力内容の末尾に追加する文字列（json では無視）
-  useBin?: boolean                 // ts/js に対し、<name>.bin とそれを復元するラッパーを書き出す。json では無視
-  schema?: z.ZodType               // ext='ts' && useBin=true のときに、ラッパーの TS 型注釈を合成（未指定時は `unknown`）
+  binary?: boolean                 // ts/js に対し、<name>.bin とそれを復元するラッパーを書き出す。json では無視
+  schema?: z.ZodType               // ext='ts' && binary=true のときに、ラッパーの TS 型注釈を合成（未指定時は `unknown`）
 }
 ```
 
@@ -248,15 +248,15 @@ type OutputOptions = {
 | 拡張子 | 形式 | 特殊型の扱い |
 |--------|------|-------------|
 | `.ts` / `.js` | `export const <exportName> = ...` | Date, BigInt, Map, Set, Symbol, File, Blob を正確にシリアライズ |
-| `.ts` / `.js` + `useBin: true` | ESM ラッパー + 同名 `.bin`（v8 structured clone）| Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, 循環参照を保持。`ext: 'ts'` では渡された `schema` から TS 型注釈を合成。Node.js 限定 |
-| `.json` | JSON | Date は ISO文字列、BigInt は文字列化、Map/Set/Symbol は情報損失（警告あり）。`useBin` は無視 |
+| `.ts` / `.js` + `binary: true` | ESM ラッパー + 同名 `.bin`（v8 structured clone）| Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, 循環参照を保持。`ext: 'ts'` では渡された `schema` から TS 型注釈を合成。Node.js 限定 |
+| `.json` | JSON | Date は ISO文字列、BigInt は文字列化、Map/Set/Symbol は情報損失（警告あり）。`binary` は無視 |
 
 ::: warning JSON 出力時のデータ損失
-JSON では表現できない型（BigInt, Symbol, Map, Set, File, Blob）を含むデータを `.json` で出力すると、データの正確性が失われます。警告メッセージが出力されるので、`.ts` / `.js`（必要に応じて `useBin: true`）の使用を検討してください。
+JSON では表現できない型（BigInt, Symbol, Map, Set, File, Blob）を含むデータを `.json` で出力すると、データの正確性が失われます。警告メッセージが出力されるので、`.ts` / `.js`（必要に応じて `binary: true`）の使用を検討してください。
 :::
 
-::: info `useBin: true`（完全な round-trip）
-`useBin: true` を指定すると、`output()` は 2 つのファイルを書き出します:
+::: info `binary: true`（完全な round-trip）
+`binary: true` を指定すると、`output()` は 2 つのファイルを書き出します:
 
 - `<name>.bin` — `v8.serialize` の生バッファ。Zod が生成するあらゆる値（循環参照を含む）を完全に保持
 - `<name>.ts` / `<name>.js` — import 時に同名の `.bin` を `v8.deserialize` で遅延復元する薄い ESM ラッパー。消費側は `import { mockData } from './user'` でそのまま使える
@@ -341,7 +341,7 @@ type OutputOptions = {
   exportName?: string
   header?: string
   footer?: string
-  useBin?: boolean
+  binary?: boolean
   schema?: z.ZodType
 }
 ```

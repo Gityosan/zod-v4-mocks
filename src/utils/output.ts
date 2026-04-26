@@ -51,10 +51,10 @@ export type OutputOptions = {
    *
    * Ignored for `ext: 'json'`.
    */
-  useBin?: boolean;
+  binary?: boolean;
   /**
    * Zod schema used to emit a TypeScript type annotation when
-   * `ext: 'ts'` and `useBin: true`. Falls back to `unknown` if omitted.
+   * `ext: 'ts'` and `binary: true`. Falls back to `unknown` if omitted.
    * Ignored for other combinations.
    */
   schema?: z.core.$ZodType;
@@ -321,14 +321,14 @@ function buildContent(
  * For 'json' ext: returns pure JSON string (header/footer/exportName are ignored).
  * For 'ts'/'js' ext: returns `export const <exportName> = <serialized>;`
  *
- * Throws if `useBin` is true with `ext: 'ts'` or `'js'` — that combination
+ * Throws if `binary` is true with `ext: 'ts'` or `'js'` — that combination
  * inherently requires writing a sibling `.bin`; use `output()` instead.
  */
 export function serializeOutput(data: unknown, options?: OutputOptions): string {
   const ext = options?.ext ?? getExtFromPath(options?.path) ?? 'ts';
-  if (options?.useBin && ext !== 'json') {
+  if (options?.binary && ext !== 'json') {
     throw new Error(
-      `serialize() does not support 'useBin' with ext '${ext}' — it requires writing a sibling .bin file. Use output() with the same options instead.`,
+      `serialize() cannot use binary mode with ext '${ext}' — it requires writing a sibling .bin file. Use output() with the same options instead.`,
     );
   }
   return buildContent(data, { ...options, ext });
@@ -367,7 +367,7 @@ export function outputToFile(data: unknown, options?: OutputOptions) {
     mkdirSync(dir, { recursive: true });
   }
 
-  if (options?.useBin && (ext === 'ts' || ext === 'js')) {
+  if (options?.binary && (ext === 'ts' || ext === 'js')) {
     const binName = wrapperBinRelativeName(outputPath);
     const binPath = join(dir, binName);
     writeFileSync(binPath, serializeBinary(data));

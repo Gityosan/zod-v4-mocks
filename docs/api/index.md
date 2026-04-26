@@ -180,14 +180,14 @@ const buf = generator.serializeBinary(data) // Buffer
 deserialize(input: Buffer | Uint8Array | string): unknown
 ```
 
-Restores a value previously serialized via `serializeBinary` or `output({ useBin: true })`. Pass either a `Buffer`/`Uint8Array` or a path to a `.bin` file.
+Restores a value previously serialized via `serializeBinary` or `output({ binary: true })`. Pass either a `Buffer`/`Uint8Array` or a path to a `.bin` file.
 
 ```ts
 // From a Buffer
 const restored = generator.deserialize(generator.serializeBinary(data))
 
-// From a .bin file written next to a wrapper by output({ useBin: true })
-generator.output(data, { path: './mocks/user.ts', useBin: true, schema })
+// From a .bin file written next to a wrapper by output({ binary: true })
+generator.output(data, { path: './mocks/user.ts', binary: true, schema })
 const restored = generator.deserialize('./mocks/user.bin')
 ```
 
@@ -211,14 +211,14 @@ generator.output(data, { path: './mocks/user.json' })
 generator.output(data, { path: './mocks/user.ts' })
 generator.output(data, { path: './mocks/user.js' })
 
-// `useBin: true` — for ts/js output, writes a thin ESM wrapper plus a sibling
+// `binary: true` — for ts/js output, writes a thin ESM wrapper plus a sibling
 // <name>.bin produced by v8.serialize. The wrapper lazily deserializes the
 // .bin on import, so the module behaves like normal `import { mockData }`
 // but preserves Date / Map / Set / RegExp / BigInt / TypedArray / undefined /
-// circular refs losslessly. Pass `schema` with ext: 'ts' to have the wrapper
+// circular refs losslessly. Pass `schema` with `ext: 'ts'` to have the wrapper
 // typed via a TypeScript type inferred from the schema.
-generator.output(data, { path: './mocks/user.ts', useBin: true, schema })
-generator.output(data, { path: './mocks/user.js', useBin: true })
+generator.output(data, { path: './mocks/user.ts', binary: true, schema })
+generator.output(data, { path: './mocks/user.js', binary: true })
 
 // Custom export name with header/footer
 generator.output(data, {
@@ -238,8 +238,8 @@ type OutputOptions = {
   exportName?: string              // custom export variable name (default: 'mockData', ts/js only)
   header?: string                  // string prepended to the output content (ignored for json)
   footer?: string                  // string appended to the output content (ignored for json)
-  useBin?: boolean                 // for ts/js, write a <name>.bin and a wrapper that deserializes it; ignored for json
-  schema?: z.ZodType               // schema used to infer the TS type annotation when ext='ts' && useBin=true (falls back to `unknown`)
+  binary?: boolean                 // for ts/js, write a <name>.bin and a wrapper that deserializes it; ignored for json
+  schema?: z.ZodType               // schema used to infer the TS type annotation when ext='ts' && binary=true (falls back to `unknown`)
 }
 ```
 
@@ -248,15 +248,15 @@ type OutputOptions = {
 | Extension | Format | Special Type Handling |
 |--------|------|-------------|
 | `.ts` / `.js` | `export const <exportName> = ...` | Accurately serializes Date, BigInt, Map, Set, Symbol, File, Blob |
-| `.ts` / `.js` + `useBin: true` | ESM wrapper + sibling `.bin` (v8 structured clone) | Preserves Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, circular refs. With `ext: 'ts'`, the wrapper is typed from the passed `schema`. Node.js only. |
-| `.json` | JSON | Date as ISO string, BigInt as string, Map/Set/Symbol lose information (with warnings). `useBin` is ignored. |
+| `.ts` / `.js` + `binary: true` | ESM wrapper + sibling `.bin` (v8 structured clone) | Preserves Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, circular refs. With `ext: 'ts'`, the wrapper is typed from the passed `schema`. Node.js only. |
+| `.json` | JSON | Date as ISO string, BigInt as string, Map/Set/Symbol lose information (with warnings). `binary` is ignored. |
 
 ::: warning Data Loss in JSON Output
-When outputting data containing types that cannot be represented in JSON (BigInt, Symbol, Map, Set, File, Blob) as `.json`, data accuracy is lost. Warning messages will be displayed, so consider using `.ts` / `.js` (optionally with `useBin: true`) instead.
+When outputting data containing types that cannot be represented in JSON (BigInt, Symbol, Map, Set, File, Blob) as `.json`, data accuracy is lost. Warning messages will be displayed, so consider using `.ts` / `.js` (optionally with `binary: true`) instead.
 :::
 
-::: info `useBin: true` (lossless round-trip)
-With `useBin: true`, `output()` writes two files:
+::: info `binary: true` (lossless round-trip)
+With `binary: true`, `output()` writes two files:
 
 - `<name>.bin` — raw `v8.serialize` Buffer. Perfectly preserves every value Zod can generate, including circular references.
 - `<name>.ts` / `<name>.js` — a thin ESM wrapper that lazily `v8.deserialize`s the sibling `.bin` at import time, so consumers just do `import { mockData } from './user'` with no awareness of the binary representation.
@@ -338,7 +338,7 @@ type OutputOptions = {
   exportName?: string
   header?: string
   footer?: string
-  useBin?: boolean
+  binary?: boolean
   schema?: z.ZodType
 }
 ```
