@@ -17,7 +17,6 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
 import { deserialize as v8Deserialize, serialize as v8Serialize } from 'node:v8';
 import { z } from 'zod';
-import { zodToTsType } from './zod-to-ts-type';
 
 const outputExtSchema = z.literal(['json', 'js', 'ts']);
 type OutputExt = z.infer<typeof outputExtSchema>;
@@ -49,15 +48,12 @@ export type OutputOptions = {
    * time, preserving `Date`, `Map`, `Set`, `RegExp`, `BigInt`, `TypedArray`,
    * `undefined`, and circular references with no information loss.
    *
+   * The wrapper exports the deserialized value as `unknown`. Cast on the
+   * consumer side or use `deserialize<T>()` directly if you need typing.
+   *
    * Ignored for `ext: 'json'`.
    */
   binary?: boolean;
-  /**
-   * Zod schema used to emit a TypeScript type annotation when
-   * `ext: 'ts'` and `binary: true`. Falls back to `unknown` if omitted.
-   * Ignored for other combinations.
-   */
-  schema?: z.core.$ZodType;
 };
 
 const DEFAULT_OUTPUT_DIR = './__generated__';
@@ -269,19 +265,14 @@ function buildBinWrapper(
     "import { deserialize } from 'node:v8';",
   ].join('\n');
 
-  let body: string;
-  if (ext === 'ts') {
-    const typeText = options.schema ? zodToTsType(options.schema) : 'unknown';
-    body =
-      `export const ${exportName} = deserialize(\n` +
-      `  readFileSync(new URL(${JSON.stringify(`./${binRef}`)}, import.meta.url)),\n` +
-      `) as ${typeText};\n`;
-  } else {
-    body =
-      `export const ${exportName} = deserialize(\n` +
-      `  readFileSync(new URL(${JSON.stringify(`./${binRef}`)}, import.meta.url)),\n` +
-      `);\n`;
-  }
+  const body =
+    ext === 'ts'
+      ? `export const ${exportName}: unknown = deserialize(\n` +
+        `  readFileSync(new URL(${JSON.stringify(`./${binRef}`)}, import.meta.url)),\n` +
+        `);\n`
+      : `export const ${exportName} = deserialize(\n` +
+        `  readFileSync(new URL(${JSON.stringify(`./${binRef}`)}, import.meta.url)),\n` +
+        `);\n`;
 
   const parts: string[] = [];
   if (header) parts.push(header);
@@ -351,10 +342,15 @@ export function serializeBinary(data: unknown): Buffer {
  * back into the original JavaScript value.
  *
  * Accepts either a Buffer or a path to a `.bin` file written by `outputToFile`.
+ *
+ * Pass a generic type parameter to cast the result, e.g.
+ * `deserializeBinary<User>('./user.bin')`.
  */
-export function deserializeBinary(input: Buffer | Uint8Array | string): unknown {
+export function deserializeBinary<T = unknown>(
+  input: Buffer | Uint8Array | string,
+): T {
   const buffer = typeof input === 'string' ? readFileSync(input) : input;
-  return v8Deserialize(buffer);
+  return v8Deserialize(buffer) as T;
 }
 
 export function outputToFile(data: unknown, options?: OutputOptions) {

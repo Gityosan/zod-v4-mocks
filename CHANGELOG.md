@@ -9,9 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added `serializeBinary(data)` method on `MockGenerator` — serializes data to a `Buffer` via `v8.serialize` (structured clone), preserving `Date`, `Map`, `Set`, `RegExp`, `BigInt`, `TypedArray`, `undefined`, and circular references with no information loss
-- Added `deserialize(input)` method on `MockGenerator` — restores data from a `Buffer`/`Uint8Array` or `.bin` file path
-- Added `binary` option to `OutputOptions` — when combined with `ext: 'ts'` or `'js'`, `output()` writes a sibling `<name>.bin` and turns the script into a thin ESM wrapper that `v8.deserialize`s the `.bin` at import time. This gives lossless persistence with normal `import` ergonomics. Silently ignored for `ext: 'json'`
-- Added `schema` option to `OutputOptions` — when `ext: 'ts'` and `binary: true`, the passed Zod schema is converted into a TypeScript type annotation so the exported value is typed without hand-written casts
+- Added `deserialize<T>(input)` method on `MockGenerator` — restores data from a `Buffer`/`Uint8Array` or `.bin` file path. Accepts an optional generic type parameter to cast the result (e.g. `deserialize<User>('./user.bin')`)
+- Added `binary` option to `OutputOptions` — when combined with `ext: 'ts'` or `'js'`, `output()` writes a sibling `<name>.bin` and turns the script into a thin ESM wrapper that `v8.deserialize`s the `.bin` at import time. This gives lossless persistence with normal `import` ergonomics. The wrapper exports the value as `unknown`; cast on the consumer side or use `deserialize<T>()` directly for typing. Silently ignored for `ext: 'json'`
 
 ### Changed
 - `serialize()` now throws when `binary: true` is combined with `ext: 'ts'` or `'js'` (those variants require writing a sibling `.bin`); use `output()` or `serializeBinary()` instead

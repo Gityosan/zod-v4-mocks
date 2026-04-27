@@ -177,18 +177,17 @@ const buf = generator.serializeBinary(data) // Buffer
 ### deserialize
 
 ```ts
-deserialize(input: Buffer | Uint8Array | string): unknown
+deserialize<T = unknown>(input: Buffer | Uint8Array | string): T
 ```
 
-`serializeBinary` または `output({ binary: true })` で書き出した値を復元します。`Buffer`/`Uint8Array` または `.bin` ファイルのパスを受け取れます。
+`serializeBinary` または `output({ binary: true })` で書き出した値を復元します。`Buffer`/`Uint8Array` または `.bin` ファイルのパスを受け取れます。型引数を渡すと結果をその型としてキャストします。
 
 ```ts
-// Buffer から
-const restored = generator.deserialize(generator.serializeBinary(data))
+// 型引数で結果に型を付ける
+const restored = generator.deserialize<User>('./mocks/user.bin')
 
-// output({ binary: true }) がラッパーと同時に書き出した .bin から
-generator.output(data, { path: './mocks/user.ts', binary: true, schema })
-const restored = generator.deserialize('./mocks/user.bin')
+// Buffer から
+const restored = generator.deserialize<User>(generator.serializeBinary(data))
 ```
 
 ### output
@@ -215,9 +214,10 @@ generator.output(data, { path: './mocks/user.js' })
 // 同じディレクトリに書き出し、.ts / .js 側は import 時に `.bin` を `v8.deserialize`
 // する薄い ESM ラッパーになります。Date / Map / Set / RegExp / BigInt / TypedArray /
 // undefined / 循環参照をすべて情報損失なく保持しつつ、消費側はふつうに
-// `import { mockData } from './user'` として扱えます。`ext: 'ts'` のときは `schema`
-// を渡すと、ラッパー側の型注釈をそのスキーマから合成します。
-generator.output(data, { path: './mocks/user.ts', binary: true, schema })
+// `import { mockData } from './user'` として扱えます。エクスポート値は
+// `unknown` 型なので、消費側でキャストするか、`deserialize<T>()` を直接呼んで
+// 型付けしてください。
+generator.output(data, { path: './mocks/user.ts', binary: true })
 generator.output(data, { path: './mocks/user.js', binary: true })
 
 // エクスポート名とヘッダー/フッターをカスタマイズ
@@ -239,7 +239,6 @@ type OutputOptions = {
   header?: string                  // 出力内容の先頭に追加する文字列（json では無視）
   footer?: string                  // 出力内容の末尾に追加する文字列（json では無視）
   binary?: boolean                 // ts/js に対し、<name>.bin とそれを復元するラッパーを書き出す。json では無視
-  schema?: z.ZodType               // ext='ts' && binary=true のときに、ラッパーの TS 型注釈を合成（未指定時は `unknown`）
 }
 ```
 
@@ -248,7 +247,7 @@ type OutputOptions = {
 | 拡張子 | 形式 | 特殊型の扱い |
 |--------|------|-------------|
 | `.ts` / `.js` | `export const <exportName> = ...` | Date, BigInt, Map, Set, Symbol, File, Blob を正確にシリアライズ |
-| `.ts` / `.js` + `binary: true` | ESM ラッパー + 同名 `.bin`（v8 structured clone）| Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, 循環参照を保持。`ext: 'ts'` では渡された `schema` から TS 型注釈を合成。Node.js 限定 |
+| `.ts` / `.js` + `binary: true` | ESM ラッパー + 同名 `.bin`（v8 structured clone）| Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, 循環参照を保持。エクスポートは `unknown` 型なので、消費側でキャストするか `deserialize<T>()` を直接使用。Node.js 限定 |
 | `.json` | JSON | Date は ISO文字列、BigInt は文字列化、Map/Set/Symbol は情報損失（警告あり）。`binary` は無視 |
 
 ::: warning JSON 出力時のデータ損失
@@ -261,10 +260,7 @@ JSON では表現できない型（BigInt, Symbol, Map, Set, File, Blob）を含
 - `<name>.bin` — `v8.serialize` の生バッファ。Zod が生成するあらゆる値（循環参照を含む）を完全に保持
 - `<name>.ts` / `<name>.js` — import 時に同名の `.bin` を `v8.deserialize` で遅延復元する薄い ESM ラッパー。消費側は `import { mockData } from './user'` でそのまま使える
 
-`ext: 'ts'` のときは Zod スキーマを `schema` として渡すと、ラッパーに TypeScript の型注釈が合成されるので、手書きのキャストなしで `mockData` が型付けされます。`.bin` のファイル名は常にラッパーのベース名から自動導出され、個別には変更できません。ラッパーは ESM (`import.meta.url`) 前提で Node.js 限定です。
-:::
-
-生成されるラッパーは ESM (`import.meta.url`) 前提で、Node.js 限定です。
+エクスポート値は `unknown` 型です。消費側でキャストするか、ラッパーを介さず `deserialize<T>('./user.bin')` を直接呼んで型付けしてください。`.bin` のファイル名は常にラッパーのベース名から自動導出され、個別には変更できません。ラッパーは ESM (`import.meta.url`) 前提で Node.js 限定です。
 :::
 
 ## 型定義
@@ -342,7 +338,6 @@ type OutputOptions = {
   header?: string
   footer?: string
   binary?: boolean
-  schema?: z.ZodType
 }
 ```
 

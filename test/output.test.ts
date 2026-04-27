@@ -510,7 +510,7 @@ describe('serializeBinary / deserialize (v8 structured clone)', () => {
     const buf = generator.serializeBinary(data);
     expect(Buffer.isBuffer(buf)).toBe(true);
 
-    const restored = generator.deserialize(buf) as typeof data;
+    const restored = generator.deserialize<typeof data>(buf);
     expect(restored.str).toBe('hello');
     expect(restored.num).toBe(42);
     expect(restored.bool).toBe(true);
@@ -536,7 +536,7 @@ describe('serializeBinary / deserialize (v8 structured clone)', () => {
     const b: Record<string, unknown> = { name: 'b', a };
     a.b = b;
 
-    const restored = generator.deserialize(generator.serializeBinary(a)) as typeof a;
+    const restored = generator.deserialize<typeof a>(generator.serializeBinary(a));
     expect(restored.name).toBe('a');
     expect((restored.b as typeof b).name).toBe('b');
     expect((restored.b as typeof b).a).toBe(restored);
@@ -550,7 +550,7 @@ describe('serializeBinary / deserialize (v8 structured clone)', () => {
     mkdirSync(testOutputDir, { recursive: true });
     writeFileSync(outputPath, generator.serializeBinary(data));
 
-    const restored = generator.deserialize(outputPath) as typeof data;
+    const restored = generator.deserialize<typeof data>(outputPath);
     expect(restored.count).toBe(7n);
     expect(restored.when.toISOString()).toBe('2026-04-23T00:00:00.000Z');
   });
@@ -565,7 +565,7 @@ describe('serializeBinary / deserialize (v8 structured clone)', () => {
     });
     const data = generator.generate(schema);
 
-    const restored = generator.deserialize(generator.serializeBinary(data)) as typeof data;
+    const restored = generator.deserialize<typeof data>(generator.serializeBinary(data));
     expect(typeof restored.id).toBe('bigint');
     expect(restored.tags).toBeInstanceOf(Set);
     expect(restored.meta).toBeInstanceOf(Map);
@@ -575,7 +575,7 @@ describe('serializeBinary / deserialize (v8 structured clone)', () => {
 });
 
 describe('output with binary flag (wrapper + .bin)', () => {
-  it('writes user.ts wrapper and user.bin when ext=ts + binary=true + schema', () => {
+  it('writes user.ts wrapper (typed as unknown) and user.bin when ext=ts + binary=true', () => {
     const generator = initGenerator();
     const schema = z.object({
       id: z.string(),
@@ -589,7 +589,6 @@ describe('output with binary flag (wrapper + .bin)', () => {
     const result = generator.output(data, {
       path: outputPath,
       binary: true,
-      schema,
     });
 
     expect(result).toBe(outputPath);
@@ -600,19 +599,7 @@ describe('output with binary flag (wrapper + .bin)', () => {
     expect(content).toContain("import { readFileSync } from 'node:fs';");
     expect(content).toContain("import { deserialize } from 'node:v8';");
     expect(content).toContain("new URL(\"./user.bin\", import.meta.url)");
-    expect(content).toContain('export const mockData = deserialize(');
-    expect(content).toMatch(/\)\s+as\s+\{[\s\S]+id:\s+string;[\s\S]+createdAt:\s+Date;[\s\S]+count:\s+bigint;[\s\S]+tags:\s+Set<string>;/);
-  });
-
-  it('falls back to `as unknown` when schema is omitted for ts + binary', () => {
-    const generator = initGenerator();
-    const data = { n: 1n };
-    const outputPath = `${testOutputDir}/noschema.ts`;
-
-    generator.output(data, { path: outputPath, binary: true });
-
-    const content = readFileSync(outputPath, 'utf-8');
-    expect(content).toMatch(/\)\s+as\s+unknown;/);
+    expect(content).toContain('export const mockData: unknown = deserialize(');
   });
 
   it('writes user.js wrapper and user.bin when ext=js + binary=true, without type annotation', () => {
@@ -631,7 +618,7 @@ describe('output with binary flag (wrapper + .bin)', () => {
     expect(content).toContain("import { deserialize } from 'node:v8';");
     expect(content).toContain("new URL(\"./user.bin\", import.meta.url)");
     expect(content).toContain('export const mockData = deserialize(');
-    expect(content).not.toMatch(/\sas\s+/);
+    expect(content).not.toMatch(/:\s*unknown/);
   });
 
   it('round-trips via the generated wrapper at runtime', async () => {
@@ -668,7 +655,6 @@ describe('output with binary flag (wrapper + .bin)', () => {
     generator.output(data, {
       path: outputPath,
       binary: true,
-      schema,
       exportName: 'userMock',
       header: '// top',
       footer: '// end',
@@ -677,7 +663,7 @@ describe('output with binary flag (wrapper + .bin)', () => {
     const content = readFileSync(outputPath, 'utf-8');
     expect(content).toMatch(/^\/\/ top/);
     expect(content).toMatch(/\/\/ end\s*$/);
-    expect(content).toContain('export const userMock = deserialize(');
+    expect(content).toContain('export const userMock: unknown = deserialize(');
   });
 
   it('uses default wrapper path ./__generated__/generated-mock-data.ts for ts + binary', () => {
@@ -685,7 +671,7 @@ describe('output with binary flag (wrapper + .bin)', () => {
     const schema = z.object({ id: z.string() });
     const data = generator.generate(schema);
 
-    const result = generator.output(data, { binary: true, schema });
+    const result = generator.output(data, { binary: true });
 
     expect(result).toBe('./__generated__/generated-mock-data.ts');
     expect(existsSync(result)).toBe(true);

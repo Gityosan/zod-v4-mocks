@@ -169,17 +169,16 @@ Serializes data to a binary `Buffer` using Node.js's `v8.serialize` (structured 
 const buf = generator.serializeBinary(data); // Buffer
 ```
 
-### generator.deserialize(input)
+### generator.deserialize\<T = unknown\>(input)
 
-Restores a value previously produced by `serializeBinary` or `output({ binary: true })`. Accepts a `Buffer`/`Uint8Array` or a `.bin` file path.
+Restores a value previously produced by `serializeBinary` or `output({ binary: true })`. Accepts a `Buffer`/`Uint8Array` or a `.bin` file path. Pass a generic type parameter to type the result.
 
 ```ts
-// From a Buffer
-const restored = generator.deserialize(generator.serializeBinary(data));
+// Type the result via a generic parameter
+const restored = generator.deserialize<User>('./mocks/user.bin');
 
-// From the .bin file written alongside a wrapper
-generator.output(data, { path: './mocks/user.ts', binary: true, schema });
-const restored = generator.deserialize('./mocks/user.bin');
+// From a Buffer
+const restored = generator.deserialize<User>(generator.serializeBinary(data));
 ```
 
 ### generator.output(data, options?)
@@ -196,7 +195,6 @@ Outputs generated data to a file. Supports JSON, JavaScript, and TypeScript form
 | header | string | undefined | String prepended to the generated wrapper/text (ignored for json) |
 | footer | string | undefined | String appended to the generated wrapper/text (ignored for json) |
 | binary | boolean | false | For ts/js: also write a `<name>.bin` and make the script a v8.deserialize wrapper. Ignored for json. |
-| schema | z.ZodType | undefined | Schema used to emit the TS type annotation when `ext: 'ts'` + `binary: true`; ignored otherwise |
 
 ```ts
 const generator = initGenerator();
@@ -210,10 +208,9 @@ generator.output(data);
 // Output as JSON with custom path
 generator.output(data, { path: './mocks/user.json' });
 
-// Output a .ts wrapper + sibling .bin; mockData is typed from the schema
-generator.output(data, { path: './mocks/user.ts', binary: true, schema });
-
-// Same pattern without type annotation
+// Output a .ts wrapper + sibling .bin (mockData is typed as `unknown`;
+// cast on consumer side or use `deserialize<T>()` for typing)
+generator.output(data, { path: './mocks/user.ts', binary: true });
 generator.output(data, { path: './mocks/user.js', binary: true });
 
 // Custom export name with header/footer

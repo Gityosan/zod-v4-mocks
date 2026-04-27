@@ -109,10 +109,13 @@ class MockGenerator {
 
   /**
    * Deserialize a Buffer (or `.bin` file path) produced by `serializeBinary`
-   * or `output({ ext: 'bin' })` back into the original JavaScript value.
+   * or `output({ binary: true })` back into the original JavaScript value.
+   *
+   * Pass a generic type parameter to cast the result, e.g.
+   * `generator.deserialize<User>('./user.bin')`.
    */
-  deserialize(input: Buffer | Uint8Array | string): unknown {
-    return deserializeBinary(input);
+  deserialize<T = unknown>(input: Buffer | Uint8Array | string): T {
+    return deserializeBinary<T>(input);
   }
 
   output(data: unknown, options?: OutputOptions): string {

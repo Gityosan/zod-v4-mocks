@@ -177,18 +177,17 @@ const buf = generator.serializeBinary(data) // Buffer
 ### deserialize
 
 ```ts
-deserialize(input: Buffer | Uint8Array | string): unknown
+deserialize<T = unknown>(input: Buffer | Uint8Array | string): T
 ```
 
-Restores a value previously serialized via `serializeBinary` or `output({ binary: true })`. Pass either a `Buffer`/`Uint8Array` or a path to a `.bin` file.
+Restores a value previously serialized via `serializeBinary` or `output({ binary: true })`. Pass either a `Buffer`/`Uint8Array` or a path to a `.bin` file. Pass a generic type parameter to type the result.
 
 ```ts
-// From a Buffer
-const restored = generator.deserialize(generator.serializeBinary(data))
+// Type the result via a generic parameter
+const restored = generator.deserialize<User>('./mocks/user.bin')
 
-// From a .bin file written next to a wrapper by output({ binary: true })
-generator.output(data, { path: './mocks/user.ts', binary: true, schema })
-const restored = generator.deserialize('./mocks/user.bin')
+// From a Buffer
+const restored = generator.deserialize<User>(generator.serializeBinary(data))
 ```
 
 ### output
@@ -215,9 +214,9 @@ generator.output(data, { path: './mocks/user.js' })
 // <name>.bin produced by v8.serialize. The wrapper lazily deserializes the
 // .bin on import, so the module behaves like normal `import { mockData }`
 // but preserves Date / Map / Set / RegExp / BigInt / TypedArray / undefined /
-// circular refs losslessly. Pass `schema` with `ext: 'ts'` to have the wrapper
-// typed via a TypeScript type inferred from the schema.
-generator.output(data, { path: './mocks/user.ts', binary: true, schema })
+// circular refs losslessly. The exported value is typed as `unknown`; cast on
+// the consumer side or use `deserialize<T>()` directly when you need typing.
+generator.output(data, { path: './mocks/user.ts', binary: true })
 generator.output(data, { path: './mocks/user.js', binary: true })
 
 // Custom export name with header/footer
@@ -239,7 +238,6 @@ type OutputOptions = {
   header?: string                  // string prepended to the output content (ignored for json)
   footer?: string                  // string appended to the output content (ignored for json)
   binary?: boolean                 // for ts/js, write a <name>.bin and a wrapper that deserializes it; ignored for json
-  schema?: z.ZodType               // schema used to infer the TS type annotation when ext='ts' && binary=true (falls back to `unknown`)
 }
 ```
 
@@ -248,7 +246,7 @@ type OutputOptions = {
 | Extension | Format | Special Type Handling |
 |--------|------|-------------|
 | `.ts` / `.js` | `export const <exportName> = ...` | Accurately serializes Date, BigInt, Map, Set, Symbol, File, Blob |
-| `.ts` / `.js` + `binary: true` | ESM wrapper + sibling `.bin` (v8 structured clone) | Preserves Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, circular refs. With `ext: 'ts'`, the wrapper is typed from the passed `schema`. Node.js only. |
+| `.ts` / `.js` + `binary: true` | ESM wrapper + sibling `.bin` (v8 structured clone) | Preserves Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, circular refs. The wrapper exports the value as `unknown`; cast on the consumer side or use `deserialize<T>()` for typing. Node.js only. |
 | `.json` | JSON | Date as ISO string, BigInt as string, Map/Set/Symbol lose information (with warnings). `binary` is ignored. |
 
 ::: warning Data Loss in JSON Output
@@ -261,7 +259,7 @@ With `binary: true`, `output()` writes two files:
 - `<name>.bin` — raw `v8.serialize` Buffer. Perfectly preserves every value Zod can generate, including circular references.
 - `<name>.ts` / `<name>.js` — a thin ESM wrapper that lazily `v8.deserialize`s the sibling `.bin` at import time, so consumers just do `import { mockData } from './user'` with no awareness of the binary representation.
 
-With `ext: 'ts'`, pass the Zod `schema` to have the wrapper emit a TypeScript type annotation so `mockData` is typed without hand-written casts. The `.bin` filename is always derived from the wrapper's basename and cannot be customized separately. The wrapper targets ESM (`import.meta.url`) and is Node.js only.
+The wrapper exports the value as `unknown`; cast on the consumer side, or call `deserialize<T>('./user.bin')` directly when you want a typed value without going through the wrapper. The `.bin` filename is always derived from the wrapper's basename and cannot be customized separately. The wrapper targets ESM (`import.meta.url`) and is Node.js only.
 :::
 
 ## Type Definitions
@@ -339,7 +337,6 @@ type OutputOptions = {
   header?: string
   footer?: string
   binary?: boolean
-  schema?: z.ZodType
 }
 ```
 

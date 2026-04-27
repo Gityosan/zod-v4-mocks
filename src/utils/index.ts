@@ -7,4 +7,3 @@ export * from './output';
 export * from './schema';
 export * from './string';
 export * from './warning';
-export * from './zod-to-ts-type';
