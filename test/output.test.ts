@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { initGenerator } from '../src';
@@ -485,6 +485,226 @@ describe('serialize', () => {
     const fileContent = readFileSync(outputPath, 'utf-8');
 
     expect(serialized).toBe(fileContent);
+  });
+});
+
+describe('serializeBinary / deserialize (v8 structured clone)', () => {
+  it('round-trips primitives, Date, BigInt, Map, Set, RegExp, undefined', () => {
+    const generator = initGenerator();
+    const data = {
+      str: 'hello',
+      num: 42,
+      bool: true,
+      und: undefined,
+      bi: 123456789012345678901234567890n,
+      d: new Date('2025-01-01T00:00:00.000Z'),
+      m: new Map<string, unknown>([
+        ['a', 1],
+        ['b', new Date(0)],
+      ]),
+      s: new Set([1, 2, 3]),
+      re: /abc/gi,
+      bytes: new Uint8Array([1, 2, 3, 4]),
+    };
+
+    const buf = generator.serializeBinary(data);
+    expect(Buffer.isBuffer(buf)).toBe(true);
+
+    const restored = generator.deserialize<typeof data>(buf);
+    expect(restored.str).toBe('hello');
+    expect(restored.num).toBe(42);
+    expect(restored.bool).toBe(true);
+    expect(restored.und).toBeUndefined();
+    expect(restored.bi).toBe(123456789012345678901234567890n);
+    expect(restored.d).toBeInstanceOf(Date);
+    expect(restored.d.toISOString()).toBe('2025-01-01T00:00:00.000Z');
+    expect(restored.m).toBeInstanceOf(Map);
+    expect(restored.m.get('a')).toBe(1);
+    expect((restored.m.get('b') as Date).toISOString()).toBe(new Date(0).toISOString());
+    expect(restored.s).toBeInstanceOf(Set);
+    expect([...restored.s]).toEqual([1, 2, 3]);
+    expect(restored.re).toBeInstanceOf(RegExp);
+    expect(restored.re.source).toBe('abc');
+    expect(restored.re.flags).toBe('gi');
+    expect(restored.bytes).toBeInstanceOf(Uint8Array);
+    expect(Array.from(restored.bytes)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('round-trips circular references', () => {
+    const generator = initGenerator();
+    const a: Record<string, unknown> = { name: 'a' };
+    const b: Record<string, unknown> = { name: 'b', a };
+    a.b = b;
+
+    const restored = generator.deserialize<typeof a>(generator.serializeBinary(a));
+    expect(restored.name).toBe('a');
+    expect((restored.b as typeof b).name).toBe('b');
+    expect((restored.b as typeof b).a).toBe(restored);
+  });
+
+  it('serializeBinary Buffer can be written manually and read back via deserialize(path)', () => {
+    const generator = initGenerator();
+    const data = { count: 7n, when: new Date('2026-04-23T00:00:00.000Z') };
+    const outputPath = `${testOutputDir}/mock.bin`;
+
+    mkdirSync(testOutputDir, { recursive: true });
+    writeFileSync(outputPath, generator.serializeBinary(data));
+
+    const restored = generator.deserialize<typeof data>(outputPath);
+    expect(restored.count).toBe(7n);
+    expect(restored.when.toISOString()).toBe('2026-04-23T00:00:00.000Z');
+  });
+
+  it('preserves data Zod can generate that JSON would lose', () => {
+    const generator = initGenerator({ seed: 123 });
+    const schema = z.object({
+      id: z.bigint(),
+      tags: z.set(z.string()),
+      meta: z.map(z.string(), z.number()),
+      createdAt: z.date(),
+    });
+    const data = generator.generate(schema);
+
+    const restored = generator.deserialize<typeof data>(generator.serializeBinary(data));
+    expect(typeof restored.id).toBe('bigint');
+    expect(restored.tags).toBeInstanceOf(Set);
+    expect(restored.meta).toBeInstanceOf(Map);
+    expect(restored.createdAt).toBeInstanceOf(Date);
+    expect(schema.parse(restored)).toBeDefined();
+  });
+});
+
+describe('output with binary flag (wrapper + .bin)', () => {
+  it('writes user.ts wrapper (typed as unknown) and user.bin when ext=ts + binary=true', () => {
+    const generator = initGenerator();
+    const schema = z.object({
+      id: z.string(),
+      createdAt: z.date(),
+      count: z.bigint(),
+      tags: z.set(z.string()),
+    });
+    const data = generator.generate(schema);
+    const outputPath = `${testOutputDir}/user.ts`;
+
+    const result = generator.output(data, {
+      path: outputPath,
+      binary: true,
+    });
+
+    expect(result).toBe(outputPath);
+    expect(existsSync(outputPath)).toBe(true);
+    expect(existsSync(`${testOutputDir}/user.bin`)).toBe(true);
+
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toContain("import { readFileSync } from 'node:fs';");
+    expect(content).toContain("import { deserialize } from 'node:v8';");
+    expect(content).toContain("new URL(\"./user.bin\", import.meta.url)");
+    expect(content).toContain('export const mockData: unknown = deserialize(');
+  });
+
+  it('writes user.js wrapper and user.bin when ext=js + binary=true, without type annotation', () => {
+    const generator = initGenerator();
+    const schema = z.object({ id: z.string(), count: z.bigint() });
+    const data = generator.generate(schema);
+    const outputPath = `${testOutputDir}/user.js`;
+
+    generator.output(data, { path: outputPath, binary: true });
+
+    expect(existsSync(outputPath)).toBe(true);
+    expect(existsSync(`${testOutputDir}/user.bin`)).toBe(true);
+
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toContain("import { readFileSync } from 'node:fs';");
+    expect(content).toContain("import { deserialize } from 'node:v8';");
+    expect(content).toContain("new URL(\"./user.bin\", import.meta.url)");
+    expect(content).toContain('export const mockData = deserialize(');
+    expect(content).not.toMatch(/:\s*unknown/);
+  });
+
+  it('round-trips via the generated wrapper at runtime', async () => {
+    const generator = initGenerator();
+    const schema = z.object({
+      id: z.string(),
+      createdAt: z.date(),
+      count: z.bigint(),
+      tags: z.set(z.string()),
+    });
+    const data = generator.generate(schema);
+    const outputPath = `${testOutputDir}/runtime.js`;
+
+    generator.output(data, { path: outputPath, binary: true });
+
+    const moduleUrl = new URL(`file://${process.cwd()}/${outputPath}`).href;
+    const mod = (await import(moduleUrl)) as { mockData: typeof data };
+
+    expect(mod.mockData.id).toBe(data.id);
+    expect(mod.mockData.createdAt).toBeInstanceOf(Date);
+    expect(mod.mockData.createdAt.getTime()).toBe(data.createdAt.getTime());
+    expect(typeof mod.mockData.count).toBe('bigint');
+    expect(mod.mockData.count).toBe(data.count);
+    expect(mod.mockData.tags).toBeInstanceOf(Set);
+    expect([...mod.mockData.tags]).toEqual([...data.tags]);
+  });
+
+  it('respects exportName / header / footer in the wrapper', () => {
+    const generator = initGenerator();
+    const schema = z.object({ id: z.string() });
+    const data = generator.generate(schema);
+    const outputPath = `${testOutputDir}/custom.ts`;
+
+    generator.output(data, {
+      path: outputPath,
+      binary: true,
+      exportName: 'userMock',
+      header: '// top',
+      footer: '// end',
+    });
+
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toMatch(/^\/\/ top/);
+    expect(content).toMatch(/\/\/ end\s*$/);
+    expect(content).toContain('export const userMock: unknown = deserialize(');
+  });
+
+  it('uses default wrapper path ./__generated__/generated-mock-data.ts for ts + binary', () => {
+    const generator = initGenerator();
+    const schema = z.object({ id: z.string() });
+    const data = generator.generate(schema);
+
+    const result = generator.output(data, { binary: true });
+
+    expect(result).toBe('./__generated__/generated-mock-data.ts');
+    expect(existsSync(result)).toBe(true);
+    expect(existsSync('./__generated__/generated-mock-data.bin')).toBe(true);
+  });
+
+  it('ignores binary flag when ext is json (plain JSON output)', () => {
+    const generator = initGenerator();
+    const data = { id: 'abc' };
+    const outputPath = `${testOutputDir}/plain.json`;
+
+    const result = generator.output(data, { path: outputPath, binary: true });
+
+    expect(result).toBe(outputPath);
+    expect(existsSync(outputPath)).toBe(true);
+    expect(existsSync(`${testOutputDir}/plain.bin`)).toBe(false);
+    expect(JSON.parse(readFileSync(outputPath, 'utf-8'))).toEqual({ id: 'abc' });
+  });
+
+  it('serialize() throws when binary is true with ts/js', () => {
+    const generator = initGenerator();
+    expect(() =>
+      generator.serialize({}, { ext: 'ts', binary: true }),
+    ).toThrow(/output\(\)/);
+    expect(() =>
+      generator.serialize({}, { ext: 'js', binary: true }),
+    ).toThrow(/output\(\)/);
+  });
+
+  it('serialize() ignores binary flag for json (no throw)', () => {
+    const generator = initGenerator();
+    const result = generator.serialize({ id: 1 }, { ext: 'json', binary: true });
+    expect(JSON.parse(result)).toEqual({ id: 1 });
   });
 });
 

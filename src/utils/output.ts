@@ -13,8 +13,9 @@ import {
   isSymbol,
   isUndefined,
 } from 'es-toolkit';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, dirname, extname, join } from 'node:path';
+import { deserialize as v8Deserialize, serialize as v8Serialize } from 'node:v8';
 import { z } from 'zod';
 
 const outputExtSchema = z.literal(['json', 'js', 'ts']);
@@ -32,14 +33,27 @@ export type OutputOptions = {
   /**
    * Header string prepended to the output content.
    * Useful for adding import statements or comments.
-   * Ignored for JSON format.
+   * Ignored for 'json' format.
    */
   header?: string;
   /**
    * Footer string appended to the output content.
-   * Ignored for JSON format.
+   * Ignored for 'json' format.
    */
   footer?: string;
+  /**
+   * When combined with `ext: 'ts'` or `'js'`, writes a v8.serialize binary
+   * (`.bin`) alongside the script file. The script itself becomes a thin
+   * ESM wrapper that lazily `v8.deserialize`s the sibling `.bin` at import
+   * time, preserving `Date`, `Map`, `Set`, `RegExp`, `BigInt`, `TypedArray`,
+   * `undefined`, and circular references with no information loss.
+   *
+   * The wrapper exports the deserialized value as `unknown`. Cast on the
+   * consumer side or use `deserialize<T>()` directly if you need typing.
+   *
+   * Ignored for `ext: 'json'`.
+   */
+  binary?: boolean;
 };
 
 const DEFAULT_OUTPUT_DIR = './__generated__';
@@ -231,16 +245,56 @@ function getExtFromPath(path?: string) {
   return result.success ? result.data : undefined;
 }
 
-function buildContent(data: unknown, options?: OutputOptions): string {
-  const ext = options?.ext ?? getExtFromPath(options?.path) ?? 'ts';
+function wrapperBinRelativeName(outputPath: string): string {
+  const base = basename(outputPath, extname(outputPath));
+  return `${base}.bin`;
+}
+
+function buildBinWrapper(
+  outputPath: string,
+  options: OutputOptions,
+  ext: 'ts' | 'js',
+): string {
+  const exportName = options.exportName ?? 'mockData';
+  const header = options.header ?? '';
+  const footer = options.footer ?? '';
+  const binRef = wrapperBinRelativeName(outputPath);
+
+  const imports = [
+    "import { readFileSync } from 'node:fs';",
+    "import { deserialize } from 'node:v8';",
+  ].join('\n');
+
+  const body =
+    ext === 'ts'
+      ? `export const ${exportName}: unknown = deserialize(\n` +
+        `  readFileSync(new URL(${JSON.stringify(`./${binRef}`)}, import.meta.url)),\n` +
+        `);\n`
+      : `export const ${exportName} = deserialize(\n` +
+        `  readFileSync(new URL(${JSON.stringify(`./${binRef}`)}, import.meta.url)),\n` +
+        `);\n`;
+
+  const parts: string[] = [];
+  if (header) parts.push(header);
+  parts.push(imports);
+  parts.push(body);
+  if (footer) parts.push(footer);
+  return parts.join('\n');
+}
+
+function buildContent(
+  data: unknown,
+  options: Omit<OutputOptions, 'ext'> & { ext: OutputExt },
+): string {
+  const { ext } = options;
 
   if (ext === 'json') {
     return serializeToJSON(data);
   }
 
-  const exportName = options?.exportName ?? 'mockData';
-  const header = options?.header ?? '';
-  const footer = options?.footer ?? '';
+  const exportName = options.exportName ?? 'mockData';
+  const header = options.header ?? '';
+  const footer = options.footer ?? '';
   const body = `export const ${exportName} = ${serializeToJS(data, 0)};\n`;
 
   const parts: string[] = [];
@@ -257,9 +311,46 @@ function buildContent(data: unknown, options?: OutputOptions): string {
  *
  * For 'json' ext: returns pure JSON string (header/footer/exportName are ignored).
  * For 'ts'/'js' ext: returns `export const <exportName> = <serialized>;`
+ *
+ * Throws if `binary` is true with `ext: 'ts'` or `'js'` — that combination
+ * inherently requires writing a sibling `.bin`; use `output()` instead.
  */
 export function serializeOutput(data: unknown, options?: OutputOptions): string {
-  return buildContent(data, options);
+  const ext = options?.ext ?? getExtFromPath(options?.path) ?? 'ts';
+  if (options?.binary && ext !== 'json') {
+    throw new Error(
+      `serialize() cannot use binary mode with ext '${ext}' — it requires writing a sibling .bin file. Use output() with the same options instead.`,
+    );
+  }
+  return buildContent(data, { ...options, ext });
+}
+
+/**
+ * Serialize data to a binary Buffer using Node.js's structured clone algorithm
+ * (`v8.serialize`). Preserves Date, Map, Set, RegExp, BigInt, TypedArray,
+ * `undefined`, and circular references with no information loss.
+ *
+ * The resulting Buffer is only readable in a Node.js environment via
+ * `deserializeBinary` (or `v8.deserialize` directly).
+ */
+export function serializeBinary(data: unknown): Buffer {
+  return v8Serialize(data);
+}
+
+/**
+ * Deserialize a binary Buffer produced by `serializeBinary` (or `v8.serialize`)
+ * back into the original JavaScript value.
+ *
+ * Accepts either a Buffer or a path to a `.bin` file written by `outputToFile`.
+ *
+ * Pass a generic type parameter to cast the result, e.g.
+ * `deserializeBinary<User>('./user.bin')`.
+ */
+export function deserializeBinary<T = unknown>(
+  input: Buffer | Uint8Array | string,
+): T {
+  const buffer = typeof input === 'string' ? readFileSync(input) : input;
+  return v8Deserialize(buffer) as T;
 }
 
 export function outputToFile(data: unknown, options?: OutputOptions) {
@@ -272,8 +363,16 @@ export function outputToFile(data: unknown, options?: OutputOptions) {
     mkdirSync(dir, { recursive: true });
   }
 
-  const content = buildContent(data, options);
+  if (options?.binary && (ext === 'ts' || ext === 'js')) {
+    const binName = wrapperBinRelativeName(outputPath);
+    const binPath = join(dir, binName);
+    writeFileSync(binPath, serializeBinary(data));
+    const wrapper = buildBinWrapper(outputPath, options, ext);
+    writeFileSync(outputPath, wrapper, 'utf-8');
+    return outputPath;
+  }
 
+  const content = buildContent(data, { ...options, ext });
   writeFileSync(outputPath, content, 'utf-8');
   return outputPath;
 }

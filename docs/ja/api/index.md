@@ -161,6 +161,35 @@ const content = generator.serialize(data, {
 })
 ```
 
+### serializeBinary
+
+```ts
+serializeBinary(data: unknown): Buffer
+```
+
+Node.js の structured clone アルゴリズム (`v8.serialize`) を使ってデータをバイナリ `Buffer` にシリアライズします。`Date` / `Map` / `Set` / `RegExp` / `BigInt` / `TypedArray` / `undefined` / 循環参照を情報損失なく保持できます。復元は Node.js 環境上で `deserialize`（または `v8.deserialize`）でのみ可能です。
+
+```ts
+const data = generator.generate(schema)
+const buf = generator.serializeBinary(data) // Buffer
+```
+
+### deserialize
+
+```ts
+deserialize<T = unknown>(input: Buffer | Uint8Array | string): T
+```
+
+`serializeBinary` または `output({ binary: true })` で書き出した値を復元します。`Buffer`/`Uint8Array` または `.bin` ファイルのパスを受け取れます。型引数を渡すと結果をその型としてキャストします。
+
+```ts
+// 型引数で結果に型を付ける
+const restored = generator.deserialize<User>('./mocks/user.bin')
+
+// Buffer から
+const restored = generator.deserialize<User>(generator.serializeBinary(data))
+```
+
 ### output
 
 ```ts
@@ -181,6 +210,16 @@ generator.output(data, { path: './mocks/user.json' })
 generator.output(data, { path: './mocks/user.ts' })
 generator.output(data, { path: './mocks/user.js' })
 
+// `binary: true` — ts/js 出力のときに、同名の <name>.bin（v8.serialize の生データ）を
+// 同じディレクトリに書き出し、.ts / .js 側は import 時に `.bin` を `v8.deserialize`
+// する薄い ESM ラッパーになります。Date / Map / Set / RegExp / BigInt / TypedArray /
+// undefined / 循環参照をすべて情報損失なく保持しつつ、消費側はふつうに
+// `import { mockData } from './user'` として扱えます。エクスポート値は
+// `unknown` 型なので、消費側でキャストするか、`deserialize<T>()` を直接呼んで
+// 型付けしてください。
+generator.output(data, { path: './mocks/user.ts', binary: true })
+generator.output(data, { path: './mocks/user.js', binary: true })
+
 // エクスポート名とヘッダー/フッターをカスタマイズ
 generator.output(data, {
   path: './mocks/user.ts',
@@ -194,11 +233,12 @@ generator.output(data, {
 
 ```ts
 type OutputOptions = {
-  path?: string                // 出力先パス（デフォルト: ./__generated__/generated-mock-data.ts）
-  ext?: 'json' | 'js' | 'ts'  // 拡張子（path から推測、未指定時は 'ts'）
-  exportName?: string          // エクスポート変数名（デフォルト: 'mockData'、ts/js のみ）
-  header?: string              // 出力内容の先頭に追加する文字列（JSON では無視）
-  footer?: string              // 出力内容の末尾に追加する文字列（JSON では無視）
+  path?: string                    // 出力先パス（デフォルト: ./__generated__/generated-mock-data.<ext>）
+  ext?: 'json' | 'js' | 'ts'       // 拡張子（path から推測、未指定時は 'ts'）
+  exportName?: string              // エクスポート変数名（デフォルト: 'mockData'、ts/js のみ）
+  header?: string                  // 出力内容の先頭に追加する文字列（json では無視）
+  footer?: string                  // 出力内容の末尾に追加する文字列（json では無視）
+  binary?: boolean                 // ts/js に対し、<name>.bin とそれを復元するラッパーを書き出す。json では無視
 }
 ```
 
@@ -207,10 +247,20 @@ type OutputOptions = {
 | 拡張子 | 形式 | 特殊型の扱い |
 |--------|------|-------------|
 | `.ts` / `.js` | `export const <exportName> = ...` | Date, BigInt, Map, Set, Symbol, File, Blob を正確にシリアライズ |
-| `.json` | JSON | Date は ISO文字列、BigInt は文字列化、Map/Set/Symbol は情報損失（警告あり） |
+| `.ts` / `.js` + `binary: true` | ESM ラッパー + 同名 `.bin`（v8 structured clone）| Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, 循環参照を保持。エクスポートは `unknown` 型なので、消費側でキャストするか `deserialize<T>()` を直接使用。Node.js 限定 |
+| `.json` | JSON | Date は ISO文字列、BigInt は文字列化、Map/Set/Symbol は情報損失（警告あり）。`binary` は無視 |
 
 ::: warning JSON 出力時のデータ損失
-JSON では表現できない型（BigInt, Symbol, Map, Set, File, Blob）を含むデータを `.json` で出力すると、データの正確性が失われます。警告メッセージが出力されるので、`.ts` または `.js` 形式の使用を検討してください。
+JSON では表現できない型（BigInt, Symbol, Map, Set, File, Blob）を含むデータを `.json` で出力すると、データの正確性が失われます。警告メッセージが出力されるので、`.ts` / `.js`（必要に応じて `binary: true`）の使用を検討してください。
+:::
+
+::: info `binary: true`（完全な round-trip）
+`binary: true` を指定すると、`output()` は 2 つのファイルを書き出します:
+
+- `<name>.bin` — `v8.serialize` の生バッファ。Zod が生成するあらゆる値（循環参照を含む）を完全に保持
+- `<name>.ts` / `<name>.js` — import 時に同名の `.bin` を `v8.deserialize` で遅延復元する薄い ESM ラッパー。消費側は `import { mockData } from './user'` でそのまま使える
+
+エクスポート値は `unknown` 型です。消費側でキャストするか、ラッパーを介さず `deserialize<T>('./user.bin')` を直接呼んで型付けしてください。`.bin` のファイル名は常にラッパーのベース名から自動導出され、個別には変更できません。ラッパーは ESM (`import.meta.url`) 前提で Node.js 限定です。
 :::
 
 ## 型定義
@@ -287,6 +337,7 @@ type OutputOptions = {
   exportName?: string
   header?: string
   footer?: string
+  binary?: boolean
 }
 ```
 

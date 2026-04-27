@@ -3,8 +3,10 @@ import { generateMocks } from './generate-from-schema';
 import type { CustomGeneratorType, GeneraterOptions, MockConfig } from './type';
 import {
   createGeneraterOptions,
+  deserializeBinary,
   outputToFile,
   regenerateIfOmitted,
+  serializeBinary,
   serializeOutput,
   type OutputOptions,
 } from './utils';
@@ -93,6 +95,27 @@ class MockGenerator {
 
   serialize(data: unknown, options?: OutputOptions): string {
     return serializeOutput(data, options);
+  }
+
+  /**
+   * Serialize data to a binary Buffer using Node.js's structured clone
+   * algorithm (`v8.serialize`). Preserves Date, Map, Set, RegExp, BigInt,
+   * TypedArray, `undefined`, and circular references with no information loss.
+   * The result is only readable in a Node.js environment.
+   */
+  serializeBinary(data: unknown): Buffer {
+    return serializeBinary(data);
+  }
+
+  /**
+   * Deserialize a Buffer (or `.bin` file path) produced by `serializeBinary`
+   * or `output({ binary: true })` back into the original JavaScript value.
+   *
+   * Pass a generic type parameter to cast the result, e.g.
+   * `generator.deserialize<User>('./user.bin')`.
+   */
+  deserialize<T = unknown>(input: Buffer | Uint8Array | string): T {
+    return deserializeBinary<T>(input);
   }
 
   output(data: unknown, options?: OutputOptions): string {
