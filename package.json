@@ -46,7 +46,10 @@
   },
   "dependencies": {
     "@faker-js/faker": "10.3.0",
+    "citty": "0.2.2",
+    "consola": "3.4.2",
     "es-toolkit": "1.45.1",
+    "log-update": "8.0.0",
     "randexp": "0.5.3"
   },
   "devDependencies": {

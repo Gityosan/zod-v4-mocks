@@ -413,7 +413,7 @@ npx zod-v4-mocks generate ./schemas.js User --count 10 -o users.json --pretty
 npx tsx node_modules/zod-v4-mocks/dist/cli.js generate ./schemas.ts User -c 10
 ```
 
-Options: `-c/--count`, `-s/--seed`, `-o/--output`, `-f/--format` (`json|ts|js|bin`), `-l/--locale`, `--pretty`.
+Options: `-c/--count`, `-s/--seed`, `-o/--output`, `-f/--format` (`json|ts|js|bin`), `-l/--locale`, `--pretty`, `--silent`. Run `--help` on any command for the full reference.
 
 ## Unsupported Schemas
 

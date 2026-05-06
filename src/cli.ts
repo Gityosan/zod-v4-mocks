@@ -1,119 +1,51 @@
 #!/usr/bin/env node
- 
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, extname, isAbsolute, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { z } from 'zod';
+import { defineCommand, runMain } from 'citty';
+import { consola } from 'consola';
+import logUpdate from 'log-update';
+import type { z } from 'zod';
 import { initGenerator } from './mock-generator';
 import type { LocaleType, MockConfig } from './type';
 
-type Cli = {
-  command?: string;
-  modulePath?: string;
-  exportName?: string;
-  count: number;
-  seed?: number;
-  output?: string;
-  format?: 'json' | 'ts' | 'js' | 'bin';
-  locale?: LocaleType;
-  pretty: boolean;
-  help: boolean;
-  version: boolean;
-};
+type Format = 'json' | 'ts' | 'js' | 'bin';
 
-function parseArgs(argv: string[]): Cli {
-  const out: Cli = { count: 1, pretty: false, help: false, version: false };
-  let positional = 0;
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    const next = () => argv[++i];
-    switch (a) {
-      case '-h':
-      case '--help':
-        out.help = true;
-        break;
-      case '-V':
-      case '--version':
-        out.version = true;
-        break;
-      case '-c':
-      case '--count':
-        out.count = Number(next());
-        break;
-      case '-s':
-      case '--seed':
-        out.seed = Number(next());
-        break;
-      case '-o':
-      case '--output':
-        out.output = next();
-        break;
-      case '-f':
-      case '--format':
-        out.format = next() as Cli['format'];
-        break;
-      case '-l':
-      case '--locale':
-        out.locale = next() as LocaleType;
-        break;
-      case '--pretty':
-        out.pretty = true;
-        break;
-      default:
-        if (a.startsWith('-')) {
-          throw new Error(`Unknown option: ${a}`);
-        }
-        if (positional === 0) out.command = a;
-        else if (positional === 1) out.modulePath = a;
-        else if (positional === 2) out.exportName = a;
-        positional++;
-    }
+function readPkgVersion(): string {
+  try {
+    const url = new URL('../package.json', import.meta.url);
+    const pkg = JSON.parse(readFileSync(url, 'utf8')) as { version?: string };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
   }
-  return out;
 }
 
-const HELP = `zod-v4-mocks <command> [options]
-
-Commands:
-  generate <module> [export]   Generate mocks from a Zod schema export.
-                                If [export] is omitted, the module's default
-                                export is used.
-
-Options:
-  -c, --count <n>     Number of items (default 1).
-                      With count=1, output is a single value.
-                      With count>1, output is an array.
-  -s, --seed <n>      Random seed (default 1).
-  -o, --output <path> Write to file. Format inferred from extension.
-                      Without -o, writes JSON to stdout.
-  -f, --format <fmt>  json | ts | js | bin (overrides extension).
-  -l, --locale <loc>  Faker locale (e.g. ja, en, de).
-  --pretty            Pretty-print JSON to stdout.
-  -h, --help          Show this help.
-  -V, --version       Show version.
-
-Notes:
-  - Module must be JavaScript/ESM. For TypeScript schemas, run via tsx:
-      npx tsx node_modules/zod-v4-mocks/dist/cli.js generate ./schemas.ts User
-
-Examples:
-  zod-v4-mocks generate ./schemas.js User -c 10 -o users.json
-  zod-v4-mocks generate ./schemas.js User --pretty
-`;
+function isZodSchema(value: unknown): value is z.ZodType {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    '_zod' in value &&
+    'parse' in value &&
+    typeof (value as { parse: unknown }).parse === 'function'
+  );
+}
 
 async function loadSchema(
   modulePath: string,
   exportName: string | undefined,
 ): Promise<z.ZodType> {
-  const abs = isAbsolute(modulePath) ? modulePath : resolve(process.cwd(), modulePath);
+  const abs = isAbsolute(modulePath)
+    ? modulePath
+    : resolve(process.cwd(), modulePath);
   if (!existsSync(abs)) {
     throw new Error(`Module not found: ${abs}`);
   }
   const ext = extname(abs);
   if (ext === '.ts' || ext === '.tsx' || ext === '.mts' || ext === '.cts') {
     throw new Error(
-      `TypeScript files are not loaded directly. Run via tsx, e.g.:\n` +
-        `  npx tsx node_modules/zod-v4-mocks/dist/cli.js ...`,
+      'TypeScript files are not loaded directly. Run via tsx, e.g.:\n' +
+        '  npx tsx node_modules/zod-v4-mocks/dist/cli.js generate ./schemas.ts User',
     );
   }
   const url = pathToFileURL(abs).href;
@@ -132,65 +64,18 @@ async function loadSchema(
   return value;
 }
 
-function isZodSchema(value: unknown): value is z.ZodType {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    '_zod' in value &&
-    'parse' in value &&
-    typeof (value as { parse: unknown }).parse === 'function'
-  );
-}
-
-function inferFormat(out: Cli): 'json' | 'ts' | 'js' | 'bin' {
-  if (out.format) return out.format;
-  if (out.output) {
-    const ext = extname(out.output).slice(1).toLowerCase();
+function inferFormat(format: string | undefined, output: string | undefined): Format {
+  if (format) {
+    if (format === 'json' || format === 'ts' || format === 'js' || format === 'bin') {
+      return format;
+    }
+    throw new Error(`Unknown format: ${format} (expected: json|ts|js|bin)`);
+  }
+  if (output) {
+    const ext = extname(output).slice(1).toLowerCase();
     if (ext === 'json' || ext === 'ts' || ext === 'js' || ext === 'bin') return ext;
   }
   return 'json';
-}
-
-async function runGenerate(opts: Cli): Promise<void> {
-  if (!opts.modulePath) {
-    throw new Error('Missing <module> argument. Run with --help for usage.');
-  }
-  const schema = await loadSchema(opts.modulePath, opts.exportName);
-
-  const config: Partial<MockConfig> = {};
-  if (opts.seed !== undefined) config.seed = opts.seed;
-  if (opts.locale) config.locale = opts.locale;
-
-  const gen = initGenerator(config);
-  const data = opts.count > 1 ? gen.generateMany(schema, opts.count) : gen.generate(schema);
-
-  const fmt = inferFormat(opts);
-
-  if (!opts.output) {
-    if (fmt === 'bin') {
-      process.stdout.write(gen.serializeBinary(data));
-      return;
-    }
-    if (fmt === 'json') {
-      console.log(JSON.stringify(data, jsonReplacer, opts.pretty ? 2 : 0));
-      return;
-    }
-    console.log(gen.serialize(data));
-    return;
-  }
-
-  const absOut = isAbsolute(opts.output) ? opts.output : resolve(process.cwd(), opts.output);
-  const dir = dirname(absOut);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-
-  if (fmt === 'bin') {
-    gen.output(data, { path: absOut, binary: true });
-  } else if (fmt === 'json') {
-    gen.output(data, { path: absOut });
-  } else {
-    gen.output(data, { path: absOut });
-  }
-  console.error(`Wrote ${absOut}`);
 }
 
 function jsonReplacer(_key: string, value: unknown): unknown {
@@ -202,48 +87,167 @@ function jsonReplacer(_key: string, value: unknown): unknown {
   return value;
 }
 
-async function readVersion(): Promise<string> {
-  try {
-    const { readFileSync } = await import('node:fs');
-    const url = new URL('../package.json', import.meta.url);
-    const pkg = JSON.parse(readFileSync(url, 'utf8')) as { version?: string };
-    return pkg.version ?? 'unknown';
-  } catch {
-    return 'unknown';
-  }
-}
+const PROGRESS_THRESHOLD = 10;
 
-async function main(): Promise<void> {
-  let opts: Cli;
-  try {
-    opts = parseArgs(process.argv.slice(2));
-  } catch (e) {
-    console.error((e as Error).message);
-    console.error('\n' + HELP);
-    process.exit(2);
+const generateCmd = defineCommand({
+  meta: {
+    name: 'generate',
+    description: 'Generate mock data from a Zod schema export.',
+  },
+  args: {
+    module: {
+      type: 'positional',
+      description: 'Path to a JS/ESM module exporting a Zod schema.',
+      required: true,
+    },
+    export: {
+      type: 'positional',
+      description:
+        'Named export to use. Defaults to the module\'s default export.',
+      required: false,
+    },
+    count: {
+      type: 'string',
+      alias: 'c',
+      description:
+        'Number of items. count>1 yields an array; count=1 yields a single value.',
+      default: '1',
+    },
+    seed: {
+      type: 'string',
+      alias: 's',
+      description: 'Random seed (default 1).',
+    },
+    output: {
+      type: 'string',
+      alias: 'o',
+      description: 'Write to file. Format inferred from extension.',
+    },
+    format: {
+      type: 'string',
+      alias: 'f',
+      description: 'Output format: json | ts | js | bin (overrides extension).',
+    },
+    locale: {
+      type: 'string',
+      alias: 'l',
+      description: 'Faker locale (e.g. ja, en, de).',
+    },
+    pretty: {
+      type: 'boolean',
+      description: 'Pretty-print JSON output to stdout.',
+      default: false,
+    },
+    silent: {
+      type: 'boolean',
+      description: 'Suppress progress and informational messages.',
+      default: false,
+    },
+  },
+  async run({ args }) {
+    if (args.silent) consola.level = 0;
+    try {
+      await runGenerate(args);
+    } catch (err) {
+      consola.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+  },
+});
+
+async function runGenerate(args: {
+  module: string;
+  export?: string;
+  count: string;
+  seed?: string;
+  output?: string;
+  format?: string;
+  locale?: string;
+  pretty: boolean;
+  silent: boolean;
+}): Promise<void> {
+  const count = Number(args.count);
+  if (!Number.isFinite(count) || count < 0 || !Number.isInteger(count)) {
+    throw new Error(`--count must be a non-negative integer (got: ${args.count})`);
   }
 
-  if (opts.version) {
-    console.log(await readVersion());
-    return;
+  const config: Partial<MockConfig> = {};
+  if (args.seed !== undefined) {
+    const n = Number(args.seed);
+    if (!Number.isFinite(n)) {
+      throw new Error(`--seed must be a number (got: ${args.seed})`);
+    }
+    config.seed = n;
   }
-  if (opts.help || !opts.command) {
-    console.log(HELP);
-    return;
+  if (args.locale) config.locale = args.locale as LocaleType;
+
+  const schema = await loadSchema(args.module, args.export);
+  const gen = initGenerator(config);
+
+  let data: unknown;
+  if (count > 1) {
+    // Progress is drawn only when writing to a file (drawing on stdout
+    // would corrupt the output) and the batch is large enough to matter.
+    const showProgress =
+      !args.silent && !!args.output && count >= PROGRESS_THRESHOLD;
+    if (showProgress) {
+      const factory = gen.factory(schema);
+      const arr: unknown[] = [];
+      for (let i = 0; i < count; i++) {
+        arr.push(factory.next());
+        if ((i + 1) % 25 === 0 || i === count - 1) {
+          logUpdate(`Generating ${i + 1}/${count}`);
+        }
+      }
+      logUpdate.clear();
+      data = arr;
+    } else {
+      data = gen.generateMany(schema, count);
+    }
+  } else {
+    data = gen.generate(schema);
   }
 
-  try {
-    if (opts.command === 'generate') {
-      await runGenerate(opts);
+  const fmt = inferFormat(args.format, args.output);
+
+  if (!args.output) {
+    if (fmt === 'bin') {
+      process.stdout.write(gen.serializeBinary(data));
       return;
     }
-    console.error(`Unknown command: ${opts.command}\n`);
-    console.error(HELP);
-    process.exit(2);
-  } catch (err) {
-    console.error('Error:', (err as Error).message);
-    process.exit(1);
+    if (fmt === 'json') {
+      process.stdout.write(
+        JSON.stringify(data, jsonReplacer, args.pretty ? 2 : 0) + '\n',
+      );
+      return;
+    }
+    process.stdout.write(gen.serialize(data) + '\n');
+    return;
   }
+
+  const absOut = isAbsolute(args.output)
+    ? args.output
+    : resolve(process.cwd(), args.output);
+  const dir = dirname(absOut);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+
+  if (fmt === 'bin') {
+    gen.output(data, { path: absOut, binary: true });
+  } else {
+    gen.output(data, { path: absOut });
+  }
+  consola.success(`Wrote ${absOut}`);
 }
 
-void main();
+const main = defineCommand({
+  meta: {
+    name: 'zod-v4-mocks',
+    version: readPkgVersion(),
+    description: 'Generate mock data from Zod v4 schemas.',
+  },
+  subCommands: {
+    generate: generateCmd,
+  },
+});
+
+void runMain(main);
