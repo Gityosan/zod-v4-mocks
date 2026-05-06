@@ -8,11 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added `supplyRef(subSchema, value)` — fix a value for a specific schema reference (more precise than `supply`, which targets a Zod constructor)
+- Added `supplyPath(path, value)` — fix a value at a specific structural path. Supports object/record/map keys, array/tuple indices, plus markers `'$item'` (array/tuple/set all elements) and `'$value'` (record/map all values). For `record` / `map`, a literal key path *injects* that key even when not randomly produced
+- Added `generateMany(schema, count)` and `factory(schema)` — produce N independent mocks for the same schema (`.next()` / `.take(n)`)
+- Added `keyMapping` config option — opt-in property-name → faker mapping for primitive leaves (string/number/boolean/date). `'auto'` enables built-in defaults (`name`, `email`, `age`, `createdAt`, ...); a custom `KeyMapper` function may be provided and falls back to defaults when it returns `undefined`
+- Added `customMockKey` config option (default `'mock'`) — meta attribute name read for `z.custom()` / `z.instanceof()` schemas. Use `z.custom<T>().meta({ mock: (faker) => ... })` to define a generator
+- Added a `zod-v4-mocks` CLI (`bin` entry). Loads a JS/ESM module and generates mocks for a named export to stdout or a file. For TS sources, run via `tsx`
 - Added `serializeBinary(data)` method on `MockGenerator` — serializes data to a `Buffer` via `v8.serialize` (structured clone), preserving `Date`, `Map`, `Set`, `RegExp`, `BigInt`, `TypedArray`, `undefined`, and circular references with no information loss
 - Added `deserialize<T>(input)` method on `MockGenerator` — restores data from a `Buffer`/`Uint8Array` or `.bin` file path. Accepts an optional generic type parameter to cast the result (e.g. `deserialize<User>('./user.bin')`)
 - Added `binary` option to `OutputOptions` — when combined with `ext: 'ts'` or `'js'`, `output()` writes a sibling `<name>.bin` and turns the script into a thin ESM wrapper that `v8.deserialize`s the `.bin` at import time. This gives lossless persistence with normal `import` ergonomics. The wrapper exports the value as `unknown`; cast on the consumer side or use `deserialize<T>()` directly for typing. Silently ignored for `ext: 'json'`
 
 ### Changed
+- `z.custom()` / `z.instanceof()` no longer fall through to the generic "unhandled type" lorem-word fallback. They now require a `meta.mock` definition or `supplyRef`; without one the slot is treated as `OMIT_SYMBOL` (silently dropped from arrays/objects, warned in tuples)
 - `serialize()` now throws when `binary: true` is combined with `ext: 'ts'` or `'js'` (those variants require writing a sibling `.bin`); use `output()` or `serializeBinary()` instead
 
 ## [2.2.0] - 2026-03-12

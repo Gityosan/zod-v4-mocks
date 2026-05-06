@@ -1,5 +1,7 @@
 import { allLocales, type Faker, type Randomizer } from '@faker-js/faker';
 import type { z } from 'zod';
+import type { KeyMapper } from './utils/key-mapping';
+import type { PathSegment, PathSupply } from './utils/path';
 
 export type { Faker, Randomizer } from '@faker-js/faker';
 export type LocaleType = keyof typeof allLocales;
@@ -13,6 +15,10 @@ export type GeneraterOptions = {
   arrayIndexes: number[];
   pinnedHierarchy: Map<string, number>;
   circularRefs: Map<z.core.$ZodType, number>;
+  /** Path supplies still in scope at the current generation point. */
+  pathSupplies: PathSupply[];
+  /** Literal path segments traversed so far (for diagnostics / future hooks). */
+  currentPath: PathSegment[];
 };
 
 export type CustomGeneratorType = (
@@ -75,4 +81,22 @@ export interface MockConfig {
    * @description meta's attribute name which is used to generate consistent property value
    */
   consistentKey?: string;
+  /**
+   * @default 'mock'
+   * @description meta's attribute name to look up a custom mock generator
+   *  for `z.custom()` / `z.instanceof()` schemas.
+   *  e.g. `z.custom<File>().meta({ mock: () => new File([], 'a') })`
+   */
+  customMockKey?: string;
+  /**
+   * @default 'off'
+   * @description Map property keys (object/record/map) to faker functions
+   *  for primitive leaf schemas (string/number/boolean/date).
+   *  - `'off'`: no mapping (default).
+   *  - `'auto'`: use built-in defaults for common keys (`name`, `email`,
+   *    `age`, `createdAt`, ...).
+   *  - `KeyMapper` function: custom; returning `undefined` falls back to
+   *    the built-in defaults.
+   */
+  keyMapping?: 'off' | 'auto' | KeyMapper;
 }

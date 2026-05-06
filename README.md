@@ -329,15 +329,103 @@ This generator will generate mock like below.
 ]
 ```
 
+### 7. Pinpoint values with `supplyRef` / `supplyPath`
+
+`supply` targets a Zod constructor (every `ZodString` etc.). When you need to fix a value at *one specific spot* in the tree, use `supplyRef` (by reference) or `supplyPath` (by structural path).
+
+```ts
+const Name = z.string();
+const Schema = z.object({
+  user: z.object({ name: Name }),
+  scores: z.record(z.string(), z.number()),
+  pair: z.tuple([z.string(), z.string()]),
+});
+
+initGenerator()
+  // by reference — same Name node only
+  .supplyRef(Name, 'fixed')
+  // by path — object key
+  .supplyPath(['user', 'name'], 'Alice')
+  // record key injection (forces 'alice' to exist)
+  .supplyPath(['scores', 'alice'], 100)
+  // tuple index
+  .supplyPath(['pair', 0], 'first')
+  // wildcard markers: $item / $value
+  .supplyPath(['scores', '$value'], 0)
+  .generate(Schema);
+```
+
+Path segments are `string | number | symbol`. Markers:
+- `'$item'` — all elements of arrays / tuples / sets
+- `'$value'` — all values of records / maps
+
+Specific paths beat marker paths. `'$key'` is intentionally not provided (Map/Record keys must be unique, so "all keys = X" collapses to one entry).
+
+### 8. Generate many mocks (`generateMany` / `factory`)
+
+```ts
+const users = initGenerator().generateMany(UserSchema, 50);
+
+const f = initGenerator().factory(UserSchema);
+const a = f.next();
+const batch = f.take(10);
+```
+
+### 9. `z.custom()` / `z.instanceof()` via meta
+
+Attach a generator function (or static value) under the configured `customMockKey` (default `'mock'`):
+
+```ts
+const FileLike = z.custom<File>(v => v instanceof File)
+  .meta({ mock: (faker) => new File(['x'], faker.system.fileName()) });
+
+const BigDec = z.instanceof(BigDecimal)
+  .meta({ mock: () => new BigDecimal('1.5') });
+```
+
+If neither `meta.mock` nor `supplyRef` is provided, the slot is silently dropped from arrays/objects (warned for tuples) — it is no longer filled with a placeholder string.
+
+### 10. Property-name based faker mapping (opt-in)
+
+Set `keyMapping: 'auto'` to map common property names to faker functions automatically:
+
+```ts
+const Schema = z.object({
+  firstName: z.string(),
+  email: z.string(),
+  age: z.number(),
+  createdAt: z.date(),
+});
+
+initGenerator({ keyMapping: 'auto' }).generate(Schema);
+// → { firstName: 'Hannah', email: 'a@example.com', age: 37, createdAt: <Date> }
+```
+
+You can also pass a `KeyMapper` function for full control; returning `undefined` falls back to the built-in defaults.
+
+### 11. CLI
+
+```bash
+# JS / ESM module
+npx zod-v4-mocks generate ./schemas.js User --count 10 -o users.json --pretty
+
+# TS module — run through tsx
+npx tsx node_modules/zod-v4-mocks/dist/cli.js generate ./schemas.ts User -c 10
+```
+
+Options: `-c/--count`, `-s/--seed`, `-o/--output`, `-f/--format` (`json|ts|js|bin`), `-l/--locale`, `--pretty`.
+
 ## Unsupported Schemas
 
-- `z.ZodCustom`
-  - `.custom()` and `.instanceof()` are not supported
 - `.catchall()` is ignored
 - `.function()` is not supported
 - `.nativeEnum()` is deprecated in v4
 - `.promise()` is deprecated in v4
 - `.superRefine()` is deprecated in v4
+
+## Schemas requiring user input
+
+- `z.custom()` / `z.instanceof()` — must define `meta({ mock: ... })` (see section 9) or use `supplyRef`. Without one, the slot is dropped from arrays/objects.
 
 ## Partially Supported Schemas
 

@@ -1,14 +1,19 @@
 import { z } from 'zod';
 import type { GeneraterOptions } from './type';
 import {
+  OMIT_SYMBOL,
+  PATH_NO_MATCH,
+  findMatchedValue,
   getEmptyValueForSchema,
   isCircularRefSchema,
   isZodCheckEmail,
   isZodJsonSchema,
   isZodStringbool,
+  resolveKeyMapping,
   safeInstanceof,
   generateStringWithChecks,
   generateUtils as u,
+  warnOnceForSchema,
 } from './utils';
 
 function generateFromSchema(
@@ -196,6 +201,28 @@ function generateFromSchema(
     return u.never();
   }
 
+  if (safeInstanceof(s, z.ZodCustom)) {
+    const key = o.config.customMockKey ?? 'mock';
+    const meta =
+      'meta' in s && typeof s.meta === 'function' ? s.meta() : undefined;
+    const candidate = meta?.[key];
+    if (typeof candidate === 'function') {
+      return (candidate as (faker: typeof f, opts: GeneraterOptions) => unknown)(
+        f,
+        o,
+      );
+    }
+    if (candidate !== undefined) return candidate;
+    warnOnceForSchema(
+      s,
+      `z.custom() / z.instanceof() に mock 定義がありません. ` +
+        `\`.meta({ ${key}: (faker) => ... })\` を設定するか, ` +
+        `\`supplyRef(schema, value)\` を利用してください. ` +
+        `この値はオブジェクト/配列等のコンテナから省略されます.`,
+    );
+    return OMIT_SYMBOL;
+  }
+
   console.warn(
     `Unhandled Zod s type: ${s.constructor.name}. Returning dummy value.`,
   );
@@ -213,7 +240,13 @@ export function generateMocks(
     valueStore,
     arrayIndexes,
     pinnedHierarchy,
+    pathSupplies,
   } = options;
+
+  if (pathSupplies.length > 0) {
+    const matched = findMatchedValue(pathSupplies);
+    if (matched !== PATH_NO_MATCH) return matched;
+  }
 
   if ('meta' in schema && typeof schema.meta === 'function') {
     const meta = schema.meta();
@@ -242,6 +275,18 @@ export function generateMocks(
   if (customGenerator) {
     const res = customGenerator(schema, options);
     if (res !== undefined) return res;
+  }
+
+  if (
+    config.keyMapping &&
+    config.keyMapping !== 'off' &&
+    options.currentPath.length > 0
+  ) {
+    const lastSeg = options.currentPath[options.currentPath.length - 1];
+    if (typeof lastSeg === 'string') {
+      const mapped = resolveKeyMapping(lastSeg, schema, options);
+      if (mapped !== undefined) return mapped;
+    }
   }
 
   if (isCircularRefSchema(schema)) {

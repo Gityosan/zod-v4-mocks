@@ -4,7 +4,9 @@ import type { CustomGeneratorType, GeneraterOptions, MockConfig } from './type';
 import {
   createGeneraterOptions,
   deserializeBinary,
+  makePathSupply,
   outputToFile,
+  type PathSegment,
   regenerateIfOmitted,
   serializeBinary,
   serializeOutput,
@@ -55,6 +57,38 @@ class MockGenerator {
     return this;
   }
 
+  /**
+   * @description Supply a fixed value when the exact same schema reference
+   *  is encountered during generation. First registered wins on conflict.
+   */
+  supplyRef(subSchema: z.core.$ZodType, value: unknown): MockGenerator {
+    const prevGenerator = this.options.customGenerator;
+    this.options.customGenerator = (schema, options) => {
+      if (prevGenerator) {
+        const res = prevGenerator(schema, options);
+        if (res !== undefined) return res;
+      }
+      if (schema === subSchema) return value;
+    };
+    return this;
+  }
+
+  /**
+   * @description Supply a fixed value at a specific path inside the
+   *  generated structure.
+   *  - object: string key  | array/tuple: number index
+   *  - record/map: literal key (injected if absent)
+   *  - markers: '$item' (array/set/tuple all elements), '$value' (record/map all values)
+   *  Specific paths beat marker paths; '$key' is intentionally not supported.
+   */
+  supplyPath(path: PathSegment[], value: unknown): MockGenerator {
+    this.options.pathSupplies = [
+      ...this.options.pathSupplies,
+      makePathSupply(path, value),
+    ];
+    return this;
+  }
+
   register(schemas: z.ZodType[]) {
     const { config, registry, valueStore } = this.options;
     const length = config.array?.max ?? 10;
@@ -91,6 +125,34 @@ class MockGenerator {
       result[key] = this.generate(schemas[key]);
     }
     return result as { [K in keyof T]: z.infer<T[K]> };
+  }
+
+  /**
+   * Generate `count` independent mocks for the same schema. The seeded RNG
+   * produces deterministic but distinct values on each call.
+   */
+  generateMany<T extends z.ZodType>(schema: T, count: number): z.infer<T>[] {
+    if (!Number.isFinite(count) || count < 0) {
+      throw new Error(`generateMany: count must be a non-negative number`);
+    }
+    const out: z.infer<T>[] = [];
+    for (let i = 0; i < count; i++) {
+      out.push(this.generate(schema) as z.infer<T>);
+    }
+    return out;
+  }
+
+  /**
+   * Return a factory bound to the schema. Each `.next()` produces a fresh
+   * mock; `.take(n)` returns an array of n mocks.
+   */
+  factory<T extends z.ZodType>(
+    schema: T,
+  ): { next: () => z.infer<T>; take: (n: number) => z.infer<T>[] } {
+    return {
+      next: () => this.generate(schema) as z.infer<T>,
+      take: (n: number) => this.generateMany(schema, n),
+    };
   }
 
   serialize(data: unknown, options?: OutputOptions): string {

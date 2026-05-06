@@ -12,11 +12,80 @@ import {
 } from './calculation';
 import { OMIT_SYMBOL, regenerateIfOmitted } from './exact-optional';
 import {
+  type ChildStep,
+  type PathSegment,
+  descendPathSupplies,
+  findKeyInjections,
+  findMaxLiteralIndex,
+} from './path';
+import {
   isZodCheckMultipleOfBigInt,
   isZodCheckMultipleOfNumber,
   safeInstanceof,
   unwrapSchema,
 } from './schema';
+
+function pushPathSegment(
+  options: GeneraterOptions,
+  step: ChildStep,
+): GeneraterOptions {
+  let seg: PathSegment | undefined;
+  switch (step.kind) {
+    case 'objectKey':
+      seg = step.key;
+      break;
+    case 'arrayIndex':
+    case 'tupleIndex':
+      seg = step.index;
+      break;
+    case 'recordKey':
+      seg = step.key;
+      break;
+    case 'mapKey':
+      if (
+        typeof step.key === 'string' ||
+        typeof step.key === 'number' ||
+        typeof step.key === 'symbol'
+      ) {
+        seg = step.key;
+      }
+      break;
+    case 'setItem':
+      seg = undefined;
+      break;
+  }
+  return {
+    ...options,
+    pathSupplies: descendPathSupplies(options.pathSupplies, step),
+    currentPath:
+      seg !== undefined ? [...options.currentPath, seg] : options.currentPath,
+  };
+}
+
+function recordKeyTypeAccepts(
+  keyType: z.core.$ZodType,
+): (k: PathSegment) => boolean {
+  return (k) => {
+    const t = typeof k;
+    if (safeInstanceof(keyType, z.ZodString)) return t === 'string';
+    if (safeInstanceof(keyType, z.ZodNumber)) return t === 'number';
+    if (safeInstanceof(keyType, z.ZodSymbol)) return t === 'symbol';
+    if (safeInstanceof(keyType, z.ZodLiteral)) {
+      const values = (keyType as z.ZodLiteral).values;
+      return Array.from(values).includes(k as never);
+    }
+    if (safeInstanceof(keyType, z.ZodEnum)) {
+      const opts = (keyType as z.ZodEnum).options;
+      return opts.includes(k as never);
+    }
+    if (safeInstanceof(keyType, z.ZodUnion)) {
+      const opts = (keyType as z.ZodUnion).options;
+      return opts.some((o) => recordKeyTypeAccepts(o)(k));
+    }
+    // Permissive fallback: accept primitive matches.
+    return t === 'string' || t === 'number' || t === 'symbol';
+  };
+}
 
 const validValues = [
   'true',
@@ -166,10 +235,16 @@ export const generateUtils = {
     const { faker, config } = options;
     const { checks = [] } = schema.def;
 
-    const length = calcLengthFromChecks(checks, faker, config.array);
+    let length = calcLengthFromChecks(checks, faker, config.array);
+    const maxLiteralIdx = findMaxLiteralIndex(options.pathSupplies);
+    if (maxLiteralIdx + 1 > length) length = maxLiteralIdx + 1;
     return Array.from({ length }, (_, arrayIndex) => {
       const arrayIndexes = [...options.arrayIndexes, arrayIndex];
-      return generator(schema.element, { ...options, arrayIndexes });
+      const childOpts = pushPathSegment(
+        { ...options, arrayIndexes },
+        { kind: 'arrayIndex', index: arrayIndex },
+      );
+      return generator(schema.element, childOpts);
     }).filter((v) => v !== OMIT_SYMBOL);
   },
   tuple: (
@@ -180,7 +255,11 @@ export const generateUtils = {
     const { items } = schema.def;
     const result = items.map((item, arrayIndex) => {
       const arrayIndexes = [...options.arrayIndexes, arrayIndex];
-      return generator(item, { ...options, arrayIndexes });
+      const childOpts = pushPathSegment(
+        { ...options, arrayIndexes },
+        { kind: 'tupleIndex', index: arrayIndex },
+      );
+      return generator(item, childOpts);
     });
 
     // Handle case where ZodNever returns OMIT_SYMBOL
@@ -203,11 +282,25 @@ export const generateUtils = {
     const { checks = [] } = schema.def;
 
     const length = calcLengthFromChecks(checks, faker, config.map);
-    const entries = Array.from({ length }, () => {
+    const entries: [unknown, unknown][] = [];
+    for (let i = 0; i < length; i++) {
       const k = generator(keyType, options);
-      const value = generator(valueType, options);
-      return [k, value] as const;
-    }).filter(([k, v]) => k !== OMIT_SYMBOL && v !== OMIT_SYMBOL);
+      if (k === OMIT_SYMBOL) continue;
+      const childOpts = pushPathSegment(options, { kind: 'mapKey', key: k });
+      const v = generator(valueType, childOpts);
+      if (v === OMIT_SYMBOL) continue;
+      entries.push([k, v]);
+    }
+    const injections = findKeyInjections(
+      options.pathSupplies,
+      recordKeyTypeAccepts(keyType),
+    );
+    for (const k of injections) {
+      const childOpts = pushPathSegment(options, { kind: 'mapKey', key: k });
+      const v = generator(valueType, childOpts);
+      if (v === OMIT_SYMBOL) continue;
+      entries.push([k, v]);
+    }
     return new Map(entries);
   },
   set: (
@@ -220,7 +313,8 @@ export const generateUtils = {
 
     const length = calcLengthFromChecks(checks, faker, config.set);
     const values = Array.from({ length }, () => {
-      return generator(valueType, options);
+      const childOpts = pushPathSegment(options, { kind: 'setItem' });
+      return generator(valueType, childOpts);
     }).filter((v) => v !== OMIT_SYMBOL);
     return new Set(values);
   },
@@ -233,7 +327,11 @@ export const generateUtils = {
     const result: { [key: string]: unknown } = {};
 
     for (const [key, value] of Object.entries(shape)) {
-      const generated = generator(value, options);
+      const childOpts = pushPathSegment(options, {
+        kind: 'objectKey',
+        key,
+      });
+      const generated = generator(value, childOpts);
       if (generated !== OMIT_SYMBOL) {
         result[key] = generated;
       }
@@ -248,22 +346,42 @@ export const generateUtils = {
     const { faker, config } = options;
     const { keyType, valueType } = schema;
     const length = faker.number.int(config.record);
-    return [...Array(length)].reduce((acc) => {
+    const acc: Record<string | number | symbol, unknown> = {};
+
+    for (let i = 0; i < length; i++) {
       const k = generator(keyType, options);
-
-      // If keyType is ZodNever, skip this entry.
-      if (k === OMIT_SYMBOL) return acc;
-
+      if (k === OMIT_SYMBOL) continue;
       const keyIsValid =
         typeof k === 'string' || typeof k === 'number' || typeof k === 'symbol';
-      if (keyIsValid) {
-        const keyStr = typeof k === 'symbol' ? String(k) : k;
-        const value = generator(valueType, options);
-        if (value === OMIT_SYMBOL) return acc;
-        return { ...acc, [keyStr]: value };
-      }
-      throw new Error('Invalid record key type');
-    }, {});
+      if (!keyIsValid) throw new Error('Invalid record key type');
+      const typedKey = k;
+      const keyStr = typeof typedKey === 'symbol' ? String(typedKey) : typedKey;
+      const childOpts = pushPathSegment(options, {
+        kind: 'recordKey',
+        key: typedKey,
+      });
+      const value = generator(valueType, childOpts);
+      if (value === OMIT_SYMBOL) continue;
+      acc[keyStr] = value;
+    }
+
+    const injections = findKeyInjections(
+      options.pathSupplies,
+      recordKeyTypeAccepts(keyType),
+    );
+    for (const k of injections) {
+      const typedKey = k as string | number | symbol;
+      const keyStr = typeof typedKey === 'symbol' ? String(typedKey) : typedKey;
+      const childOpts = pushPathSegment(options, {
+        kind: 'recordKey',
+        key: typedKey,
+      });
+      const value = generator(valueType, childOpts);
+      if (value === OMIT_SYMBOL) continue;
+      acc[keyStr] = value;
+    }
+
+    return acc;
   },
   union: (
     schema: z.ZodUnion,
