@@ -6,7 +6,13 @@ import { defineCommand, runMain } from 'citty';
 import { consola } from 'consola';
 import logUpdate from 'log-update';
 import type { z } from 'zod';
-import { initGenerator } from './mock-generator';
+import {
+  type ConfigProfile,
+  getProfileFactory,
+  loadConfig,
+  type LoadedMockConfig,
+} from './config';
+import { initGenerator, type MockGenerator } from './mock-generator';
 import type { LocaleType, MockConfig } from './type';
 
 type Format = 'json' | 'ts' | 'js' | 'bin';
@@ -143,6 +149,17 @@ const generateCmd = defineCommand({
       description: 'Suppress progress and informational messages.',
       default: false,
     },
+    config: {
+      type: 'string',
+      description:
+        'Path to a zod-v4-mocks.config.{ts,js,mjs} file. Auto-discovered from cwd when omitted.',
+    },
+    profile: {
+      type: 'string',
+      description:
+        'Profile to use from the config file: base | cli | test (default cli).',
+      default: 'cli',
+    },
   },
   async run({ args }) {
     if (args.silent) consola.level = 0;
@@ -165,24 +182,53 @@ async function runGenerate(args: {
   locale?: string;
   pretty: boolean;
   silent: boolean;
+  config?: string;
+  profile?: string;
 }): Promise<void> {
   const count = Number(args.count);
   if (!Number.isFinite(count) || count < 0 || !Number.isInteger(count)) {
     throw new Error(`--count must be a non-negative integer (got: ${args.count})`);
   }
 
-  const config: Partial<MockConfig> = {};
+  const profile = (args.profile ?? 'cli') as ConfigProfile;
+  if (profile !== 'base' && profile !== 'cli' && profile !== 'test') {
+    throw new Error(
+      `--profile must be one of base|cli|test (got: ${args.profile})`,
+    );
+  }
+
+  const flagConfig: Partial<MockConfig> = {};
   if (args.seed !== undefined) {
     const n = Number(args.seed);
     if (!Number.isFinite(n)) {
       throw new Error(`--seed must be a number (got: ${args.seed})`);
     }
-    config.seed = n;
+    flagConfig.seed = n;
   }
-  if (args.locale) config.locale = args.locale as LocaleType;
+  if (args.locale) flagConfig.locale = args.locale as LocaleType;
 
   const schema = await loadSchema(args.module, args.export);
-  const gen = initGenerator(config);
+
+  const loaded: LoadedMockConfig | null = await loadConfig({
+    configFile: args.config,
+  });
+
+  let gen: MockGenerator;
+  if (loaded) {
+    if (!args.silent) {
+      consola.info(
+        `Using config: ${loaded.configFile ?? '(unknown)'} (profile: ${profile})`,
+      );
+    }
+    gen = getProfileFactory(loaded, profile)();
+    if (Object.keys(flagConfig).length > 0) {
+      // CLI flags override config-file values for the well-known knobs
+      // they cover (seed, locale).
+      gen.updateConfig(flagConfig);
+    }
+  } else {
+    gen = initGenerator(flagConfig);
+  }
 
   let data: unknown;
   if (count > 1) {

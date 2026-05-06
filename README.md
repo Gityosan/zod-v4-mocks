@@ -413,7 +413,54 @@ npx zod-v4-mocks generate ./schemas.js User --count 10 -o users.json --pretty
 npx tsx node_modules/zod-v4-mocks/dist/cli.js generate ./schemas.ts User -c 10
 ```
 
-Options: `-c/--count`, `-s/--seed`, `-o/--output`, `-f/--format` (`json|ts|js|bin`), `-l/--locale`, `--pretty`, `--silent`. Run `--help` on any command for the full reference.
+Options: `-c/--count`, `-s/--seed`, `-o/--output`, `-f/--format` (`json|ts|js|bin`), `-l/--locale`, `--pretty`, `--silent`, `--config`, `--profile`. Run `--help` on any command for the full reference.
+
+### 12. Shared config file (`zod-v4-mocks.config.{ts,js,mjs}`)
+
+A single config file expresses generator setup that's reused both from the CLI and from runtime code (tests, scripts). Three layers are supported:
+
+- **`baseConfig`** — project-wide defaults (locale, common `supplyRef`, project conventions)
+- **`extend.cliConfig`** — additions when run via the CLI
+- **`extend.testConfig`** — additions when consumed from tests
+
+```ts
+// zod-v4-mocks.config.ts
+import { defineMockConfig } from 'zod-v4-mocks/config';
+import { UserId, FIXED_UUID } from './src/schemas/ids';
+
+export default defineMockConfig({
+  baseConfig: ({ initGenerator }) =>
+    initGenerator({ locale: 'ja', keyMapping: 'auto' })
+      .supplyRef(UserId, FIXED_UUID),
+
+  extend: {
+    cliConfig: (base) =>
+      base.updateConfig({ seed: 1 })
+        .supplyPath(['createdAt'], new Date('2024-01-01')),
+    testConfig: (base) =>
+      base.override((schema, opts) => /* test-only rules */ undefined),
+  },
+});
+```
+
+CLI auto-discovers the file from cwd (or pass `--config <path>`) and uses the `cli` profile by default (`--profile base|cli|test`).
+
+From tests / Node code:
+
+```ts
+import { loadConfig } from 'zod-v4-mocks/config';
+
+const { createBase, createCli, createTest } = await loadConfig();
+
+beforeEach(() => {
+  // Each call returns a fresh MockGenerator — no cross-test mutation.
+  gen = createTest()
+    .updateConfig({ seed: testCase.seed })
+    .supplyPath(['user', 'email'], 'override@x');
+});
+```
+
+`loadConfig()` is built on [`c12`](https://github.com/unjs/c12), so TS configs work out of the box and the resolved config is cached.
 
 ## Unsupported Schemas
 
