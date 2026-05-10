@@ -6,18 +6,20 @@
 
 ```ts
 interface MockConfig {
-  locale?: LocaleType | LocaleType[]  // default: [en, base]
-  randomizer?: Randomizer             // faker.js का रैंडमाइज़र
-  seed: number                        // default: 1
-  array: { min: number; max: number } // default: { min: 1, max: 3 }
-  map: { min: number; max: number }   // default: { min: 1, max: 3 }
-  set: { min: number; max: number }   // default: { min: 1, max: 3 }
+  locale?: LocaleType | LocaleType[]   // default: [en, base]
+  randomizer?: Randomizer              // faker.js का रैंडमाइज़र
+  seed: number                         // default: 1
+  array: { min: number; max: number }  // default: { min: 1, max: 3 }
+  map: { min: number; max: number }    // default: { min: 1, max: 3 }
+  set: { min: number; max: number }    // default: { min: 1, max: 3 }
   record: { min: number; max: number } // default: { min: 1, max: 3 }
   optionalProbability: number          // default: 0.5
   nullableProbability: number          // default: 0.5
   defaultProbability: number           // default: 0.5
   recursiveDepthLimit?: number         // default: 5
-  consistentKey?: string               // मेटाडेटा का कुंजी नाम
+  consistentKey?: string               // मेटाडेटा कुंजी नाम (कंसिस्टेंट वैल्यू)
+  customMockKey?: string               // default: 'mock' (z.custom की meta key)
+  keyMapping?: 'off' | 'auto' | KeyMapper // default: 'off'
 }
 ```
 
@@ -269,6 +271,79 @@ const mock = initGenerator({ consistentKey })
     "value": "ut"
   }
 ]
+```
+
+## customMockKey
+
+`z.custom()` / `z.instanceof()` स्कीमा के meta से मॉक जेनरेटर पढ़ने के लिए उपयोग होने वाला एट्रिब्यूट नाम। डिफ़ॉल्ट `'mock'`।
+
+```ts
+const Schema = z.custom<File>().meta({ mock: (faker) => new File(['x'], faker.system.fileName()) })
+
+initGenerator().generate(Schema) // meta.mock को कॉल करता है
+```
+
+अन्य meta उपयोगकर्ताओं से टकराव से बचने के लिए key बदली जा सकती है:
+
+```ts
+const Schema = z.custom<File>().meta({ zodMock: () => new File([], 'a') })
+initGenerator({ customMockKey: 'zodMock' }).generate(Schema)
+```
+
+पूर्ण उपयोग के लिए देखें [कस्टम जेनरेटर — `z.custom()` और `z.instanceof()` का हैंडलिंग](/hi/guide/custom-generator#z-custom-और-z-instanceof-का-हैंडलिंग)।
+
+## keyMapping
+
+प्रॉपर्टी नाम → `faker` फंक्शन की ऑप्ट-इन मैपिंग, केवल प्रिमिटिव लीफ़ स्कीमा (string / number / boolean / date) पर लागू होती है। डिफ़ॉल्ट `'off'`।
+
+- `'off'` — कोई मैपिंग नहीं (डिफ़ॉल्ट)
+- `'auto'` — बिल्ट-इन डिफ़ॉल्ट का उपयोग (`firstName`, `email`, `age`, `createdAt`, ...)
+- `KeyMapper` फंक्शन — `(key, schema, faker, options) => value | undefined`। `undefined` लौटाने पर बिल्ट-इन डिफ़ॉल्ट पर फ़ॉलबैक
+
+```ts
+const Schema = z.object({
+  firstName: z.string(),
+  email: z.string(),
+  age: z.number(),
+  createdAt: z.date(),
+})
+
+initGenerator({ keyMapping: 'auto' }).generate(Schema)
+// => { firstName: 'Hannah', email: 'a@x', age: 37, createdAt: <Date> }
+```
+
+`keyMapping` **`supplyPath` और `supply` / `supplyRef` / `override` चेन के बाद** चलता है, इसलिए स्पष्ट ओवरराइड हमेशा जीतते हैं।
+
+```ts
+initGenerator({ keyMapping: 'auto' })
+  .supplyPath(['email'], 'override@x')
+  .generate(Schema)
+// email 'override@x' होगा, faker email नहीं
+```
+
+बिल्ट-इन मैपिंग का कवरेज (केस और सेपरेटर-असंवेदी — `firstName`, `first_name`, `FIRST-NAME` सभी एक ही माने जाते हैं):
+
+| Key | कहाँ मैप होती है |
+|---|---|
+| `firstName` / `lastName` / `name` | `faker.person.*` |
+| `email`, `phone`, `url`, `avatar` | `faker.internet.*` |
+| `street` / `city` / `country` / `zip` | `faker.location.*` |
+| `company`, `jobTitle`, `department` | `faker.company.*`, `faker.person.jobTitle()` |
+| `description`, `title`, `content` | `faker.lorem.*` |
+| `age`, `price`, `quantity`, `rating`, `latitude`, `longitude` | उपयुक्त रेंज के `faker.number.*` |
+| `createdAt`, `updatedAt`, `birthDate` | `faker.date.*` |
+
+कस्टम मैचर:
+
+```ts
+import type { KeyMapper } from 'zod-v4-mocks'
+
+const myMap: KeyMapper = (key, schema, faker) => {
+  if (key === 'sku') return faker.string.alphanumeric(10).toUpperCase()
+  return undefined // बिल्ट-इन डिफ़ॉल्ट पर फ़ॉलबैक
+}
+
+initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 ```
 
 ## updateConfig

@@ -1,51 +1,51 @@
-# CLI & Shared Config File
+# CLI और साझा कॉन्फ़िग फ़ाइल
 
-`zod-v4-mocks` ships with a small CLI for ad-hoc generation and a shared config file mechanism that both the CLI and your runtime code (tests, scripts) load the same way.
+`zod-v4-mocks` एक छोटा CLI प्रदान करता है ज़रिए जरूरत के समय मॉक बनाने के लिए, साथ ही एक साझा कॉन्फ़िग फ़ाइल मैकेनिज़्म जिसे CLI और रनटाइम कोड (टेस्ट, स्क्रिप्ट) दोनों एक ही तरह लोड करते हैं।
 
 ## CLI
 
-The `zod-v4-mocks` binary loads a JS/ESM module, picks a Zod schema export, and prints (or writes) mock data.
+`zod-v4-mocks` कमांड एक JS/ESM मॉड्यूल लोड करता है, एक Zod स्कीमा एक्सपोर्ट चुनता है, और मॉक डेटा को प्रिंट (या लिख) देता है।
 
 ```bash
-# Single mock to stdout (pretty-printed JSON)
+# एक मॉक स्टैंडर्ड आउटपुट पर (pretty JSON)
 npx zod-v4-mocks generate ./schemas.js User --pretty
 
-# 50 mocks to a file
+# 50 मॉक एक फ़ाइल में
 npx zod-v4-mocks generate ./schemas.js User --count 50 --output users.json
 
-# Specify seed and locale
+# seed और locale निर्दिष्ट करें
 npx zod-v4-mocks generate ./schemas.js User --seed 42 --locale ja
 ```
 
-For TypeScript schema modules, run through `tsx`:
+TypeScript स्कीमा मॉड्यूल के लिए `tsx` से चलाएँ:
 
 ```bash
 npx tsx node_modules/zod-v4-mocks/dist/cli.js generate ./schemas.ts User -c 10
 ```
 
-### Options
+### विकल्प
 
-| Flag | Description |
+| फ़्लैग | विवरण |
 |---|---|
-| `-c, --count <n>` | Number of items. `count > 1` produces an array; `count = 1` produces a single value. |
-| `-s, --seed <n>` | Random seed (default `1`). |
-| `-o, --output <path>` | Write to a file. Format is inferred from the extension. |
-| `-f, --format <fmt>` | Output format: `json` / `ts` / `js` / `bin`. Overrides the extension. |
-| `-l, --locale <loc>` | Faker locale (e.g. `ja`, `en`, `de`). |
-| `--pretty` | Pretty-print JSON on stdout. |
-| `--silent` | Suppress progress and informational messages. |
-| `--config <path>` | Explicit config file. Auto-discovered when omitted. |
-| `--profile <name>` | Config profile: `base` / `cli` / `test` (default `cli`). |
+| `-c, --count <n>` | आइटम्स की संख्या। `count > 1` से array; `count = 1` से एकल वैल्यू |
+| `-s, --seed <n>` | रैंडम seed (डिफ़ॉल्ट `1`) |
+| `-o, --output <path>` | फ़ाइल में लिखें। फ़ॉर्मेट एक्सटेंशन से अनुमानित |
+| `-f, --format <fmt>` | आउटपुट फ़ॉर्मेट: `json` / `ts` / `js` / `bin`। एक्सटेंशन से ऊपर |
+| `-l, --locale <loc>` | Faker locale (जैसे `ja`, `en`, `de`) |
+| `--pretty` | स्टैंडर्ड आउटपुट पर JSON को सुंदर बनाएँ |
+| `--silent` | प्रगति और सूचनात्मक संदेश छिपाएँ |
+| `--config <path>` | स्पष्ट कॉन्फ़िग फ़ाइल पाथ। न देने पर ऑटो-खोज |
+| `--profile <name>` | कॉन्फ़िग प्रोफ़ाइल: `base` / `cli` / `test` (डिफ़ॉल्ट `cli`) |
 
-For large batches written to a file, the CLI shows a progress indicator (it never draws on stdout — that would corrupt your output).
+जब फ़ाइल में बड़ी मात्रा लिखी जा रही हो तब CLI प्रगति दिखाता है (स्टैंडर्ड आउटपुट पर नहीं — वहाँ यह आउटपुट स्ट्रीम भ्रष्ट करता है)।
 
-## Shared Config File
+## साझा कॉन्फ़िग फ़ाइल
 
-A `zod-v4-mocks.config.{ts,js,mjs}` file expresses project-wide generator setup that's reused by the CLI **and** by your runtime code. Loading is handled by [`c12`](https://github.com/unjs/c12), so TypeScript configs work without any extra tooling, and the file is auto-discovered from the working directory.
+`zod-v4-mocks.config.{ts,js,mjs}` फ़ाइल प्रोजेक्ट-स्तर का जेनरेटर सेटअप व्यक्त करती है और CLI **तथा** रनटाइम कोड दोनों इसका उपयोग करते हैं। लोडिंग [`c12`](https://github.com/unjs/c12) पर आधारित है, इसलिए TypeScript कॉन्फ़िग बिना अतिरिक्त टूल के काम करते हैं और फ़ाइल वर्किंग डायरेक्टरी से ऑटो-खोजी जाती है।
 
-### Three layers
+### तीन लेयर
 
-`defineMockConfig` takes one required factory (`baseConfig`) and two optional extension callbacks (`extend.cliConfig` / `extend.testConfig`). Each extension receives the base generator and returns an enriched one.
+`defineMockConfig` एक आवश्यक फैक्ट्री `baseConfig` और दो वैकल्पिक एक्सटेंशन कॉलबैक (`extend.cliConfig` / `extend.testConfig`) लेता है। प्रत्येक एक्सटेंशन बेस जेनरेटर लेता है और संवर्धित जेनरेटर लौटाता है।
 
 ```ts
 // zod-v4-mocks.config.ts
@@ -53,65 +53,65 @@ import { defineMockConfig } from 'zod-v4-mocks/config'
 import { UserId, FIXED_UUID } from './src/schemas/ids'
 
 export default defineMockConfig({
-  // Project-wide defaults (used by every profile).
+  // प्रोजेक्ट-स्तर डिफ़ॉल्ट (हर प्रोफ़ाइल में लागू)
   baseConfig: ({ initGenerator }) =>
     initGenerator({ locale: 'ja', keyMapping: 'auto' })
       .supplyRef(UserId, FIXED_UUID),
 
   extend: {
-    // Applied when run from the CLI.
+    // CLI से चलाने पर लागू
     cliConfig: (base) =>
       base.updateConfig({ seed: 1 })
         .supplyPath(['createdAt'], new Date('2024-01-01')),
 
-    // Applied when consumed from tests.
+    // टेस्ट से उपयोग पर लागू
     testConfig: (base) =>
-      base.override((schema, opts) => /* test-only rules */ undefined),
+      base.override((schema, opts) => /* केवल-टेस्ट नियम */ undefined),
   },
 })
 ```
 
-Use the layers for what they're good at:
+प्रत्येक लेयर के उद्देश्य:
 
-| Layer | What belongs here |
+| लेयर | क्या रखें |
 |---|---|
-| `baseConfig` | `locale`, `customMockKey`, `consistentKey`, project-wide `supplyRef`, `keyMapping` policy |
-| `extend.cliConfig` | Defaults that only make sense for ad-hoc CLI generation (fixed seed, output format hints) |
-| `extend.testConfig` | Cross-test conventions (`override` rules, additional `supplyRef`) — but per-test overrides should still be chained on the returned generator in the test itself |
+| `baseConfig` | `locale`, `customMockKey`, `consistentKey`, प्रोजेक्ट-स्तर `supplyRef`, `keyMapping` पॉलिसी |
+| `extend.cliConfig` | केवल CLI जनरेशन के लिए सार्थक डिफ़ॉल्ट (फ़िक्स्ड seed, आउटपुट फ़ॉर्मेट संकेत) |
+| `extend.testConfig` | क्रॉस-टेस्ट संधि (`override` नियम, अतिरिक्त `supplyRef`) — प्रति-टेस्ट विशिष्ट ओवरराइड टेस्ट के अंदर लौटे जेनरेटर पर चेन करें |
 
-### Loading from CLI
+### CLI से लोडिंग
 
-The CLI auto-discovers `zod-v4-mocks.config.{ts,js,mjs}` from the current working directory and applies the `cli` profile by default. Override with `--config <path>` and `--profile <name>`.
+CLI वर्किंग डायरेक्टरी से `zod-v4-mocks.config.{ts,js,mjs}` ऑटो-खोजता है और डिफ़ॉल्ट रूप से `cli` प्रोफ़ाइल लागू करता है। `--config <path>` और `--profile <name>` से ओवरराइड किया जा सकता है।
 
-### Loading from tests / Node code
+### टेस्ट / Node कोड से लोडिंग
 
 ```ts
 import { loadConfig } from 'zod-v4-mocks/config'
 
 const { createBase, createCli, createTest } = await loadConfig()
-// createBase / createCli / createTest are factories — calling each returns
-// a fresh MockGenerator instance.
+// createBase / createCli / createTest फैक्ट्री हैं — हर कॉल पर एक नया
+// MockGenerator इंस्टेंस लौटता है।
 
 beforeEach(() => {
-  // Per-test variations are chained on top of the shared base + testConfig.
+  // प्रति-टेस्ट विविधताएँ साझा base + testConfig के ऊपर चेन की जाती हैं
   gen = createTest()
     .updateConfig({ seed: testCase.seed })
     .supplyPath(['user', 'email'], 'override@x')
 })
 ```
 
-`loadConfig` returns `null` when no config file is found and none was explicitly requested, so the same code path works whether or not a project has a config.
+जब कोई कॉन्फ़िग फ़ाइल नहीं मिलती और स्पष्ट रूप से माँगी नहीं गई थी, तब `loadConfig` `null` लौटाता है — इसलिए वही कोड पाथ काम करता है चाहे प्रोजेक्ट में कॉन्फ़िग हो या नहीं।
 
-### Why "factory" matters
+### "फैक्ट्री" क्यों मायने रखती है
 
-The chained API mutates the generator (`gen.supplyPath(...)` returns the same instance). If `loadConfig` returned a single shared instance, supplies added in one test would leak into the next. The `create*` factories rebuild the generator from the original `baseConfig` (plus the relevant `extend`) on each call, so each call returns an isolated instance.
+चेन API जेनरेटर को mutate करता है (`gen.supplyPath(...)` वही इंस्टेंस लौटाता है)। यदि `loadConfig` एक साझा इंस्टेंस लौटाए, तो एक टेस्ट में जोड़े गए supplies अगले टेस्ट में रिसते हैं। `create*` फैक्ट्री हर कॉल पर मूल `baseConfig` (और संगत `extend`) से जेनरेटर पुनर्निर्मित करती हैं, इसलिए हर कॉल पर एक अलग इंस्टेंस मिलता है।
 
 ```ts
 const a = createTest().supplyPath(['note'], 'A')
-const b = createTest()                  // b does not see ['note'] -> 'A'
+const b = createTest()                  // b में ['note'] -> 'A' नहीं दिखता
 ```
 
-### API reference
+### API संदर्भ
 
 ```ts
 import {
@@ -141,8 +141,8 @@ getProfileFactory(loaded: LoadedMockConfig, profile?: ConfigProfile)
   : () => MockGenerator
 ```
 
-## Next Steps
+## अगले कदम
 
-- [Configuration](/guide/configuration) - All `MockConfig` options
-- [Custom Generator](/guide/custom-generator) - `supply` / `supplyRef` / `supplyPath` / `override`
-- [API Reference](/api/) - Method-level reference
+- [कॉन्फ़िगरेशन](/hi/guide/configuration) - `MockConfig` के सभी विकल्प
+- [कस्टम जेनरेटर](/hi/guide/custom-generator) - `supply` / `supplyRef` / `supplyPath` / `override`
+- [API संदर्भ](/hi/api/) - मेथड-स्तर संदर्भ

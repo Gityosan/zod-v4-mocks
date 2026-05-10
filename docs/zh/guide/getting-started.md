@@ -86,6 +86,23 @@ console.log(mocks.user) // { id: "...", name: "...", email: "..." }
 console.log(mocks.post) // { id: 123, title: "...", body: "...", published: true }
 ```
 
+## generateMany / factory
+
+`generateMany(schema, count)` 为同一 Schema 返回 `count` 个独立的 Mock。带 seed 的 RNG 会产生确定但各不相同的值。
+
+```ts
+const users = initGenerator({ seed: 1 }).generateMany(userSchema, 10)
+// users.length === 10，同一 seed 下唯一
+```
+
+`factory(schema)` 返回一个绑定到 Schema 的小对象，便于按需取值：
+
+```ts
+const f = initGenerator().factory(userSchema)
+const user = f.next()          // 单个 mock
+const batch = f.take(5)        // 5 个 mock
+```
+
 ## 可复现的生成
 
 指定相同的 `seed` 值，每次都会生成相同的 Mock 数据。这对于测试的稳定性非常有用。
@@ -157,11 +174,16 @@ const mock = initGenerator().generate(complexSchema)
 | `.refine()` | 验证条件会被忽略 |
 | `.check()` | 仅支持 `z.overwrite()` / `z.trim()`。不支持 `z.regex()` / `z.minLength()` 等（方法形式 `.regex()` 已支持） |
 
+### 需要用户输入
+
+| Schema | 说明 |
+|---------|------|
+| `z.custom()` / `z.instanceof()` | 无法解析自定义验证。请通过 `.meta({ mock: ... })` 或 `supplyRef` 提供值。详见 [自定义生成器](/zh/guide/custom-generator#处理-z-custom-和-z-instanceof) |
+
 ### 不支持
 
 | Schema | 原因 |
 |---------|------|
-| `z.custom()` / `z.instanceof()` | 无法解析自定义验证。可通过 `override` 回避 |
 | `z.function()` | 函数的 Mock 生成较为复杂 |
 | `.catchall()` | 会被忽略（对 Mock 生成无影响） |
 | `z.nativeEnum()` | 在 Zod v4 中已弃用。请使用 `z.enum()` |

@@ -6,18 +6,20 @@
 
 ```ts
 interface MockConfig {
-  locale?: LocaleType | LocaleType[]  // default: [en, base]
-  randomizer?: Randomizer             // faker.js 的随机器
-  seed: number                        // default: 1
-  array: { min: number; max: number } // default: { min: 1, max: 3 }
-  map: { min: number; max: number }   // default: { min: 1, max: 3 }
-  set: { min: number; max: number }   // default: { min: 1, max: 3 }
+  locale?: LocaleType | LocaleType[]   // default: [en, base]
+  randomizer?: Randomizer              // faker.js 的随机器
+  seed: number                         // default: 1
+  array: { min: number; max: number }  // default: { min: 1, max: 3 }
+  map: { min: number; max: number }    // default: { min: 1, max: 3 }
+  set: { min: number; max: number }    // default: { min: 1, max: 3 }
   record: { min: number; max: number } // default: { min: 1, max: 3 }
   optionalProbability: number          // default: 0.5
   nullableProbability: number          // default: 0.5
   defaultProbability: number           // default: 0.5
   recursiveDepthLimit?: number         // default: 5
-  consistentKey?: string               // 元数据的键名
+  consistentKey?: string               // 元数据键名（一致性生成）
+  customMockKey?: string               // default: 'mock'（z.custom 的 meta 键）
+  keyMapping?: 'off' | 'auto' | KeyMapper // default: 'off'
 }
 ```
 
@@ -269,6 +271,79 @@ const mock = initGenerator({ consistentKey })
     "value": "ut"
   }
 ]
+```
+
+## customMockKey
+
+从 `z.custom()` / `z.instanceof()` Schema 的 meta 中读取生成器的属性名。默认 `'mock'`。
+
+```ts
+const Schema = z.custom<File>().meta({ mock: (faker) => new File(['x'], faker.system.fileName()) })
+
+initGenerator().generate(Schema) // 调用 meta.mock
+```
+
+为避免与其他 meta 使用者冲突，可以更改键名：
+
+```ts
+const Schema = z.custom<File>().meta({ zodMock: () => new File([], 'a') })
+initGenerator({ customMockKey: 'zodMock' }).generate(Schema)
+```
+
+完整用法见 [自定义生成器 — 处理 `z.custom()`](/zh/guide/custom-generator#处理-z-custom-和-z-instanceof)。
+
+## keyMapping
+
+属性名 → `faker` 函数的可选映射，仅对原始叶子 Schema（string / number / boolean / date）生效。默认 `'off'`。
+
+- `'off'` —— 不映射（默认行为）
+- `'auto'` —— 使用内置默认映射（`firstName`, `email`, `age`, `createdAt` 等）
+- `KeyMapper` 函数 —— `(key, schema, faker, options) => value | undefined`。返回 `undefined` 时回退到内置默认
+
+```ts
+const Schema = z.object({
+  firstName: z.string(),
+  email: z.string(),
+  age: z.number(),
+  createdAt: z.date(),
+})
+
+initGenerator({ keyMapping: 'auto' }).generate(Schema)
+// => { firstName: 'Hannah', email: 'a@x', age: 37, createdAt: <Date> }
+```
+
+`keyMapping` 在 **`supplyPath` 和 `supply` / `supplyRef` / `override` 链之后**执行，所以显式覆盖始终优先。
+
+```ts
+initGenerator({ keyMapping: 'auto' })
+  .supplyPath(['email'], 'override@x')
+  .generate(Schema)
+// email 为 'override@x'，不是 faker 邮箱
+```
+
+内置映射的覆盖范围（大小写、分隔符不敏感 —— `firstName`、`first_name`、`FIRST-NAME` 都视为同一个）：
+
+| 键 | 映射到 |
+|---|---|
+| `firstName` / `lastName` / `name` | `faker.person.*` |
+| `email`, `phone`, `url`, `avatar` | `faker.internet.*` |
+| `street` / `city` / `country` / `zip` | `faker.location.*` |
+| `company`, `jobTitle`, `department` | `faker.company.*`, `faker.person.jobTitle()` |
+| `description`, `title`, `content` | `faker.lorem.*` |
+| `age`, `price`, `quantity`, `rating`, `latitude`, `longitude` | 合适范围的 `faker.number.*` |
+| `createdAt`, `updatedAt`, `birthDate` | `faker.date.*` |
+
+自定义匹配器：
+
+```ts
+import type { KeyMapper } from 'zod-v4-mocks'
+
+const myMap: KeyMapper = (key, schema, faker) => {
+  if (key === 'sku') return faker.string.alphanumeric(10).toUpperCase()
+  return undefined // 回退到内置默认
+}
+
+initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 ```
 
 ## updateConfig

@@ -86,6 +86,23 @@ console.log(mocks.user) // { id: "...", name: "...", email: "..." }
 console.log(mocks.post) // { id: 123, title: "...", body: "...", published: true }
 ```
 
+## generateMany / factory
+
+`generateMany(schema, count)` एक ही स्कीमा के लिए `count` स्वतंत्र मॉक लौटाता है। seeded RNG डिटरमिनिस्टिक लेकिन भिन्न वैल्यू देता है।
+
+```ts
+const users = initGenerator({ seed: 1 }).generateMany(userSchema, 10)
+// users.length === 10, समान seed में हर बार समान
+```
+
+`factory(schema)` स्कीमा से बंधा हुआ एक छोटा ऑब्जेक्ट देता है, क्रमिक उपयोग के लिए सुविधाजनक:
+
+```ts
+const f = initGenerator().factory(userSchema)
+const user = f.next()          // एक मॉक
+const batch = f.take(5)        // पाँच मॉक
+```
+
 ## पुनरुत्पादन योग्य जनरेशन
 
 एक ही `seed` वैल्यू निर्दिष्ट करने पर, हर बार वही मॉक डेटा जनरेट होता है। यह टेस्ट की स्थिरता के लिए उपयोगी है।
@@ -157,11 +174,16 @@ const mock = initGenerator().generate(complexSchema)
 | `.refine()` | वैलिडेशन कंडीशन को अनदेखा किया जाता है |
 | `.check()` | केवल `z.overwrite()` / `z.trim()` सपोर्टेड। `z.regex()` / `z.minLength()` आदि असपोर्टेड (मेथड फॉर्म `.regex()` सपोर्टेड) |
 
+### यूज़र इनपुट आवश्यक
+
+| स्कीमा | विवरण |
+|---------|------|
+| `z.custom()` / `z.instanceof()` | कस्टम वैलिडेशन पार्सिंग संभव नहीं। `.meta({ mock: ... })` या `supplyRef` से वैल्यू प्रदान करें। अधिक जानकारी [कस्टम जेनरेटर](/hi/guide/custom-generator#z-custom-और-z-instanceof-का-हैंडलिंग) पर |
+
 ### असपोर्टेड
 
 | स्कीमा | कारण |
 |---------|------|
-| `z.custom()` / `z.instanceof()` | कस्टम वैलिडेशन पार्सिंग संभव नहीं। `override` से समाधान |
 | `z.function()` | फंक्शन का मॉक जनरेशन जटिल है |
 | `.catchall()` | अनदेखा किया जाता है (मॉक जनरेशन पर प्रभाव नहीं) |
 | `z.nativeEnum()` | Zod v4 में डेप्रिकेटेड। `z.enum()` का उपयोग करें |
