@@ -6,18 +6,20 @@
 
 ```ts
 interface MockConfig {
-  locale?: LocaleType | LocaleType[]  // default: [en, base]
-  randomizer?: Randomizer             // faker.js のランダマイザー
-  seed: number                        // default: 1
-  array: { min: number; max: number } // default: { min: 1, max: 3 }
-  map: { min: number; max: number }   // default: { min: 1, max: 3 }
-  set: { min: number; max: number }   // default: { min: 1, max: 3 }
+  locale?: LocaleType | LocaleType[]   // default: [en, base]
+  randomizer?: Randomizer              // faker.js のランダマイザー
+  seed: number                         // default: 1
+  array: { min: number; max: number }  // default: { min: 1, max: 3 }
+  map: { min: number; max: number }    // default: { min: 1, max: 3 }
+  set: { min: number; max: number }    // default: { min: 1, max: 3 }
   record: { min: number; max: number } // default: { min: 1, max: 3 }
   optionalProbability: number          // default: 0.5
   nullableProbability: number          // default: 0.5
   defaultProbability: number           // default: 0.5
   recursiveDepthLimit?: number         // default: 5
-  consistentKey?: string               // メタデータのキー名
+  consistentKey?: string               // メタデータのキー名（一貫値生成用）
+  customMockKey?: string               // default: 'mock' (z.custom のメタキー)
+  keyMapping?: 'off' | 'auto' | KeyMapper // default: 'off'
 }
 ```
 
@@ -269,6 +271,79 @@ const mock = initGenerator({ consistentKey })
     "value": "ut"
   }
 ]
+```
+
+## customMockKey
+
+`z.custom()` / `z.instanceof()` のスキーマから生成関数を読み取る meta 属性名。既定 `'mock'`。
+
+```ts
+const Schema = z.custom<File>().meta({ mock: (faker) => new File(['x'], faker.system.fileName()) })
+
+initGenerator().generate(Schema) // meta.mock を呼び出す
+```
+
+他の meta 利用者と衝突を避けたい場合はキー名を変更：
+
+```ts
+const Schema = z.custom<File>().meta({ zodMock: () => new File([], 'a') })
+initGenerator({ customMockKey: 'zodMock' }).generate(Schema)
+```
+
+詳しい使い方は [カスタムジェネレータ — `z.custom()` / `z.instanceof()` の扱い](/ja/guide/custom-generator#z-custom-z-instanceof-の扱い) を参照。
+
+## keyMapping
+
+プロパティ名 → `faker` 関数のオプトインマッピング。プリミティブ葉スキーマ（string / number / boolean / date）にのみ作用します。既定 `'off'`。
+
+- `'off'` — マッピング無し（既定動作）
+- `'auto'` — 組み込みのデフォルトを使用（`firstName`, `email`, `age`, `createdAt` 等）
+- `KeyMapper` 関数 — `(key, schema, faker, options) => value | undefined`。`undefined` を返すと組み込みデフォルトにフォールバック
+
+```ts
+const Schema = z.object({
+  firstName: z.string(),
+  email: z.string(),
+  age: z.number(),
+  createdAt: z.date(),
+})
+
+initGenerator({ keyMapping: 'auto' }).generate(Schema)
+// => { firstName: 'Hannah', email: 'a@x', age: 37, createdAt: <Date> }
+```
+
+`keyMapping` は **`supplyPath` および `supply` / `supplyRef` / `override` チェーンの後に**実行されるため、明示的なオーバーライドが常に優先されます。
+
+```ts
+initGenerator({ keyMapping: 'auto' })
+  .supplyPath(['email'], 'override@x')
+  .generate(Schema)
+// email は 'override@x'（faker email ではない）
+```
+
+組み込みマッピングの範囲（大文字小文字・区切り文字を無視 — `firstName`, `first_name`, `FIRST-NAME` はすべて同一視）：
+
+| キー | マッピング先 |
+|---|---|
+| `firstName` / `lastName` / `name` | `faker.person.*` |
+| `email`, `phone`, `url`, `avatar` | `faker.internet.*` |
+| `street` / `city` / `country` / `zip` | `faker.location.*` |
+| `company`, `jobTitle`, `department` | `faker.company.*`, `faker.person.jobTitle()` |
+| `description`, `title`, `content` | `faker.lorem.*` |
+| `age`, `price`, `quantity`, `rating`, `latitude`, `longitude` | 適切な範囲の `faker.number.*` |
+| `createdAt`, `updatedAt`, `birthDate` | `faker.date.*` |
+
+カスタムマッチャー：
+
+```ts
+import type { KeyMapper } from 'zod-v4-mocks'
+
+const myMap: KeyMapper = (key, schema, faker) => {
+  if (key === 'sku') return faker.string.alphanumeric(10).toUpperCase()
+  return undefined // 組み込みデフォルトへフォールバック
+}
+
+initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 ```
 
 ## updateConfig

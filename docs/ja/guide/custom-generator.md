@@ -1,6 +1,14 @@
 # カスタムジェネレータ
 
-特定のスキーマに対してカスタム値やジェネレータ関数を設定できます。`supply`、`override`、`register` の3つの方法があり、それぞれ異なるユースケースに対応しています。
+特定のスキーマに対してカスタム値やジェネレータ関数を設定できます。`supply` / `supplyRef` / `supplyPath` / `override` / `register` の5つの方法があり、それぞれ異なる粒度の制御に対応しています。
+
+| メソッド | 対象 | 使いどころ |
+|---|---|---|
+| `supply` | Zod の*コンストラクタ*（`z.ZodString` 等） | 「すべての string を X に」 |
+| `supplyRef` | 特定の*スキーマ参照* | 「この個別のサブスキーマを X に」 |
+| `supplyPath` | 生成ツリー内の*パス* | 「`user.email` のスロットを X に」 |
+| `override` | 任意の*関数*（schema + context） | 「コードで表現できることならなんでも」 |
+| `register` | 整合性をとる関連スキーマ | 「`User.id` と `Comment.userId` で同じ UUID」 |
 
 ## supply - 固定値の設定
 
@@ -49,6 +57,93 @@ const mock = initGenerator()
 | `z.ZodUUID` | `z.uuid()` |
 | `z.ZodURL` | `z.url()` |
 | `z.ZodDate` | `z.date()` |
+
+## supplyRef - スキーマ参照で一致
+
+`supply` は同じ Zod クラスのスキーマすべてに当たります。**特定の1箇所だけ**固定したい場合は、参照（`===`）で一致する `supplyRef` を使います。
+
+```ts
+const Name = z.string()
+
+const Schema = z.object({
+  user: z.object({ name: Name }),  // <- この Name ノード
+  bio: z.string(),                  // <- 別の z.string()
+})
+
+const mock = initGenerator()
+  .supplyRef(Name, 'Alice')
+  .generate(Schema)
+// mock.user.name === 'Alice'
+// mock.bio は通常生成（別の参照なので無関係）
+```
+
+- 一致は**インスタンス同一性**ベース。`z.string()` を2回呼び出すと別参照になり、互いに一致しません。
+- 同じ参照を2回 supply した場合、`supply` と同様に**最初の登録が優先**されます。
+
+## supplyPath - 構造パスで一致
+
+`supplyPath` は生成ツリーの**特定パス**に値を固定します。そのパスの Zod 型に関係なく当たります。パスは `string | number | symbol` のセグメントと、2つのマーカーで構成されます。
+
+- `'$item'` — 配列・タプル・Set のすべての要素
+- `'$value'` — レコード・Map のすべての値
+
+```ts
+const Schema = z.object({
+  user: z.object({ name: z.string(), createdAt: z.date() }),
+  scores: z.record(z.string(), z.number()),
+  pair: z.tuple([z.string(), z.string()]),
+})
+
+const mock = initGenerator()
+  .supplyPath(['user', 'name'], 'Alice')              // object のキー
+  .supplyPath(['user', 'createdAt'], new Date(0))     // 型付きの葉
+  .supplyPath(['scores', 'alice'], 100)               // record の特定キーを注入
+  .supplyPath(['scores', '$value'], 0)                // それ以外の値のデフォルト
+  .supplyPath(['pair', 0], 'first')                   // tuple の index
+  .generate(Schema)
+```
+
+### コンテナ別のルール
+
+| コンテナ | `string` セグメント | `number` セグメント | `$item` | `$value` |
+|---|---|---|---|---|
+| `object` | プロパティ名 | — | — | — |
+| `array` | — | index（必要なら配列長を拡張） | 全要素 | — |
+| `tuple` | — | 固定 index | 全要素 | — |
+| `record` | この鍵を注入 | 数値鍵を注入 | — | 全値 |
+| `map` | この鍵を注入 | 数値鍵を注入 | — | 全値 |
+| `set` | — | — | 全要素 | — |
+
+record / map では、特定鍵を指定すると**そのエントリが必ず存在**するように注入されます。残りはランダムに生成されます。
+
+### 具体パスはマーカーに勝つ
+
+両方が当たる場合、リテラルパスが `$item` / `$value` に勝ちます。同じ specificity 内では最初の登録が勝ちます。
+
+```ts
+const mock = initGenerator({ array: { min: 3, max: 3 } })
+  .supplyPath(['$item'], 'default')
+  .supplyPath([1], 'middle')
+  .generate(z.array(z.string()))
+// => ['default', 'middle', 'default']
+```
+
+### `$key` が無い理由
+
+「すべてのキーを X に」という `$key` は意図的に未サポートです。record / map の鍵は一意制約があるため、全鍵を同じ値にするとコレクションが1エントリに縮約されます。リテラルセグメントで特定鍵を指定するパターンが現実的なユースケースを覆えます。
+
+### Symbol セグメント
+
+`Symbol` 参照は `z.record(z.symbol(), ...)` や `z.map(z.symbol(), ...)` のパスセグメントとして有効です。
+
+```ts
+const KEY = Symbol('user')
+const Schema = z.map(z.symbol(), z.number())
+const mock = initGenerator().supplyPath([KEY], 7).generate(Schema)
+// mock.get(KEY) === 7
+```
+
+`Set` は要素単位の指定をサポートしません（メンバーに安定した identity がないため）。
 
 ## override - カスタムジェネレータ関数
 
@@ -109,22 +204,32 @@ const customGenerator: CustomGeneratorType = (schema, options) => {
 }
 ```
 
-### 非対応スキーマへの対応
+### `z.custom()` / `z.instanceof()` の扱い
 
-`z.custom()` や `z.instanceof()` のようにライブラリが対応していないスキーマには、`override` で値を提供できます。
+`z.custom()` は実行時に「何を生成すべきか」のヒントがありません。そのため、本ライブラリはスキーマの `meta` から生成関数を読み取ります。メタキー名は [`customMockKey`](/ja/guide/configuration#custommockkey) で設定可能（既定 `'mock'`）。
 
 ```ts
-const myCustomSchema = z.custom<MyClass>((val) => val instanceof MyClass)
+const FileSchema = z.custom<File>((v) => v instanceof File).meta({
+  mock: (faker) => new File(['x'], faker.system.fileName()),
+})
 
-const customGenerator: CustomGeneratorType = (schema) => {
-  if (schema === myCustomSchema) {
-    return new MyClass()
-  }
-}
+const BigDec = z.instanceof(BigDecimal).meta({
+  mock: () => new BigDecimal('1.5'),
+})
 
+const mock = initGenerator().generate(z.object({ file: FileSchema, n: BigDec }))
+```
+
+meta の値は関数 `(faker, options) => unknown` でもプレーンな値でも構いません。
+
+`z.custom` のスロットに meta `mock` も `supplyRef` も指定されていない場合、その値は**省略扱い**になります。配列・オブジェクト・record・map・set からは黙って脱落し、tuple（長さ固定で脱落不可）では警告が出ます。
+
+テスト固有の値を一発で固定したい場合は `supplyRef` が meta より優先されます。
+
+```ts
 const mock = initGenerator()
-  .override(customGenerator)
-  .generate(myCustomSchema)
+  .supplyRef(FileSchema, new File(['fixed'], 'fixed.txt'))
+  .generate(FileSchema)
 ```
 
 ## supply と override の優先順位
@@ -144,6 +249,17 @@ const mock = initGenerator()
   .generate(schema)
 // email は 'supply@example.com' になる
 ```
+
+### 全体の優先順位
+
+すべてのカスタマイズ方法を含めた優先順位：
+
+1. **`supplyPath`** — 一致するパスは何よりも優先される（最も具体的な位置指定）
+2. **`consistentKey` レジストリ** — 整合性付きスキーマとして登録されている場合
+3. **`supply` / `supplyRef` / `override`** — 統合された custom generator chain（先に登録した方が優先）
+4. **`keyMapping`** — プロパティ名 → faker のオプトインマッピング（プリミティブ葉のみ）
+5. **`z.custom().meta(...)`** — `z.custom` / `z.instanceof` の meta ベース生成
+6. **デフォルト生成** — ライブラリ既定のルール
 
 内部的には、`supply` も `override` も同じカスタムジェネレータチェーンに追加されます。先に追加されたものが先に評価され、`undefined` 以外を返した時点で確定します。
 

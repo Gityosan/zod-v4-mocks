@@ -1,6 +1,14 @@
 # Custom Generator
 
-You can set custom values or generator functions for specific schemas. There are three methods available -- `supply`, `override`, and `register` -- each designed for different use cases.
+You can set custom values or generator functions for specific schemas. There are five methods available -- `supply`, `supplyRef`, `supplyPath`, `override`, and `register` -- each designed for a different grain of control:
+
+| Method | Targets | When to use |
+|---|---|---|
+| `supply` | A Zod *constructor* (`z.ZodString`, ...) | "All strings should be X" |
+| `supplyRef` | A specific *schema reference* | "This particular sub-schema should be X" |
+| `supplyPath` | A *path* inside the generated tree | "The `user.email` slot should be X" |
+| `override` | An arbitrary *function* over schema + context | "Anything I can express as code" |
+| `register` | Related schemas for value consistency | "Same UUID across `User.id` / `Comment.userId`" |
 
 ## supply - Setting Fixed Values
 
@@ -49,6 +57,93 @@ const mock = initGenerator()
 | `z.ZodUUID` | `z.uuid()` |
 | `z.ZodURL` | `z.url()` |
 | `z.ZodDate` | `z.date()` |
+
+## supplyRef - Match by Schema Reference
+
+`supply` targets every schema of a given Zod class. When you need to pin only **one specific occurrence**, use `supplyRef` to compare by reference (`===`).
+
+```ts
+const Name = z.string()
+
+const Schema = z.object({
+  user: z.object({ name: Name }),  // <- this Name node
+  bio: z.string(),                  // <- a different z.string()
+})
+
+const mock = initGenerator()
+  .supplyRef(Name, 'Alice')
+  .generate(Schema)
+// mock.user.name === 'Alice'
+// mock.bio is generated normally (different reference)
+```
+
+- The match is **identity-based**, so two `z.string()` calls produce two distinct references that do not match each other.
+- When the same reference is supplied twice, the **first** registration wins, just like `supply`.
+
+## supplyPath - Match by Structural Path
+
+`supplyPath` pins a value at a specific **path inside the generated tree**, regardless of what Zod type is at that location. Path segments are `string | number | symbol`, plus two markers:
+
+- `'$item'` — every element of an array / tuple / set
+- `'$value'` — every value of a record / map
+
+```ts
+const Schema = z.object({
+  user: z.object({ name: z.string(), createdAt: z.date() }),
+  scores: z.record(z.string(), z.number()),
+  pair: z.tuple([z.string(), z.string()]),
+})
+
+const mock = initGenerator()
+  .supplyPath(['user', 'name'], 'Alice')              // object key
+  .supplyPath(['user', 'createdAt'], new Date(0))     // typed value at a leaf
+  .supplyPath(['scores', 'alice'], 100)               // inject a specific record key
+  .supplyPath(['scores', '$value'], 0)                // fallback for other values
+  .supplyPath(['pair', 0], 'first')                   // tuple index
+  .generate(Schema)
+```
+
+### Path rules per container
+
+| Container | `string` segment | `number` segment | `$item` | `$value` |
+|---|---|---|---|---|
+| `object` | property name | — | — | — |
+| `array` | — | index (length is extended if needed) | all elements | — |
+| `tuple` | — | fixed index | all elements | — |
+| `record` | inject this key | inject numeric key | — | every value |
+| `map` | inject this key | inject numeric key | — | every value |
+| `set` | — | — | all members | — |
+
+For records and maps, supplying a specific key **injects** that entry — the key is guaranteed to exist in the output even if it would not have been randomly generated. Random entries are still produced around it.
+
+### Specific paths beat marker paths
+
+When both apply, a literal path wins over `$item` / `$value`. Within the same specificity, the first registration wins.
+
+```ts
+const mock = initGenerator({ array: { min: 3, max: 3 } })
+  .supplyPath(['$item'], 'default')
+  .supplyPath([1], 'middle')
+  .generate(z.array(z.string()))
+// => ['default', 'middle', 'default']
+```
+
+### Why no `$key`?
+
+`$key` (replace all keys with one value) is intentionally not supported: record/map keys must be unique, so "all keys = X" would collapse the collection to a single entry. Specific keys via literal segments cover the useful cases.
+
+### Symbol segments
+
+Symbols (`Symbol` references) are valid path segments for `z.record(z.symbol(), ...)` and `z.map(z.symbol(), ...)`.
+
+```ts
+const KEY = Symbol('user')
+const Schema = z.map(z.symbol(), z.number())
+const mock = initGenerator().supplyPath([KEY], 7).generate(Schema)
+// mock.get(KEY) === 7
+```
+
+`Set` does not support per-element targeting (its members have no stable identity).
 
 ## override - Custom Generator Functions
 
@@ -109,22 +204,32 @@ const customGenerator: CustomGeneratorType = (schema, options) => {
 }
 ```
 
-### Handling Unsupported Schemas
+### Handling `z.custom()` and `z.instanceof()`
 
-For schemas not supported by the library, such as `z.custom()` or `z.instanceof()`, you can provide values via `override`.
+`z.custom()` schemas have no runtime hint about what to produce, so the library reads a generator from the schema's `meta`. The meta key is configurable via [`customMockKey`](/guide/configuration#custommockkey) and defaults to `'mock'`.
 
 ```ts
-const myCustomSchema = z.custom<MyClass>((val) => val instanceof MyClass)
+const FileSchema = z.custom<File>((v) => v instanceof File).meta({
+  mock: (faker) => new File(['x'], faker.system.fileName()),
+})
 
-const customGenerator: CustomGeneratorType = (schema) => {
-  if (schema === myCustomSchema) {
-    return new MyClass()
-  }
-}
+const BigDec = z.instanceof(BigDecimal).meta({
+  mock: () => new BigDecimal('1.5'),
+})
 
+const mock = initGenerator().generate(z.object({ file: FileSchema, n: BigDec }))
+```
+
+The meta value can be either a function `(faker, options) => unknown` or a plain value.
+
+When neither a meta `mock` nor a `supplyRef` is provided for a `z.custom` slot, the value is treated as **omitted** — it is silently dropped from arrays / objects / records / maps / sets and produces a warning in tuples (which cannot be shrunk).
+
+You can also pin one-off values from a test via `supplyRef`, which takes precedence over the meta:
+
+```ts
 const mock = initGenerator()
-  .override(customGenerator)
-  .generate(myCustomSchema)
+  .supplyRef(FileSchema, new File(['fixed'], 'fixed.txt'))
+  .generate(FileSchema)
 ```
 
 ## Priority of supply and override
@@ -146,6 +251,17 @@ const mock = initGenerator()
 ```
 
 Internally, both `supply` and `override` are added to the same custom generator chain. The one added first is evaluated first, and the result is determined when a non-`undefined` value is returned.
+
+### Full priority order
+
+Across all customization methods:
+
+1. **`supplyPath`** — matched paths win over everything else (most specific location).
+2. **`consistentKey` registry** — if the schema is registered for consistent values.
+3. **`supply` / `supplyRef` / `override`** — the unified custom generator chain (first registered wins).
+4. **`keyMapping`** — opt-in property-name → faker mapping for primitive leaves.
+5. **`z.custom().meta(...)`** — meta-driven generator for `z.custom` / `z.instanceof`.
+6. **Default generation** — the library's built-in rules.
 
 ## Reproducible Custom Generators
 

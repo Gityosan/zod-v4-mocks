@@ -6,18 +6,20 @@ You can customize mock generation behavior by passing an options object to `init
 
 ```ts
 interface MockConfig {
-  locale?: LocaleType | LocaleType[]  // default: [en, base]
-  randomizer?: Randomizer             // faker.js randomizer
-  seed: number                        // default: 1
-  array: { min: number; max: number } // default: { min: 1, max: 3 }
-  map: { min: number; max: number }   // default: { min: 1, max: 3 }
-  set: { min: number; max: number }   // default: { min: 1, max: 3 }
+  locale?: LocaleType | LocaleType[]   // default: [en, base]
+  randomizer?: Randomizer              // faker.js randomizer
+  seed: number                         // default: 1
+  array: { min: number; max: number }  // default: { min: 1, max: 3 }
+  map: { min: number; max: number }    // default: { min: 1, max: 3 }
+  set: { min: number; max: number }    // default: { min: 1, max: 3 }
   record: { min: number; max: number } // default: { min: 1, max: 3 }
   optionalProbability: number          // default: 0.5
   nullableProbability: number          // default: 0.5
   defaultProbability: number           // default: 0.5
   recursiveDepthLimit?: number         // default: 5
-  consistentKey?: string               // metadata key name
+  consistentKey?: string               // metadata key name (consistent values)
+  customMockKey?: string               // default: 'mock' (z.custom meta key)
+  keyMapping?: 'off' | 'auto' | KeyMapper // default: 'off'
 }
 ```
 
@@ -269,6 +271,79 @@ In the example above, the following consistency is guaranteed:
     "value": "ut"
   }
 ]
+```
+
+## customMockKey
+
+Meta attribute name read from `z.custom()` / `z.instanceof()` schemas to find a mock generator. Default `'mock'`.
+
+```ts
+const Schema = z.custom<File>().meta({ mock: (faker) => new File(['x'], faker.system.fileName()) })
+
+initGenerator().generate(Schema) // calls meta.mock
+```
+
+To avoid name conflicts with other meta consumers, override the key:
+
+```ts
+const Schema = z.custom<File>().meta({ zodMock: () => new File([], 'a') })
+initGenerator({ customMockKey: 'zodMock' }).generate(Schema)
+```
+
+See [Custom Generator — Handling `z.custom()`](/guide/custom-generator#handling-z-custom-and-z-instanceof) for full usage.
+
+## keyMapping
+
+Opt-in mapping from a property name to a `faker` function for primitive leaf schemas (string / number / boolean / date). Default `'off'`.
+
+- `'off'` — no mapping (default behaviour).
+- `'auto'` — use built-in defaults (`firstName`, `email`, `age`, `createdAt`, ...).
+- `KeyMapper` function — `(key, schema, faker, options) => value | undefined`. Returning `undefined` falls back to the built-in defaults.
+
+```ts
+const Schema = z.object({
+  firstName: z.string(),
+  email: z.string(),
+  age: z.number(),
+  createdAt: z.date(),
+})
+
+initGenerator({ keyMapping: 'auto' }).generate(Schema)
+// => { firstName: 'Hannah', email: 'a@x', age: 37, createdAt: <Date> }
+```
+
+`keyMapping` runs **after** `supplyPath` and the `supply` / `supplyRef` / `override` chain, so explicit overrides always win.
+
+```ts
+initGenerator({ keyMapping: 'auto' })
+  .supplyPath(['email'], 'override@x')
+  .generate(Schema)
+// email is 'override@x', not a faker email
+```
+
+Built-in coverage includes (case-insensitive, separator-insensitive — `firstName`, `first_name`, `FIRST-NAME` all match):
+
+| Key | Maps to |
+|---|---|
+| `firstName` / `lastName` / `name` | `faker.person.*` |
+| `email`, `phone`, `url`, `avatar` | `faker.internet.*` |
+| `street` / `city` / `country` / `zip` | `faker.location.*` |
+| `company`, `jobTitle`, `department` | `faker.company.*`, `faker.person.jobTitle()` |
+| `description`, `title`, `content` | `faker.lorem.*` |
+| `age`, `price`, `quantity`, `rating`, `latitude`, `longitude` | sensible `faker.number.*` ranges |
+| `createdAt`, `updatedAt`, `birthDate` | `faker.date.*` |
+
+For a custom matcher:
+
+```ts
+import type { KeyMapper } from 'zod-v4-mocks'
+
+const myMap: KeyMapper = (key, schema, faker) => {
+  if (key === 'sku') return faker.string.alphanumeric(10).toUpperCase()
+  return undefined // fall back to the built-in defaults
+}
+
+initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 ```
 
 ## updateConfig
