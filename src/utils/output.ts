@@ -262,16 +262,17 @@ function buildBinWrapper(
 
   const imports = [
     "import { readFileSync } from 'node:fs';",
+    "import { join } from 'node:path';",
     "import { deserialize } from 'node:v8';",
   ].join('\n');
 
   const body =
     ext === 'ts'
       ? `export const ${exportName}: unknown = deserialize(\n` +
-        `  readFileSync(new URL(${JSON.stringify(`./${binRef}`)}, import.meta.url)),\n` +
+        `  readFileSync(join(import.meta.dirname, ${JSON.stringify(binRef)})),\n` +
         `);\n`
       : `export const ${exportName} = deserialize(\n` +
-        `  readFileSync(new URL(${JSON.stringify(`./${binRef}`)}, import.meta.url)),\n` +
+        `  readFileSync(join(import.meta.dirname, ${JSON.stringify(binRef)})),\n` +
         `);\n`;
 
   const parts: string[] = [];

@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `serialize()` now throws when `binary: true` is combined with `ext: 'ts'` or `'js'` (those variants require writing a sibling `.bin`); use `output()` or `serializeBinary()` instead
 
+### Fixed
+- Fixed `output({ binary: true })` generated wrapper using `new URL(..., import.meta.url)` which fails under Vitest/Vite (non-`file://` scheme). Now uses `path.join(import.meta.dirname, ...)` instead (requires Node.js 20.11+)
+
 ## [2.2.0] - 2026-03-12
 
 ### Added

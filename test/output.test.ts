@@ -597,8 +597,9 @@ describe('output with binary flag (wrapper + .bin)', () => {
 
     const content = readFileSync(outputPath, 'utf-8');
     expect(content).toContain("import { readFileSync } from 'node:fs';");
+    expect(content).toContain("import { join } from 'node:path';");
     expect(content).toContain("import { deserialize } from 'node:v8';");
-    expect(content).toContain("new URL(\"./user.bin\", import.meta.url)");
+    expect(content).toContain('join(import.meta.dirname, "user.bin")');
     expect(content).toContain('export const mockData: unknown = deserialize(');
   });
 
@@ -615,8 +616,9 @@ describe('output with binary flag (wrapper + .bin)', () => {
 
     const content = readFileSync(outputPath, 'utf-8');
     expect(content).toContain("import { readFileSync } from 'node:fs';");
+    expect(content).toContain("import { join } from 'node:path';");
     expect(content).toContain("import { deserialize } from 'node:v8';");
-    expect(content).toContain("new URL(\"./user.bin\", import.meta.url)");
+    expect(content).toContain('join(import.meta.dirname, "user.bin")');
     expect(content).toContain('export const mockData = deserialize(');
     expect(content).not.toMatch(/:\s*unknown/);
   });
