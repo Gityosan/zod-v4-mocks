@@ -139,3 +139,82 @@ describe('getProfileFactory', () => {
     expect(gen.generate(Schema).email).toBe(CLI_EMAIL);
   });
 });
+
+describe('loadConfig: configs without extend', () => {
+  let tmp2: string;
+  beforeAll(() => {
+    tmp2 = mkdtempSync(join(tmpdir(), 'zod-v4-mocks-noext-'));
+    writeFileSync(
+      join(tmp2, 'zod-v4-mocks.config.mjs'),
+      `export default {
+         baseConfig: ({ initGenerator }) =>
+           initGenerator({ seed: 1 }).supplyPath(['name'], 'BASE_ONLY'),
+       };
+`,
+    );
+  });
+  afterAll(() => {
+    rmSync(tmp2, { recursive: true, force: true });
+  });
+
+  it('createCli falls back to base when extend.cliConfig is absent', async () => {
+    const result = await loadConfig({ cwd: tmp2 });
+    expect(result!.createCli().generate(Schema).name).toBe('BASE_ONLY');
+  });
+
+  it('createTest falls back to base when extend.testConfig is absent', async () => {
+    const result = await loadConfig({ cwd: tmp2 });
+    expect(result!.createTest().generate(Schema).name).toBe('BASE_ONLY');
+  });
+});
+
+describe('loadConfig: invalid configs', () => {
+  it('throws when an explicit configFile lacks baseConfig', async () => {
+    const tmp3 = mkdtempSync(join(tmpdir(), 'zod-v4-mocks-bad-'));
+    try {
+      const file = join(tmp3, 'bad.config.mjs');
+      writeFileSync(file, `export default { something: 'else' };`);
+      await expect(loadConfig({ configFile: file })).rejects.toThrow(
+        /baseConfig/,
+      );
+    } finally {
+      rmSync(tmp3, { recursive: true, force: true });
+    }
+  });
+
+  it('returns null on auto-discovery when the file has no baseConfig', async () => {
+    const tmp4 = mkdtempSync(join(tmpdir(), 'zod-v4-mocks-noBase-'));
+    try {
+      writeFileSync(
+        join(tmp4, 'zod-v4-mocks.config.mjs'),
+        `export default { something: 'else' };`,
+      );
+      const result = await loadConfig({ cwd: tmp4 });
+      expect(result).toBeNull();
+    } finally {
+      rmSync(tmp4, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('loadConfig: factory propagates exceptions', () => {
+  let tmp5: string;
+  beforeAll(() => {
+    tmp5 = mkdtempSync(join(tmpdir(), 'zod-v4-mocks-throw-'));
+    writeFileSync(
+      join(tmp5, 'zod-v4-mocks.config.mjs'),
+      `export default {
+         baseConfig: () => { throw new Error('boom'); },
+       };
+`,
+    );
+  });
+  afterAll(() => {
+    rmSync(tmp5, { recursive: true, force: true });
+  });
+
+  it('exceptions in baseConfig are surfaced when a factory is invoked', async () => {
+    const result = await loadConfig({ cwd: tmp5 });
+    expect(() => result!.createBase()).toThrow('boom');
+  });
+});

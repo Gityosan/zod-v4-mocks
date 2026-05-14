@@ -328,3 +328,147 @@ describe('generateMany / factory', () => {
     expect(new Set(a).size).toBeGreaterThan(1);
   });
 });
+
+describe('supplyPath - through wrappers', () => {
+  it('matches through z.optional()', () => {
+    const Schema = z.object({ name: z.string().optional() });
+    // optionalProbability=0 ensures the inner is generated; supplyPath
+    // should still apply (and overrides the inner).
+    const result = initGenerator({ optionalProbability: 0 })
+      .supplyPath(['name'], 'Alice')
+      .generate(Schema);
+    expect(result.name).toBe('Alice');
+  });
+
+  it('matches through z.nullable()', () => {
+    const Schema = z.object({ name: z.string().nullable() });
+    const result = initGenerator({ nullableProbability: 0 })
+      .supplyPath(['name'], 'Alice')
+      .generate(Schema);
+    expect(result.name).toBe('Alice');
+  });
+
+  it('matches through z.default()', () => {
+    const Schema = z.object({ name: z.string().default('def') });
+    const result = initGenerator({ defaultProbability: 0 })
+      .supplyPath(['name'], 'Alice')
+      .generate(Schema);
+    expect(result.name).toBe('Alice');
+  });
+
+  it('matches through z.lazy()', () => {
+    const Inner = z.lazy(() => z.string());
+    const Schema = z.object({ name: Inner });
+    const result = initGenerator()
+      .supplyPath(['name'], 'Alice')
+      .generate(Schema);
+    expect(result.name).toBe('Alice');
+  });
+});
+
+describe('supplyPath - inside union', () => {
+  it('matches the same path regardless of which union branch is picked', () => {
+    const A = z.object({ kind: z.literal('a'), value: z.string() });
+    const B = z.object({ kind: z.literal('b'), value: z.string() });
+    const Schema = z.object({ payload: z.union([A, B]) });
+    // Run several times: regardless of branch, payload.value should be pinned.
+    for (let i = 0; i < 5; i++) {
+      const result = initGenerator({ seed: i + 1 })
+        .supplyPath(['payload', 'value'], 'PINNED')
+        .generate(Schema);
+      expect(result.payload.value).toBe('PINNED');
+    }
+  });
+});
+
+describe('supplyPath - record/map with non-string key types', () => {
+  it('record with z.enum() key — only matching members are accepted', () => {
+    const Schema = z.record(z.enum(['admin', 'user']), z.number());
+    const result = initGenerator({ record: { min: 0, max: 0 } })
+      .supplyPath(['admin'], 999)
+      .supplyPath(['superuser'], 1) // not in enum -> ignored
+      .generate(Schema);
+    expect(result['admin']).toBe(999);
+    expect('superuser' in result).toBe(false);
+  });
+
+  it('map with z.literal key — literal value matches', () => {
+    const Schema = z.map(z.literal('only-key'), z.number());
+    const result = initGenerator({ map: { min: 0, max: 0 } })
+      .supplyPath(['only-key'], 42)
+      .generate(Schema);
+    expect(result.get('only-key')).toBe(42);
+  });
+});
+
+describe('supplyPath - empty value', () => {
+  it('can supply undefined explicitly', () => {
+    const Schema = z.object({ x: z.string().optional() });
+    const result = initGenerator()
+      .supplyPath(['x'], undefined)
+      .generate(Schema);
+    expect(result.x).toBeUndefined();
+  });
+
+  it('can supply null at a nullable slot', () => {
+    const Schema = z.object({ x: z.string().nullable() });
+    const result = initGenerator()
+      .supplyPath(['x'], null)
+      .generate(Schema);
+    expect(result.x).toBeNull();
+  });
+});
+
+describe('z.custom inside containers', () => {
+  it('omitted z.custom is dropped from arrays', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const Schema = z.array(z.custom<File>((v) => v instanceof File));
+    const result = initGenerator({ array: { min: 3, max: 3 } }).generate(
+      Schema,
+    );
+    // every entry is OMIT → array becomes empty
+    expect(result).toEqual([]);
+    warn.mockRestore();
+  });
+
+  it('omitted z.custom triggers a tuple warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const Schema = z.tuple([z.string(), z.custom<File>((v) => v instanceof File)]);
+    initGenerator().generate(Schema);
+    const tupleWarn = warn.mock.calls.find((args) =>
+      String(args[0]).includes('OMIT_SYMBOL found in tuple'),
+    );
+    expect(tupleWarn).toBeDefined();
+    warn.mockRestore();
+  });
+
+  it('omitted z.custom is dropped from a set', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const Schema = z.set(z.custom<File>((v) => v instanceof File));
+    const result = initGenerator({ set: { min: 3, max: 3 } }).generate(Schema);
+    expect(result.size).toBe(0);
+    warn.mockRestore();
+  });
+
+  it('meta.mock function receives a faker instance and is seed-deterministic', () => {
+    const Schema = z.custom<string>((v) => typeof v === 'string').meta({
+      mock: (faker: { number: { int: (opts: { min: number; max: number }) => number } }) =>
+        `id-${faker.number.int({ min: 0, max: 1_000_000 })}`,
+    });
+    const a = initGenerator({ seed: 11 }).generate(Schema);
+    const b = initGenerator({ seed: 11 }).generate(Schema);
+    expect(a).toBe(b);
+    expect(a).toMatch(/^id-\d+$/);
+  });
+});
+
+describe('factory - determinism', () => {
+  it('same seed produces the same sequence across factory calls', () => {
+    const Schema = z.number().min(0).max(1_000_000);
+    const f1 = initGenerator({ seed: 99 }).factory(Schema);
+    const f2 = initGenerator({ seed: 99 }).factory(Schema);
+    const a = [f1.next(), f1.next(), f1.next()];
+    const b = [f2.next(), f2.next(), f2.next()];
+    expect(a).toEqual(b);
+  });
+});

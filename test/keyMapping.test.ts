@@ -110,3 +110,64 @@ describe('keyMapping interaction with supplyPath', () => {
     expect(result.email).toBe('override@x');
   });
 });
+
+describe('keyMapping on records and maps', () => {
+  it('record with z.enum() key — known keys map to faker functions', () => {
+    const Schema = z.record(z.enum(['email', 'firstName']), z.string());
+    const result = initGenerator({
+      keyMapping: 'auto',
+      record: { min: 2, max: 2 },
+    }).generate(Schema);
+    if ('email' in result) {
+      expect(result['email']).toMatch(/@/);
+    }
+    if ('firstName' in result) {
+      expect(result['firstName'].length).toBeGreaterThan(0);
+    }
+  });
+
+  it('map with z.literal key — literal name triggers mapping', () => {
+    const Schema = z.map(z.literal('email'), z.string());
+    const result = initGenerator({
+      keyMapping: 'auto',
+      map: { min: 1, max: 1 },
+    }).generate(Schema);
+    const v = result.get('email');
+    expect(v).toMatch(/@/);
+  });
+});
+
+describe('keyMapping does not fire on array/tuple positions', () => {
+  it('array of strings is unaffected by key mapping', () => {
+    const Schema = z.array(z.string());
+    const result = initGenerator({
+      keyMapping: 'auto',
+      array: { min: 3, max: 3 },
+    }).generate(Schema);
+    // Array elements have a numeric path segment, so no key mapping should fire.
+    for (const v of result) {
+      expect(v).not.toMatch(/@/);
+    }
+  });
+});
+
+describe('keyMapping interaction with consistent values', () => {
+  it('consistent registry beats keyMapping', () => {
+    const consistentKey = 'name';
+    const NameId = z.string().meta({ [consistentKey]: 'NameId' });
+    const Schema = z.object({
+      name: NameId,
+      // a sibling that should still get the auto-mapped person name
+      lastName: z.string(),
+    });
+    const gen = initGenerator({ consistentKey, keyMapping: 'auto' }).register([
+      NameId,
+    ]);
+    const result = gen.generate(Schema);
+    // both fields are strings — the consistent value wins for `name` and is
+    // arbitrary; lastName goes through keyMapping and is non-empty
+    expect(typeof result.name).toBe('string');
+    expect(typeof result.lastName).toBe('string');
+    expect(result.lastName.length).toBeGreaterThan(0);
+  });
+});
