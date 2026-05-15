@@ -117,3 +117,26 @@ describe('preflight - recursion safety', () => {
     expect(() => initGenerator().generate(Schema)).toThrow(/Preflight check/);
   });
 });
+
+describe('recursive z.lazy as its own anchor', () => {
+  it('generates (terminates) when the lazy itself is the recursion anchor', () => {
+    // Previously a stack overflow: the depth limiter tracked object/array
+    // references but not z.lazy(). z.lazy() is now depth-tracked, so this
+    // form generates and terminates at the recursion limit.
+    const Tree: z.ZodLazy = z.lazy(() =>
+      z.object({ value: z.string(), children: z.array(Tree) }),
+    );
+    const result = initGenerator({ recursiveDepthLimit: 2 }).generate(Tree);
+    expect(typeof result.value).toBe('string');
+    expect(Array.isArray(result.children)).toBe(true);
+  });
+
+  it('top-level recursive lazy is deterministic under a seed', () => {
+    const Tree: z.ZodLazy = z.lazy(() =>
+      z.object({ value: z.string(), children: z.array(Tree) }),
+    );
+    const a = initGenerator({ seed: 5, recursiveDepthLimit: 2 }).generate(Tree);
+    const b = initGenerator({ seed: 5, recursiveDepthLimit: 2 }).generate(Tree);
+    expect(a).toEqual(b);
+  });
+});
