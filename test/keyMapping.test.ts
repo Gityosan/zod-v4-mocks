@@ -137,6 +137,52 @@ describe('keyMapping on records and maps', () => {
   });
 });
 
+describe('keyMapping does not fire on random record/map keys', () => {
+  it('a custom mapper is never invoked for z.record(z.string(), ...) keys', () => {
+    const seen: string[] = [];
+    const Schema = z.record(z.string(), z.string());
+    initGenerator({
+      keyMapping: (key) => {
+        seen.push(key);
+        return undefined;
+      },
+      record: { min: 3, max: 3 },
+    }).generate(Schema);
+    // Random string keys are not "named" — the mapper must not see them.
+    expect(seen).toEqual([]);
+  });
+
+  it('a custom mapper IS invoked for object keys', () => {
+    const seen: string[] = [];
+    const Schema = z.object({ email: z.string(), age: z.number() });
+    initGenerator({
+      keyMapping: (key) => {
+        seen.push(key);
+        return undefined;
+      },
+    }).generate(Schema);
+    expect(seen).toContain('email');
+    expect(seen).toContain('age');
+  });
+
+  it('a custom mapper IS invoked for z.record(z.enum(...)) keys', () => {
+    const seen: string[] = [];
+    const Schema = z.record(z.enum(['email', 'name']), z.string());
+    initGenerator({
+      keyMapping: (key) => {
+        seen.push(key);
+        return undefined;
+      },
+      record: { min: 2, max: 2 },
+    }).generate(Schema);
+    // enum keys are "named" — the mapper sees them.
+    expect(seen.length).toBeGreaterThan(0);
+    for (const k of seen) {
+      expect(['email', 'name']).toContain(k);
+    }
+  });
+});
+
 describe('keyMapping does not fire on array/tuple positions', () => {
   it('array of strings is unaffected by key mapping', () => {
     const Schema = z.array(z.string());

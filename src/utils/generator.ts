@@ -14,6 +14,7 @@ import { OMIT_SYMBOL, regenerateIfOmitted } from './exact-optional';
 import {
   type ChildStep,
   type PathSegment,
+  PATH_INDEX_HARD_LIMIT,
   descendPathSupplies,
   findKeyInjections,
   findMaxLiteralIndex,
@@ -28,6 +29,7 @@ import {
 function pushPathSegment(
   options: GeneraterOptions,
   step: ChildStep,
+  keyMappingKey?: string,
 ): GeneraterOptions {
   let seg: PathSegment | undefined;
   switch (step.kind) {
@@ -59,7 +61,22 @@ function pushPathSegment(
     pathSupplies: descendPathSupplies(options.pathSupplies, step),
     currentPath:
       seg !== undefined ? [...options.currentPath, seg] : options.currentPath,
+    keyMappingKey,
   };
+}
+
+/**
+ * Whether a record/map key type names its keys (so `keyMapping` may use
+ * the key). Random `z.string()` / `z.number()` keys are excluded — mapping
+ * on a randomly produced key name would be surprising and non-deterministic.
+ */
+function isNamedKeyType(keyType: z.core.$ZodType): boolean {
+  if (safeInstanceof(keyType, z.ZodLiteral)) return true;
+  if (safeInstanceof(keyType, z.ZodEnum)) return true;
+  if (safeInstanceof(keyType, z.ZodUnion)) {
+    return (keyType as z.ZodUnion).options.every((o) => isNamedKeyType(o));
+  }
+  return false;
 }
 
 function recordKeyTypeAccepts(
@@ -237,7 +254,15 @@ export const generateUtils = {
 
     let length = calcLengthFromChecks(checks, faker, config.array);
     const maxLiteralIdx = findMaxLiteralIndex(options.pathSupplies);
-    if (maxLiteralIdx + 1 > length) length = maxLiteralIdx + 1;
+    if (maxLiteralIdx + 1 > length) {
+      if (maxLiteralIdx + 1 > PATH_INDEX_HARD_LIMIT) {
+        throw new Error(
+          `supplyPath array index ${maxLiteralIdx} exceeds the hard limit ` +
+            `of ${PATH_INDEX_HARD_LIMIT}. Check for a typo in the supplied path.`,
+        );
+      }
+      length = maxLiteralIdx + 1;
+    }
     return Array.from({ length }, (_, arrayIndex) => {
       const arrayIndexes = [...options.arrayIndexes, arrayIndex];
       const childOpts = pushPathSegment(
@@ -282,11 +307,16 @@ export const generateUtils = {
     const { checks = [] } = schema.def;
 
     const length = calcLengthFromChecks(checks, faker, config.map);
+    const namedKeys = isNamedKeyType(keyType);
     const entries: [unknown, unknown][] = [];
     for (let i = 0; i < length; i++) {
       const k = generator(keyType, options);
       if (k === OMIT_SYMBOL) continue;
-      const childOpts = pushPathSegment(options, { kind: 'mapKey', key: k });
+      const childOpts = pushPathSegment(
+        options,
+        { kind: 'mapKey', key: k },
+        namedKeys && typeof k === 'string' ? k : undefined,
+      );
       const v = generator(valueType, childOpts);
       if (v === OMIT_SYMBOL) continue;
       entries.push([k, v]);
@@ -296,7 +326,11 @@ export const generateUtils = {
       recordKeyTypeAccepts(keyType),
     );
     for (const k of injections) {
-      const childOpts = pushPathSegment(options, { kind: 'mapKey', key: k });
+      const childOpts = pushPathSegment(
+        options,
+        { kind: 'mapKey', key: k },
+        namedKeys && typeof k === 'string' ? k : undefined,
+      );
       const v = generator(valueType, childOpts);
       if (v === OMIT_SYMBOL) continue;
       entries.push([k, v]);
@@ -327,10 +361,11 @@ export const generateUtils = {
     const result: { [key: string]: unknown } = {};
 
     for (const [key, value] of Object.entries(shape)) {
-      const childOpts = pushPathSegment(options, {
-        kind: 'objectKey',
+      const childOpts = pushPathSegment(
+        options,
+        { kind: 'objectKey', key },
         key,
-      });
+      );
       const generated = generator(value, childOpts);
       if (generated !== OMIT_SYMBOL) {
         result[key] = generated;
@@ -346,6 +381,7 @@ export const generateUtils = {
     const { faker, config } = options;
     const { keyType, valueType } = schema;
     const length = faker.number.int(config.record);
+    const namedKeys = isNamedKeyType(keyType);
     const acc: Record<string | number | symbol, unknown> = {};
 
     for (let i = 0; i < length; i++) {
@@ -356,10 +392,11 @@ export const generateUtils = {
       if (!keyIsValid) throw new Error('Invalid record key type');
       const typedKey = k;
       const keyStr = typeof typedKey === 'symbol' ? String(typedKey) : typedKey;
-      const childOpts = pushPathSegment(options, {
-        kind: 'recordKey',
-        key: typedKey,
-      });
+      const childOpts = pushPathSegment(
+        options,
+        { kind: 'recordKey', key: typedKey },
+        namedKeys && typeof typedKey === 'string' ? typedKey : undefined,
+      );
       const value = generator(valueType, childOpts);
       if (value === OMIT_SYMBOL) continue;
       acc[keyStr] = value;
@@ -372,10 +409,11 @@ export const generateUtils = {
     for (const k of injections) {
       const typedKey = k as string | number | symbol;
       const keyStr = typeof typedKey === 'symbol' ? String(typedKey) : typedKey;
-      const childOpts = pushPathSegment(options, {
-        kind: 'recordKey',
-        key: typedKey,
-      });
+      const childOpts = pushPathSegment(
+        options,
+        { kind: 'recordKey', key: typedKey },
+        namedKeys && typeof typedKey === 'string' ? typedKey : undefined,
+      );
       const value = generator(valueType, childOpts);
       if (value === OMIT_SYMBOL) continue;
       acc[keyStr] = value;

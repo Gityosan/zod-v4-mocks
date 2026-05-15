@@ -19,6 +19,19 @@ export type GeneraterOptions = {
   pathSupplies: PathSupply[];
   /** Literal path segments traversed so far (for diagnostics / future hooks). */
   currentPath: PathSegment[];
+  /**
+   * Property name eligible for `keyMapping` at the current position.
+   * Set only for object keys and literal/enum-typed record/map keys —
+   * never for random record/map keys or array/tuple indices.
+   */
+  keyMappingKey?: string;
+  /** Schema references registered via `supplyRef` (used by preflight). */
+  supplyRefTargets: Set<z.core.$ZodType>;
+  /**
+   * True once `supply` or `override` has been registered. Their coverage
+   * cannot be introspected, so preflight downgrades errors to warnings.
+   */
+  hasOpaqueCustomizer: boolean;
 };
 
 export type CustomGeneratorType = (
@@ -99,4 +112,12 @@ export interface MockConfig {
    *    the built-in defaults.
    */
   keyMapping?: 'off' | 'auto' | KeyMapper;
+  /**
+   * @default true
+   * @description Run a pre-flight schema walk before generation that
+   *  rejects schemas the library cannot safely mock (e.g. an un-mocked
+   *  `z.custom()` at a fixed-length tuple position). Set to `false` to
+   *  skip the check.
+   */
+  preflightCheck?: boolean;
 }

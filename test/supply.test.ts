@@ -431,10 +431,12 @@ describe('z.custom inside containers', () => {
     warn.mockRestore();
   });
 
-  it('omitted z.custom triggers a tuple warning', () => {
+  it('omitted z.custom triggers a tuple warning (preflight disabled)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const Schema = z.tuple([z.string(), z.custom<File>((v) => v instanceof File)]);
-    initGenerator().generate(Schema);
+    // preflight would reject this upfront — disable it to exercise the
+    // runtime tuple warning path.
+    initGenerator({ preflightCheck: false }).generate(Schema);
     const tupleWarn = warn.mock.calls.find((args) =>
       String(args[0]).includes('OMIT_SYMBOL found in tuple'),
     );
@@ -447,6 +449,17 @@ describe('z.custom inside containers', () => {
     const Schema = z.set(z.custom<File>((v) => v instanceof File));
     const result = initGenerator({ set: { min: 3, max: 3 } }).generate(Schema);
     expect(result.size).toBe(0);
+    warn.mockRestore();
+  });
+
+  it('bare z.custom without a mock returns undefined at the top level', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // top-level (not inside a tuple) — preflight does not flag it; the
+    // generate() guard converts the internal OMIT sentinel to undefined.
+    const result = initGenerator().generate(
+      z.custom<File>((v) => v instanceof File),
+    );
+    expect(result).toBeUndefined();
     warn.mockRestore();
   });
 
@@ -470,5 +483,35 @@ describe('factory - determinism', () => {
     const a = [f1.next(), f1.next(), f1.next()];
     const b = [f2.next(), f2.next(), f2.next()];
     expect(a).toEqual(b);
+  });
+});
+
+describe('generateMany - input validation', () => {
+  it('throws on a non-integer count', () => {
+    expect(() => initGenerator().generateMany(z.string(), 2.5)).toThrow();
+  });
+
+  it('throws on NaN / Infinity', () => {
+    expect(() => initGenerator().generateMany(z.string(), NaN)).toThrow();
+    expect(() =>
+      initGenerator().generateMany(z.string(), Infinity),
+    ).toThrow();
+  });
+});
+
+describe('supplyPath - array index hard limit', () => {
+  it('throws when a supplied index exceeds the hard limit', () => {
+    expect(() =>
+      initGenerator()
+        .supplyPath([20_000], 'x')
+        .generate(z.array(z.string())),
+    ).toThrow(/hard limit/);
+  });
+
+  it('allows an index within the limit', () => {
+    const result = initGenerator()
+      .supplyPath([50], 'x')
+      .generate(z.array(z.string()));
+    expect(result[50]).toBe('x');
   });
 });

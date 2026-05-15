@@ -280,13 +280,10 @@ export function generateMocks(
   if (
     config.keyMapping &&
     config.keyMapping !== 'off' &&
-    options.currentPath.length > 0
+    options.keyMappingKey !== undefined
   ) {
-    const lastSeg = options.currentPath[options.currentPath.length - 1];
-    if (typeof lastSeg === 'string') {
-      const mapped = resolveKeyMapping(lastSeg, schema, options);
-      if (mapped !== undefined) return mapped;
-    }
+    const mapped = resolveKeyMapping(options.keyMappingKey, schema, options);
+    if (mapped !== undefined) return mapped;
   }
 
   if (isCircularRefSchema(schema)) {

@@ -115,6 +115,13 @@ export function findKeyInjections(
 }
 
 /**
+ * Upper bound for array length extension driven by a literal `supplyPath`
+ * index. Guards against a typo (e.g. `supplyPath(['x', 1e8], ...)`)
+ * triggering an out-of-memory allocation.
+ */
+export const PATH_INDEX_HARD_LIMIT = 10_000;
+
+/**
  * Find the maximum literal numeric index referenced by remaining path
  * segments. Used by array generator to extend its random length so a
  * targeted index actually exists.

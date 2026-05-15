@@ -5,9 +5,11 @@ import {
   createGeneraterOptions,
   deserializeBinary,
   makePathSupply,
+  OMIT_SYMBOL,
   outputToFile,
   type PathSegment,
   regenerateIfOmitted,
+  runPreflight,
   serializeBinary,
   serializeOutput,
   type OutputOptions,
@@ -15,15 +17,30 @@ import {
 
 class MockGenerator {
   protected options: GeneraterOptions;
+  /** Schemas that have already passed preflight (memo for generateMany). */
+  #preflighted = new WeakSet<object>();
 
   constructor(config?: Partial<MockConfig>) {
     this.options = createGeneraterOptions(config);
   }
 
   updateConfig(newConfig?: Partial<MockConfig>): MockGenerator {
-    const { customGenerator, config } = this.options;
+    const {
+      customGenerator,
+      config,
+      pathSupplies,
+      supplyRefTargets,
+      hasOpaqueCustomizer,
+    } = this.options;
     this.options = createGeneraterOptions({ ...config, ...newConfig });
+    // Customizations registered via supply/supplyRef/override/supplyPath
+    // are not part of MockConfig — carry them across a config change.
     this.options.customGenerator = customGenerator;
+    this.options.pathSupplies = pathSupplies;
+    this.options.supplyRefTargets = supplyRefTargets;
+    this.options.hasOpaqueCustomizer = hasOpaqueCustomizer;
+    // A config change may alter preflight relevance — reset the memo.
+    this.#preflighted = new WeakSet<object>();
     return this;
   }
 
@@ -39,6 +56,7 @@ class MockGenerator {
       }
       if (schema.constructor.name === constructor.name) return value;
     };
+    this.options.hasOpaqueCustomizer = true;
     return this;
   }
 
@@ -54,6 +72,7 @@ class MockGenerator {
       }
       return customGenerator(schema, options);
     };
+    this.options.hasOpaqueCustomizer = true;
     return this;
   }
 
@@ -70,6 +89,7 @@ class MockGenerator {
       }
       if (schema === subSchema) return value;
     };
+    this.options.supplyRefTargets.add(subSchema);
     return this;
   }
 
@@ -109,12 +129,60 @@ class MockGenerator {
     return this;
   }
 
+  /**
+   * Run the pre-flight schema walk once per schema. Throws on error-level
+   * diagnostics; emits warnings otherwise. No-op when `preflightCheck` is
+   * disabled.
+   */
+  #preflight(schema: z.core.$ZodType): void {
+    if (this.options.config.preflightCheck === false) return;
+    if (this.#preflighted.has(schema)) return;
+    const diagnostics = runPreflight(schema, {
+      customMockKey: this.options.config.customMockKey ?? 'mock',
+      supplyRefTargets: this.options.supplyRefTargets,
+      hasOpaqueCustomizer: this.options.hasOpaqueCustomizer,
+    });
+    for (const d of diagnostics) {
+      if (d.level === 'warning') {
+        console.warn(`[preflight] ${d.path}: ${d.message}`);
+      }
+    }
+    const errors = diagnostics.filter((d) => d.level === 'error');
+    if (errors.length > 0) {
+      const lines = errors
+        .map((e) => `  - ${e.path}: ${e.message}`)
+        .join('\n');
+      throw new Error(
+        `Preflight check found ${errors.length} issue(s):\n${lines}\n` +
+          'Disable with initGenerator({ preflightCheck: false }).',
+      );
+    }
+    this.#preflighted.add(schema);
+  }
+
   // Overloads: ZodFunction is not supported -> unknown, others -> z.infer<T>
   generate<T extends z.ZodFunction>(schema: T): unknown;
   generate<T extends z.ZodType>(schema: T): z.infer<T>;
   generate(schema: z.ZodType): unknown {
+    this.#preflight(schema);
     const result = generateMocks(schema, this.options);
-    return regenerateIfOmitted(result, schema, this.options, generateMocks);
+    const final = regenerateIfOmitted(
+      result,
+      schema,
+      this.options,
+      generateMocks,
+    );
+    if (final === OMIT_SYMBOL) {
+      // A bare z.custom()/z.never with no value provider reached the top
+      // level. Surface a warning instead of leaking the internal sentinel.
+      console.warn(
+        'generate(): the schema produced no value (e.g. an un-mocked ' +
+          'z.custom() or z.never()). Returning undefined. Provide ' +
+          '.meta({ mock: ... }) or use supplyRef().',
+      );
+      return undefined;
+    }
+    return final;
   }
 
   multiGenerate<T extends Record<string, z.ZodType>>(
@@ -132,8 +200,10 @@ class MockGenerator {
    * produces deterministic but distinct values on each call.
    */
   generateMany<T extends z.ZodType>(schema: T, count: number): z.infer<T>[] {
-    if (!Number.isFinite(count) || count < 0) {
-      throw new Error(`generateMany: count must be a non-negative number`);
+    if (!Number.isInteger(count) || count < 0) {
+      throw new Error(
+        `generateMany: count must be a non-negative integer (got: ${count})`,
+      );
     }
     const out: z.infer<T>[] = [];
     for (let i = 0; i < count; i++) {

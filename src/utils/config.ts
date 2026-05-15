@@ -44,6 +44,7 @@ export function createMockConfig(config?: Partial<MockConfig>): MockConfig {
     recursiveDepthLimit: depthLimit,
     customMockKey: 'mock',
     keyMapping: 'off',
+    preflightCheck: true,
     ...rest,
   };
 }
@@ -65,5 +66,7 @@ export function createGeneraterOptions(
     circularRefs: new Map(),
     pathSupplies: [],
     currentPath: [],
+    supplyRefTargets: new Set(),
+    hasOpaqueCustomizer: false,
   };
 }
