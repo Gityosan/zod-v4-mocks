@@ -20,6 +20,7 @@ interface MockConfig {
   consistentKey?: string               // 元数据键名（一致性生成）
   customMockKey?: string               // default: 'mock'（z.custom 的 meta 键）
   keyMapping?: 'off' | 'auto' | KeyMapper // default: 'off'
+  preflightCheck?: boolean              // default: true
 }
 ```
 
@@ -345,6 +346,34 @@ const myMap: KeyMapper = (key, schema, faker) => {
 
 initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 ```
+
+## preflightCheck
+
+在生成之前，库会对 Schema 进行预检遍历，拒绝无法安全 mock 的结构。默认 `true`。
+
+目前它检测位于固定长度 **tuple** 位置、且未提供 meta 的 `z.custom()` / `z.instanceof()` —— tuple 无法丢弃某个槽位，因此未 mock 的 custom Schema 会留下一个非法值。错误信息会指出具体路径：
+
+```ts
+const Schema = z.object({
+  pair: z.tuple([z.string(), z.custom<File>()]),
+})
+
+initGenerator().generate(Schema)
+// throws: Preflight check found 1 issue(s):
+//   - pair[1]: z.custom()/z.instanceof() sits at a tuple position ...
+```
+
+通过提供 mock（`.meta({ mock: ... })`）、`supplyRef`，或关闭该检查来解决：
+
+```ts
+initGenerator({ preflightCheck: false }).generate(Schema)
+```
+
+当注册了 `supply` 或 `override` 时，库无法验证其覆盖范围，因此预检会将 error 降级为 warning。
+
+::: tip
+预检也是一张前向兼容的安全网：随着 Zod 新增 Schema 类型，生成器尚不能处理的情况可以在这里暴露，而不是在生成深处失败。
+:::
 
 ## updateConfig
 

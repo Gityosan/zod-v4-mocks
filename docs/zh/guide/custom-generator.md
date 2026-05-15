@@ -145,6 +145,14 @@ const mock = initGenerator().supplyPath([KEY], 7).generate(Schema)
 
 `Set` 不支持按成员指定（其成员没有稳定的标识）。
 
+::: info supplyPath 会穿透包装器
+路径匹配与该位置外层的包装器 Schema 无关。
+即使 `name` 是 `z.string().optional()` / `.nullable()` / `.default()` /
+`z.lazy(...)`，`supplyPath(['name'], 'X')` 仍然生效 —— 提供的值替换该槽位，
+包装器的概率逻辑被绕过。若要刻意产生 `undefined`/`null`，请显式提供该值：
+`supplyPath(['name'], undefined)`。
+:::
+
 ## override - 自定义生成器函数
 
 当需要比 `supply` 更灵活的自定义时，使用 `override`。可以定义一个接收 Schema 和选项作为参数并返回自定义值的函数。

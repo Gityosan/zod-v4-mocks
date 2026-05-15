@@ -145,6 +145,15 @@ const mock = initGenerator().supplyPath([KEY], 7).generate(Schema)
 
 `Set` does not support per-element targeting (its members have no stable identity).
 
+::: info supplyPath pierces wrappers
+A path matches at a location regardless of wrapper schemas around it.
+`supplyPath(['name'], 'X')` applies even when `name` is
+`z.string().optional()` / `.nullable()` / `.default()` / `z.lazy(...)` —
+the supplied value replaces the slot and the wrapper's probability logic
+is bypassed. To intentionally produce `undefined`/`null`, supply that
+value explicitly: `supplyPath(['name'], undefined)`.
+:::
+
 ## override - Custom Generator Functions
 
 Use `override` when you need more flexible customization than `supply`. You can define a function that takes a schema and options as arguments and returns a custom value.

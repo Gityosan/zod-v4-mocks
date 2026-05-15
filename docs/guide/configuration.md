@@ -20,6 +20,7 @@ interface MockConfig {
   consistentKey?: string               // metadata key name (consistent values)
   customMockKey?: string               // default: 'mock' (z.custom meta key)
   keyMapping?: 'off' | 'auto' | KeyMapper // default: 'off'
+  preflightCheck?: boolean              // default: true
 }
 ```
 
@@ -345,6 +346,42 @@ const myMap: KeyMapper = (key, schema, faker) => {
 
 initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 ```
+
+## preflightCheck
+
+Before generation, the library runs a pre-flight walk over the schema and
+rejects constructs it cannot safely mock. Default `true`.
+
+Currently it detects an un-mocked `z.custom()` / `z.instanceof()` sitting
+at a fixed-length **tuple** position — tuples cannot drop a slot, so an
+un-mocked custom schema would leave an invalid value. The error names the
+offending path:
+
+```ts
+const Schema = z.object({
+  pair: z.tuple([z.string(), z.custom<File>()]),
+})
+
+initGenerator().generate(Schema)
+// throws: Preflight check found 1 issue(s):
+//   - pair[1]: z.custom()/z.instanceof() sits at a tuple position ...
+```
+
+Fix it by providing a mock (`.meta({ mock: ... })`), a `supplyRef`, or
+disable the check:
+
+```ts
+initGenerator({ preflightCheck: false }).generate(Schema)
+```
+
+When a `supply` or `override` is registered, the library cannot verify
+coverage, so preflight downgrades errors to warnings.
+
+::: tip
+The pre-flight pass is also a forward-compatibility net: as Zod adds new
+schema types, cases the generator cannot yet handle can be surfaced here
+rather than failing deep inside generation.
+:::
 
 ## updateConfig
 

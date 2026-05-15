@@ -145,6 +145,15 @@ const mock = initGenerator().supplyPath([KEY], 7).generate(Schema)
 
 `Set` は要素単位の指定をサポートしません（メンバーに安定した identity がないため）。
 
+::: info supplyPath はラッパーを貫通する
+パスは、その位置を囲むラッパースキーマに関係なく一致します。
+`supplyPath(['name'], 'X')` は `name` が `z.string().optional()` /
+`.nullable()` / `.default()` / `z.lazy(...)` であっても適用され、
+供給値がスロットを置き換え、ラッパーの確率ロジックはバイパスされます。
+意図的に `undefined`/`null` を出したい場合は、その値を明示的に供給します：
+`supplyPath(['name'], undefined)`。
+:::
+
 ## override - カスタムジェネレータ関数
 
 `supply` よりも柔軟なカスタマイズが必要な場合に `override` を使用します。スキーマとオプションを引数に受け取り、カスタム値を返す関数を定義できます。

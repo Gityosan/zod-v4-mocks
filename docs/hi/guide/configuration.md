@@ -20,6 +20,7 @@ interface MockConfig {
   consistentKey?: string               // मेटाडेटा कुंजी नाम (कंसिस्टेंट वैल्यू)
   customMockKey?: string               // default: 'mock' (z.custom की meta key)
   keyMapping?: 'off' | 'auto' | KeyMapper // default: 'off'
+  preflightCheck?: boolean              // default: true
 }
 ```
 
@@ -345,6 +346,34 @@ const myMap: KeyMapper = (key, schema, faker) => {
 
 initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 ```
+
+## preflightCheck
+
+जेनरेशन से पहले, लाइब्रेरी स्कीमा पर एक प्री-फ़्लाइट वॉक चलाती है और उन संरचनाओं को अस्वीकार करती है जिन्हें सुरक्षित रूप से mock नहीं किया जा सकता। डिफ़ॉल्ट `true`।
+
+फ़िलहाल यह फिक्स्ड-लंबाई वाले **tuple** स्थान पर बिना meta वाले `z.custom()` / `z.instanceof()` का पता लगाती है — tuple किसी स्लॉट को हटा नहीं सकता, इसलिए बिना mock वाला custom स्कीमा एक अमान्य वैल्यू छोड़ देगा। एरर में संबंधित पाथ शामिल होता है:
+
+```ts
+const Schema = z.object({
+  pair: z.tuple([z.string(), z.custom<File>()]),
+})
+
+initGenerator().generate(Schema)
+// throws: Preflight check found 1 issue(s):
+//   - pair[1]: z.custom()/z.instanceof() sits at a tuple position ...
+```
+
+mock प्रदान करके (`.meta({ mock: ... })`), `supplyRef`, या जाँच बंद करके इसे ठीक करें:
+
+```ts
+initGenerator({ preflightCheck: false }).generate(Schema)
+```
+
+जब कोई `supply` या `override` रजिस्टर हो, तब लाइब्रेरी कवरेज सत्यापित नहीं कर सकती, इसलिए प्री-फ़्लाइट error को warning में डाउनग्रेड कर देती है।
+
+::: tip
+प्री-फ़्लाइट एक फ़ॉरवर्ड-कम्पैटिबिलिटी सेफ़्टी नेट भी है: जैसे-जैसे Zod नए स्कीमा टाइप जोड़ता है, जिन केसों को जेनरेटर अभी संभाल नहीं सकता उन्हें जेनरेशन की गहराई में फ़ेल होने के बजाय यहाँ सामने लाया जा सकता है।
+:::
 
 ## updateConfig
 

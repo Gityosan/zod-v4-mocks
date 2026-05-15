@@ -20,6 +20,7 @@ interface MockConfig {
   consistentKey?: string               // メタデータのキー名（一貫値生成用）
   customMockKey?: string               // default: 'mock' (z.custom のメタキー)
   keyMapping?: 'off' | 'auto' | KeyMapper // default: 'off'
+  preflightCheck?: boolean              // default: true
 }
 ```
 
@@ -345,6 +346,34 @@ const myMap: KeyMapper = (key, schema, faker) => {
 
 initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 ```
+
+## preflightCheck
+
+生成前に、ライブラリはスキーマをプリフライト走査し、安全にモックできない構造を弾きます。既定は `true`。
+
+現状は、固定長の **tuple** 位置にある meta 未設定の `z.custom()` / `z.instanceof()` を検出します。tuple はスロットを脱落させられないため、meta の無い custom スキーマは不正な値を残してしまいます。エラーには該当パスが含まれます：
+
+```ts
+const Schema = z.object({
+  pair: z.tuple([z.string(), z.custom<File>()]),
+})
+
+initGenerator().generate(Schema)
+// throws: Preflight check found 1 issue(s):
+//   - pair[1]: z.custom()/z.instanceof() sits at a tuple position ...
+```
+
+mock の提供（`.meta({ mock: ... })`）、`supplyRef`、またはチェックの無効化で解消します：
+
+```ts
+initGenerator({ preflightCheck: false }).generate(Schema)
+```
+
+`supply` / `override` が登録されている場合、ライブラリは網羅性を検証できないため、プリフライトは error を warning に降格します。
+
+::: tip
+プリフライトは前方互換のセーフティネットでもあります。Zod が新しいスキーマ型を追加した際、ジェネレータがまだ扱えないケースを、生成の奥深くで失敗させる代わりにここで表面化できます。
+:::
 
 ## updateConfig
 
