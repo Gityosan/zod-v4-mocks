@@ -349,27 +349,29 @@ initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 
 ## preflightCheck
 
-在生成之前，库会对 Schema 进行预检遍历，拒绝无法安全 mock 的结构。默认 `true`。
+在生成之前，库会对 Schema 进行预检遍历。默认 `true`。它检测生成器无法安全 mock 的结构，指出具体路径并尽早失败，或在存在最小修正方案时自动修复。可通过 `initGenerator({ preflightCheck: false })` 关闭。
 
-目前它检测位于固定长度 **tuple** 位置、且未提供 meta 的 `z.custom()` / `z.instanceof()` —— tuple 无法丢弃某个槽位，因此未 mock 的 custom Schema 会留下一个非法值。错误信息会指出具体路径：
+### error 级检查（生成前抛错）
+
+- **tuple 位置的 z.custom()** —— 固定长度 tuple 内未提供 meta 的 `z.custom()` / `z.instanceof()`。tuple 无法丢弃槽位，未 mock 的值会非法。用 `.meta({ mock: ... })` 或 `supplyRef()` 解决。
+- **不兼容的 z.intersection()** —— 没有任何单一值能同时满足两侧：不同的原始类型（`z.string()` & `z.number()`）、无公共值的 enum、范围不相交的 number。
+- **非法的 z.record() 键类型** —— 无法生成 string / number / symbol 的键类型。
 
 ```ts
 const Schema = z.object({
   pair: z.tuple([z.string(), z.custom<File>()]),
 })
-
 initGenerator().generate(Schema)
 // throws: Preflight check found 1 issue(s):
 //   - pair[1]: z.custom()/z.instanceof() sits at a tuple position ...
 ```
 
-通过提供 mock（`.meta({ mock: ... })`）、`supplyRef`，或关闭该检查来解决：
+当注册了 `supply` 或 `override` 时，库无法验证其覆盖范围，因此 error 级的发现会降级为 warning。
 
-```ts
-initGenerator({ preflightCheck: false }).generate(Schema)
-```
+### warning 级检查（仅报告，生成继续）
 
-当注册了 `supply` 或 `override` 时，库无法验证其覆盖范围，因此预检会将 error 降级为 warning。
+- **被忽略的 .refine() / .superRefine()** —— refine 谓词在生成时被丢弃，生成值可能不满足它。若 mock 必须通过 `.parse()`，请用 `supplyPath()` / `supplyRef()` 固定有效值。
+- **以 z.lazy() 自身作为递归锚点** —— 会被自动修复（见下）。
 
 ### 自动修复
 

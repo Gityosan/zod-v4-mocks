@@ -349,39 +349,48 @@ initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 
 ## preflightCheck
 
-Before generation, the library runs a pre-flight walk over the schema and
-rejects constructs it cannot safely mock. Default `true`.
+Before generation, the library runs a pre-flight walk over the schema.
+Default `true`. It catches constructs the generator cannot safely mock —
+failing fast with the offending path, or auto-fixing where a minimal
+correction exists. Disable with `initGenerator({ preflightCheck: false })`.
 
-Currently it detects an un-mocked `z.custom()` / `z.instanceof()` sitting
-at a fixed-length **tuple** position — tuples cannot drop a slot, so an
-un-mocked custom schema would leave an invalid value. The error names the
-offending path:
+### Error-level checks (throw before generation)
+
+- **z.custom() at a tuple position** — an un-mocked `z.custom()` /
+  `z.instanceof()` in a fixed-length tuple. A tuple cannot drop a slot, so
+  the un-mocked value would be invalid. Fix with `.meta({ mock: ... })` or
+  `supplyRef()`.
+- **Incompatible z.intersection()** — sides that no single value can
+  satisfy: different primitive types (`z.string()` & `z.number()`), enums
+  with no common value, or numbers with a disjoint range.
+- **Invalid z.record() key type** — a key type that cannot produce a
+  string / number / symbol.
 
 ```ts
 const Schema = z.object({
   pair: z.tuple([z.string(), z.custom<File>()]),
 })
-
 initGenerator().generate(Schema)
 // throws: Preflight check found 1 issue(s):
 //   - pair[1]: z.custom()/z.instanceof() sits at a tuple position ...
 ```
 
-Fix it by providing a mock (`.meta({ mock: ... })`), a `supplyRef`, or
-disable the check:
+When a `supply` or `override` is registered the library cannot verify
+coverage, so error-level findings are downgraded to warnings.
 
-```ts
-initGenerator({ preflightCheck: false }).generate(Schema)
-```
+### Warning-level checks (reported; generation continues)
 
-When a `supply` or `override` is registered, the library cannot verify
-coverage, so preflight downgrades errors to warnings.
+- **Ignored .refine() / .superRefine()** — refinement predicates are
+  dropped during generation, so the generated value may not satisfy them.
+  Pin a valid value with `supplyPath()` / `supplyRef()` if the mock must
+  pass `.parse()`.
+- **Recursive z.lazy() as its own anchor** — auto-fixed (see below).
 
 ### Auto-fixes
 
-For problems that have a safe, minimal schema correction, preflight emits
-a **warning** and applies the fix automatically — generation then proceeds
-with the corrected schema. You do not need to change your code.
+For a problem with a safe, minimal schema correction, preflight emits a
+**warning** and applies the fix automatically — generation then proceeds
+with the corrected schema, no code change required.
 
 Currently this covers a recursive `z.lazy()` that is its own recursion
 anchor. The depth limiter tracks object/array/etc. references, not

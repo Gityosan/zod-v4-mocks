@@ -31,6 +31,85 @@ type WalkState = PreflightContext & {
   fixes: Map<z.core.$ZodType, z.core.$ZodType>;
 };
 
+// --- shared helpers --------------------------------------------------------
+
+function hasUnwrap(
+  schema: z.core.$ZodType,
+): schema is z.core.$ZodType & { unwrap: () => z.core.$ZodType } {
+  return (
+    'unwrap' in schema &&
+    typeof (schema as { unwrap?: unknown }).unwrap === 'function'
+  );
+}
+
+/** Strip wrapper schemas (optional/nullable/default/readonly/lazy/...) to the core. */
+function coreOf(schema: z.core.$ZodType): z.core.$ZodType {
+  let current = schema;
+  for (let i = 0; i < 20 && hasUnwrap(current); i++) {
+    const next = current.unwrap();
+    if (next === current) break;
+    current = next;
+  }
+  return current;
+}
+
+function getChecks(schema: z.core.$ZodType): z.core.$ZodCheck<never>[] {
+  const def = schema._zod.def as { checks?: z.core.$ZodCheck<never>[] };
+  return def.checks ?? [];
+}
+
+/** Error level, downgraded to a warning when an opaque customizer is present. */
+function level(state: WalkState): 'error' | 'warning' {
+  return state.hasOpaqueCustomizer ? 'warning' : 'error';
+}
+
+type Category =
+  | 'any'
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'bigint'
+  | 'date'
+  | 'symbol'
+  | 'objectish'
+  | 'arrayish'
+  | 'map'
+  | 'set'
+  | 'enum'
+  | 'literal'
+  | 'complex';
+
+function categoryOf(schema: z.core.$ZodType): Category {
+  const t = coreOf(schema)._zod.def.type;
+  if (t === 'any' || t === 'unknown') return 'any';
+  if (t === 'object' || t === 'record') return 'objectish';
+  if (t === 'array' || t === 'tuple') return 'arrayish';
+  if (
+    t === 'string' ||
+    t === 'number' ||
+    t === 'boolean' ||
+    t === 'bigint' ||
+    t === 'date' ||
+    t === 'symbol' ||
+    t === 'map' ||
+    t === 'set' ||
+    t === 'enum' ||
+    t === 'literal'
+  ) {
+    return t;
+  }
+  return 'complex';
+}
+
+// --- node checks -----------------------------------------------------------
+
+type NodeCheck = (
+  schema: z.core.$ZodType,
+  path: string,
+  inTupleSlot: boolean,
+  state: WalkState,
+) => void;
+
 function isPlainCustom(schema: z.core.$ZodType): boolean {
   // ZodCustomStringFormat also reports as a custom type but is fully
   // handled by the generator — exclude it first to avoid a false positive.
@@ -44,27 +123,149 @@ function hasMockMeta(schema: z.core.$ZodType, key: string): boolean {
   return meta?.[key] !== undefined;
 }
 
-function hasUnwrap(
-  schema: z.core.$ZodType,
-): schema is z.core.$ZodType & { unwrap: () => z.core.$ZodType } {
-  return (
-    'unwrap' in schema &&
-    typeof (schema as { unwrap?: unknown }).unwrap === 'function'
+/** An un-mocked z.custom()/z.instanceof() at a fixed-length tuple position. */
+const checkCustomInTuple: NodeCheck = (schema, path, inTupleSlot, state) => {
+  if (!isPlainCustom(schema) || !inTupleSlot) return;
+  const covered =
+    hasMockMeta(schema, state.customMockKey) ||
+    state.supplyRefTargets.has(schema);
+  if (covered) return;
+  state.diagnostics.push({
+    level: level(state),
+    path: path || '(root)',
+    message:
+      'z.custom()/z.instanceof() sits at a tuple position. Tuples have a ' +
+      'fixed length, so an un-mocked custom schema leaves an invalid slot. ' +
+      `Add .meta({ ${state.customMockKey}: ... }) or use supplyRef().`,
+  });
+};
+
+/** `.refine()` / `.superRefine()` predicates the generator silently drops. */
+const checkIgnoredRefinements: NodeCheck = (schema, path, _inTuple, state) => {
+  const hasRefinement = getChecks(schema).some(
+    (c) => c._zod.def.check === 'custom',
   );
+  if (!hasRefinement) return;
+  state.diagnostics.push({
+    level: 'warning',
+    path: path || '(root)',
+    message:
+      'A .refine() / .superRefine() predicate is ignored during mock ' +
+      'generation, so the generated value may not satisfy it. Pin a valid ' +
+      'value with supplyPath()/supplyRef() if the mock must pass .parse().',
+  });
+};
+
+const KEYABLE_TYPES = new Set([
+  'string',
+  'number',
+  'symbol',
+  'enum',
+  'literal',
+  'template_literal',
+]);
+
+function isKeyableKeyType(keyType: z.core.$ZodType): boolean {
+  const core = coreOf(keyType);
+  if (safeInstanceof(core, z.ZodUnion)) {
+    return core.options.every((o) => isKeyableKeyType(o));
+  }
+  return KEYABLE_TYPES.has(core._zod.def.type);
 }
+
+/** A z.record() whose key type cannot produce a string/number/symbol. */
+const checkRecordKeyType: NodeCheck = (schema, path, _inTuple, state) => {
+  if (!safeInstanceof(schema, z.ZodRecord)) return;
+  if (isKeyableKeyType(schema.keyType)) return;
+  state.diagnostics.push({
+    level: level(state),
+    path: path || '(root)',
+    message:
+      `z.record() key type '${coreOf(schema.keyType)._zod.def.type}' cannot ` +
+      'be a record key — generation expects string / number / symbol. ' +
+      'Use z.string()/z.number()/z.enum()/z.literal() as the key type.',
+  });
+};
+
+function numberBounds(schema: z.core.$ZodType): { min: number; max: number } {
+  const s = schema as { minValue?: number | null; maxValue?: number | null };
+  return {
+    min: s.minValue ?? Number.NEGATIVE_INFINITY,
+    max: s.maxValue ?? Number.POSITIVE_INFINITY,
+  };
+}
+
+function enumLiteralValues(schema: z.core.$ZodType): unknown[] | null {
+  if (safeInstanceof(schema, z.ZodEnum)) return [...schema.options];
+  if (safeInstanceof(schema, z.ZodLiteral)) return [...schema.values];
+  return null;
+}
+
+/** A z.intersection() of structurally incompatible schemas. */
+const checkIntersectionCompat: NodeCheck = (schema, path, _inTuple, state) => {
+  if (!safeInstanceof(schema, z.ZodIntersection)) return;
+  const left = coreOf(schema.def.left);
+  const right = coreOf(schema.def.right);
+  const cl = categoryOf(left);
+  const cr = categoryOf(right);
+  // any/unknown is compatible with anything; complex types are not judged.
+  if (cl === 'any' || cr === 'any' || cl === 'complex' || cr === 'complex') {
+    return;
+  }
+  const here = path || '(root)';
+  if (cl !== cr) {
+    state.diagnostics.push({
+      level: level(state),
+      path: here,
+      message:
+        `z.intersection() of incompatible types: '${cl}' & '${cr}'. ` +
+        'No single value can satisfy both sides.',
+    });
+    return;
+  }
+  // Same category — look for an empty result set.
+  if (cl === 'enum' || cl === 'literal') {
+    const lv = enumLiteralValues(left);
+    const rv = enumLiteralValues(right);
+    if (lv && rv && !lv.some((v) => rv.includes(v))) {
+      state.diagnostics.push({
+        level: level(state),
+        path: here,
+        message:
+          `z.intersection() of ${cl}s with no common value. ` +
+          'No value can satisfy both sides.',
+      });
+    }
+    return;
+  }
+  if (cl === 'number') {
+    const lb = numberBounds(left);
+    const rb = numberBounds(right);
+    const min = Math.max(lb.min, rb.min);
+    const max = Math.min(lb.max, rb.max);
+    if (min > max) {
+      state.diagnostics.push({
+        level: level(state),
+        path: here,
+        message:
+          `z.intersection() of numbers with a disjoint range ` +
+          `(combined min ${min} > max ${max}).`,
+      });
+    }
+  }
+};
+
+const NODE_CHECKS: NodeCheck[] = [
+  checkCustomInTuple,
+  checkIgnoredRefinements,
+  checkRecordKeyType,
+  checkIntersectionCompat,
+];
 
 /**
  * Detect a `z.lazy()` that is its own recursion anchor and register a
- * minimal auto-fix.
- *
- * The depth limiter tracks object/array/record/etc. references, not
- * `z.lazy()`. When a recursion cycles back through a `z.lazy()` whose
- * getter rebuilds a fresh schema each call, nothing in the cycle is
- * depth-tracked and generation would never terminate.
- *
- * The fix substitutes the lazy with a single cached unwrap of itself: a
- * concrete, stable schema the depth limiter *can* track. Generation
- * proceeds with that substitution applied.
+ * minimal auto-fix (substitute the lazy with a single cached unwrap of
+ * itself — a concrete, depth-trackable schema).
  */
 function detectRecursiveLazy(
   schema: z.core.$ZodType,
@@ -73,8 +274,7 @@ function detectRecursiveLazy(
 ): void {
   if (!safeInstanceof(schema, z.ZodLazy)) return; // anchored on a tracked type
   if (state.fixes.has(schema)) return; // already handled
-  // z.json() is a recursive lazy but the generator handles it specially —
-  // leave it untouched.
+  // z.json() is a recursive lazy but the generator handles it specially.
   if (isZodJsonSchema(schema, schema.unwrap())) return;
   // A getter returning the same reference twice is depth-trackable via that
   // stable inner schema; a fresh-each-call getter is not.
@@ -85,7 +285,6 @@ function detectRecursiveLazy(
     stableGetter = false;
   }
   if (stableGetter) return;
-  // Cache one unwrap as the stable replacement.
   state.fixes.set(schema, schema.unwrap());
   state.diagnostics.push({
     level: 'warning',
@@ -106,21 +305,8 @@ function walk(
   ancestors: Set<z.core.$ZodType>,
   state: WalkState,
 ): void {
-  // --- check: un-mocked z.custom() at a fixed-length tuple position ---
-  if (isPlainCustom(schema) && inTupleSlot) {
-    const covered =
-      hasMockMeta(schema, state.customMockKey) ||
-      state.supplyRefTargets.has(schema);
-    if (!covered) {
-      state.diagnostics.push({
-        level: state.hasOpaqueCustomizer ? 'warning' : 'error',
-        path: path || '(root)',
-        message:
-          'z.custom()/z.instanceof() sits at a tuple position. Tuples have a ' +
-          'fixed length, so an un-mocked custom schema leaves an invalid slot. ' +
-          `Add .meta({ ${state.customMockKey}: ... }) or use supplyRef().`,
-      });
-    }
+  for (const check of NODE_CHECKS) {
+    check(schema, path, inTupleSlot, state);
   }
 
   // Cycle guard — lazy schemas and getter-based circular references.
@@ -198,6 +384,20 @@ function walk(
   }
 }
 
+function dedupeDiagnostics(
+  diagnostics: PreflightDiagnostic[],
+): PreflightDiagnostic[] {
+  const seen = new Set<string>();
+  const out: PreflightDiagnostic[] = [];
+  for (const d of diagnostics) {
+    const key = `${d.level}|${d.path}|${d.message}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(d);
+  }
+  return out;
+}
+
 /**
  * Walk a schema tree before generation. Reports constructs the library
  * cannot safely mock and collects minimal auto-fixes for the recoverable
@@ -213,5 +413,8 @@ export function runPreflight(
     fixes: new Map(),
   };
   walk(rootSchema, '', false, new Set(), state);
-  return { diagnostics: state.diagnostics, fixes: state.fixes };
+  return {
+    diagnostics: dedupeDiagnostics(state.diagnostics),
+    fixes: state.fixes,
+  };
 }

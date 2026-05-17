@@ -191,3 +191,111 @@ describe('preflight auto-fix - recursive z.lazy as its own anchor', () => {
     }).not.toThrow();
   });
 });
+
+describe('preflight - ignored .refine() / .superRefine()', () => {
+  it('warns when a refinement is present (still generates)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const Schema = z.object({
+      password: z.string().refine((s) => s.length > 8),
+    });
+    const result = initGenerator().generate(Schema);
+    expect(typeof result.password).toBe('string');
+    const w = warn.mock.calls.find(
+      (a) =>
+        String(a[0]).includes('[preflight]') &&
+        String(a[0]).includes('.refine()'),
+    );
+    expect(w).toBeDefined();
+    warn.mockRestore();
+  });
+
+  it('does not warn for plain method constraints like .min()', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const Schema = z.object({ name: z.string().min(3) });
+    initGenerator().generate(Schema);
+    const w = warn.mock.calls.find((a) =>
+      String(a[0]).includes('.refine()'),
+    );
+    expect(w).toBeUndefined();
+    warn.mockRestore();
+  });
+
+  it('object-level (cross-field) refinements are detected', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const Schema = z
+      .object({ a: z.string(), b: z.string() })
+      .refine((o) => o.a === o.b);
+    initGenerator().generate(Schema);
+    const w = warn.mock.calls.find((a) =>
+      String(a[0]).includes('.refine()'),
+    );
+    expect(w).toBeDefined();
+    warn.mockRestore();
+  });
+});
+
+describe('preflight - invalid z.record key type', () => {
+  it('throws for a non-keyable record key type', () => {
+    // boolean is not a valid record key (string/number/symbol expected)
+    const Schema = z.record(z.boolean() as never, z.string());
+    expect(() => initGenerator().generate(Schema)).toThrow(/record\(\) key/);
+  });
+
+  it('accepts string / number / enum key types', () => {
+    expect(() =>
+      initGenerator().generate(z.record(z.string(), z.number())),
+    ).not.toThrow();
+    expect(() =>
+      initGenerator().generate(z.record(z.enum(['a', 'b']), z.number())),
+    ).not.toThrow();
+  });
+});
+
+describe('preflight - incompatible z.intersection', () => {
+  it('throws for incompatible primitive types', () => {
+    const Schema = z.intersection(z.string(), z.number());
+    expect(() => initGenerator().generate(Schema)).toThrow(
+      /incompatible types/,
+    );
+  });
+
+  it('throws for an object intersected with a primitive', () => {
+    const Schema = z.intersection(z.object({ a: z.string() }), z.string());
+    expect(() => initGenerator().generate(Schema)).toThrow(/Preflight check/);
+  });
+
+  it('throws for enums with no common value', () => {
+    const Schema = z.intersection(z.enum(['a', 'b']), z.enum(['c', 'd']));
+    expect(() => initGenerator().generate(Schema)).toThrow(/no common value/);
+  });
+
+  it('throws for numbers with a disjoint range', () => {
+    const Schema = z.intersection(z.number().min(10), z.number().max(5));
+    expect(() => initGenerator().generate(Schema)).toThrow(/disjoint range/);
+  });
+
+  it('accepts compatible intersections', () => {
+    expect(() =>
+      initGenerator().generate(z.intersection(z.string(), z.string())),
+    ).not.toThrow();
+    expect(() =>
+      initGenerator().generate(
+        z.intersection(
+          z.object({ a: z.string() }),
+          z.object({ b: z.number() }),
+        ),
+      ),
+    ).not.toThrow();
+  });
+
+  it('does not flag an intersection involving z.any()', () => {
+    expect(() =>
+      initGenerator().generate(z.intersection(z.any(), z.string())),
+    ).not.toThrow();
+  });
+
+  it('error names the offending path', () => {
+    const Schema = z.object({ bad: z.intersection(z.string(), z.number()) });
+    expect(() => initGenerator().generate(Schema)).toThrow(/bad&L|bad&R|bad/);
+  });
+});

@@ -349,27 +349,29 @@ initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 
 ## preflightCheck
 
-生成前に、ライブラリはスキーマをプリフライト走査し、安全にモックできない構造を弾きます。既定は `true`。
+生成前に、ライブラリはスキーマをプリフライト走査します。既定は `true`。ジェネレータが安全にモックできない構造を検出し、該当パスを示して即座に失敗させるか、最小限の修正が可能なものは自動修正します。`initGenerator({ preflightCheck: false })` で無効化できます。
 
-現状は、固定長の **tuple** 位置にある meta 未設定の `z.custom()` / `z.instanceof()` を検出します。tuple はスロットを脱落させられないため、meta の無い custom スキーマは不正な値を残してしまいます。エラーには該当パスが含まれます：
+### error レベルのチェック（生成前に throw）
+
+- **tuple 位置の z.custom()** — 固定長 tuple 内の meta 未設定 `z.custom()` / `z.instanceof()`。tuple はスロットを脱落させられないため不正値が残ります。`.meta({ mock: ... })` または `supplyRef()` で解消。
+- **非互換な z.intersection()** — どの値でも両側を満たせないケース：異なるプリミティブ型（`z.string()` & `z.number()`）、共通値の無い enum、レンジが交わらない number。
+- **不正な z.record() キー型** — string / number / symbol を生成できないキー型。
 
 ```ts
 const Schema = z.object({
   pair: z.tuple([z.string(), z.custom<File>()]),
 })
-
 initGenerator().generate(Schema)
 // throws: Preflight check found 1 issue(s):
 //   - pair[1]: z.custom()/z.instanceof() sits at a tuple position ...
 ```
 
-mock の提供（`.meta({ mock: ... })`）、`supplyRef`、またはチェックの無効化で解消します：
+`supply` / `override` が登録されている場合、ライブラリは網羅性を検証できないため、error レベルの指摘は warning に降格されます。
 
-```ts
-initGenerator({ preflightCheck: false }).generate(Schema)
-```
+### warning レベルのチェック（報告のみ・生成は継続）
 
-`supply` / `override` が登録されている場合、ライブラリは網羅性を検証できないため、プリフライトは error を warning に降格します。
+- **無視される .refine() / .superRefine()** — refine の述語は生成時に捨てられるため、生成値がそれを満たさない可能性があります。`.parse()` を通す必要があるなら `supplyPath()` / `supplyRef()` で有効値を固定してください。
+- **再帰 z.lazy() が自身のアンカー** — 自動修正されます（下記）。
 
 ### 自動修正
 
