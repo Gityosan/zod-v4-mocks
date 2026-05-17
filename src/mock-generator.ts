@@ -131,13 +131,14 @@ class MockGenerator {
 
   /**
    * Run the pre-flight schema walk once per schema. Throws on error-level
-   * diagnostics; emits warnings otherwise. No-op when `preflightCheck` is
-   * disabled.
+   * diagnostics; for warning-level diagnostics it emits the warning and
+   * applies the associated minimal schema fix so generation proceeds with
+   * the corrected schema. No-op when `preflightCheck` is disabled.
    */
   #preflight(schema: z.core.$ZodType): void {
     if (this.options.config.preflightCheck === false) return;
     if (this.#preflighted.has(schema)) return;
-    const diagnostics = runPreflight(schema, {
+    const { diagnostics, fixes } = runPreflight(schema, {
       customMockKey: this.options.config.customMockKey ?? 'mock',
       supplyRefTargets: this.options.supplyRefTargets,
       hasOpaqueCustomizer: this.options.hasOpaqueCustomizer,
@@ -157,6 +158,8 @@ class MockGenerator {
           'Disable with initGenerator({ preflightCheck: false }).',
       );
     }
+    // Apply minimal auto-fixes — generation substitutes these schemas.
+    this.options.preflightFixes = fixes;
     this.#preflighted.add(schema);
   }
 

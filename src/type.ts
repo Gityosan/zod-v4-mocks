@@ -32,6 +32,12 @@ export type GeneraterOptions = {
    * cannot be introspected, so preflight downgrades errors to warnings.
    */
   hasOpaqueCustomizer: boolean;
+  /**
+   * Auto-fixes from the pre-flight walk: a problematic schema mapped to a
+   * minimally-changed replacement. The generator substitutes any schema
+   * found here before generating.
+   */
+  preflightFixes: Map<z.core.$ZodType, z.core.$ZodType>;
 };
 
 export type CustomGeneratorType = (

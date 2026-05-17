@@ -241,7 +241,15 @@ export function generateMocks(
     arrayIndexes,
     pinnedHierarchy,
     pathSupplies,
+    preflightFixes,
   } = options;
+
+  // Pre-flight auto-fix: substitute a problematic schema with its
+  // minimally-changed replacement before doing anything else.
+  if (preflightFixes.size > 0) {
+    const fixed = preflightFixes.get(schema);
+    if (fixed !== undefined) return generateMocks(fixed, options);
+  }
 
   if (pathSupplies.length > 0) {
     const matched = findMatchedValue(pathSupplies);

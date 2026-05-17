@@ -68,5 +68,6 @@ export function createGeneraterOptions(
     currentPath: [],
     supplyRefTargets: new Set(),
     hasOpaqueCustomizer: false,
+    preflightFixes: new Map(),
   };
 }

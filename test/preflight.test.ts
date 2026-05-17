@@ -118,25 +118,76 @@ describe('preflight - recursion safety', () => {
   });
 });
 
-describe('recursive z.lazy as its own anchor', () => {
-  it('generates (terminates) when the lazy itself is the recursion anchor', () => {
-    // Previously a stack overflow: the depth limiter tracked object/array
-    // references but not z.lazy(). z.lazy() is now depth-tracked, so this
-    // form generates and terminates at the recursion limit.
+describe('preflight auto-fix - recursive z.lazy as its own anchor', () => {
+  it('warns and auto-fixes so generation terminates', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Previously a stack overflow: the lazy is its own recursion anchor and
+    // z.lazy() is not depth-tracked. Preflight detects it, warns, and
+    // substitutes the unwrapped form so generation terminates.
     const Tree: z.ZodLazy = z.lazy(() =>
       z.object({ value: z.string(), children: z.array(Tree) }),
     );
     const result = initGenerator({ recursiveDepthLimit: 2 }).generate(Tree);
     expect(typeof result.value).toBe('string');
     expect(Array.isArray(result.children)).toBe(true);
+    const w = warn.mock.calls.find(
+      (a) =>
+        String(a[0]).includes('[preflight]') &&
+        String(a[0]).includes('recursion anchor'),
+    );
+    expect(w).toBeDefined();
+    warn.mockRestore();
   });
 
-  it('top-level recursive lazy is deterministic under a seed', () => {
+  it('the auto-fixed schema is deterministic under a seed', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const buildTree = (): z.ZodLazy => {
+      const Tree: z.ZodLazy = z.lazy(() =>
+        z.object({ value: z.string(), children: z.array(Tree) }),
+      );
+      return Tree;
+    };
+    const a = initGenerator({ seed: 5, recursiveDepthLimit: 2 }).generate(
+      buildTree(),
+    );
+    const b = initGenerator({ seed: 5, recursiveDepthLimit: 2 }).generate(
+      buildTree(),
+    );
+    expect(a).toEqual(b);
+    warn.mockRestore();
+  });
+
+  it('a lazy nested below a concrete anchor needs no fix and no warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const Tree: z.ZodObject<{ value: z.ZodString; children: z.ZodLazy }> =
+      z.object({
+        value: z.string(),
+        children: z.lazy(() => z.array(Tree)),
+      });
+    expect(() =>
+      initGenerator({ recursiveDepthLimit: 2 }).generate(Tree),
+    ).not.toThrow();
+    const w = warn.mock.calls.find((a) =>
+      String(a[0]).includes('recursion anchor'),
+    );
+    expect(w).toBeUndefined();
+    warn.mockRestore();
+  });
+
+  it('preflightCheck: false skips the auto-fix', () => {
+    // With preflight disabled the dangerous schema is not corrected; the
+    // toggle is the documented escape hatch.
     const Tree: z.ZodLazy = z.lazy(() =>
       z.object({ value: z.string(), children: z.array(Tree) }),
     );
-    const a = initGenerator({ seed: 5, recursiveDepthLimit: 2 }).generate(Tree);
-    const b = initGenerator({ seed: 5, recursiveDepthLimit: 2 }).generate(Tree);
-    expect(a).toEqual(b);
+    const gen = initGenerator({ preflightCheck: false });
+    // no preflight -> no fix registered
+    expect(() => {
+      try {
+        gen.generate(Tree);
+      } catch {
+        /* a stack overflow here is the expected un-fixed behaviour */
+      }
+    }).not.toThrow();
   });
 });

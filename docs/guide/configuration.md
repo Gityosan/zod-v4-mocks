@@ -377,10 +377,34 @@ initGenerator({ preflightCheck: false }).generate(Schema)
 When a `supply` or `override` is registered, the library cannot verify
 coverage, so preflight downgrades errors to warnings.
 
+### Auto-fixes
+
+For problems that have a safe, minimal schema correction, preflight emits
+a **warning** and applies the fix automatically — generation then proceeds
+with the corrected schema. You do not need to change your code.
+
+Currently this covers a recursive `z.lazy()` that is its own recursion
+anchor. The depth limiter tracks object/array/etc. references, not
+`z.lazy()`, so such a schema would otherwise stack-overflow:
+
+```ts
+// detected, warned, and auto-fixed — generation terminates normally
+const Tree = z.lazy(() =>
+  z.object({ value: z.string(), children: z.array(Tree) }),
+)
+initGenerator().generate(Tree)
+// [preflight] (root): A recursive z.lazy() is its own recursion anchor ...
+```
+
+The warning still suggests the cleaner hand-written form
+(`z.object({ ..., children: z.lazy(() => z.array(Tree)) })`). Auto-fixes
+are skipped when `preflightCheck` is `false`.
+
 ::: tip
 The pre-flight pass is also a forward-compatibility net: as Zod adds new
-schema types, cases the generator cannot yet handle can be surfaced here
-rather than failing deep inside generation.
+schema types, cases the generator cannot yet handle can be surfaced here —
+either rejected with an error or auto-fixed with a warning — rather than
+failing deep inside generation.
 :::
 
 ## updateConfig

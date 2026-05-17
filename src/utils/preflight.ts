@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { safeInstanceof } from './schema';
+import { isZodJsonSchema, safeInstanceof } from './schema';
 
 export type PreflightDiagnostic = {
   level: 'error' | 'warning';
@@ -13,8 +13,22 @@ export type PreflightContext = {
   hasOpaqueCustomizer: boolean;
 };
 
+/**
+ * Outcome of a pre-flight walk.
+ *
+ * `fixes` maps a problematic schema to a minimally-changed replacement.
+ * The generator substitutes any schema found in this map before
+ * generating, so a warning-level issue is auto-corrected rather than
+ * left to fail.
+ */
+export type PreflightResult = {
+  diagnostics: PreflightDiagnostic[];
+  fixes: Map<z.core.$ZodType, z.core.$ZodType>;
+};
+
 type WalkState = PreflightContext & {
   diagnostics: PreflightDiagnostic[];
+  fixes: Map<z.core.$ZodType, z.core.$ZodType>;
 };
 
 function isPlainCustom(schema: z.core.$ZodType): boolean {
@@ -37,6 +51,52 @@ function hasUnwrap(
     'unwrap' in schema &&
     typeof (schema as { unwrap?: unknown }).unwrap === 'function'
   );
+}
+
+/**
+ * Detect a `z.lazy()` that is its own recursion anchor and register a
+ * minimal auto-fix.
+ *
+ * The depth limiter tracks object/array/record/etc. references, not
+ * `z.lazy()`. When a recursion cycles back through a `z.lazy()` whose
+ * getter rebuilds a fresh schema each call, nothing in the cycle is
+ * depth-tracked and generation would never terminate.
+ *
+ * The fix substitutes the lazy with a single cached unwrap of itself: a
+ * concrete, stable schema the depth limiter *can* track. Generation
+ * proceeds with that substitution applied.
+ */
+function detectRecursiveLazy(
+  schema: z.core.$ZodType,
+  path: string,
+  state: WalkState,
+): void {
+  if (!safeInstanceof(schema, z.ZodLazy)) return; // anchored on a tracked type
+  if (state.fixes.has(schema)) return; // already handled
+  // z.json() is a recursive lazy but the generator handles it specially —
+  // leave it untouched.
+  if (isZodJsonSchema(schema, schema.unwrap())) return;
+  // A getter returning the same reference twice is depth-trackable via that
+  // stable inner schema; a fresh-each-call getter is not.
+  let stableGetter = false;
+  try {
+    stableGetter = schema.unwrap() === schema.unwrap();
+  } catch {
+    stableGetter = false;
+  }
+  if (stableGetter) return;
+  // Cache one unwrap as the stable replacement.
+  state.fixes.set(schema, schema.unwrap());
+  state.diagnostics.push({
+    level: 'warning',
+    path: path || '(root)',
+    message:
+      'A recursive z.lazy() is its own recursion anchor. It has been ' +
+      'auto-substituted with its unwrapped form so the depth limiter can ' +
+      'track it and generation terminates. For a clearer schema, make a ' +
+      'concrete type the stable anchor, e.g. ' +
+      '`z.object({ ..., children: z.lazy(() => z.array(Self)) })`.',
+  });
 }
 
 function walk(
@@ -64,7 +124,12 @@ function walk(
   }
 
   // Cycle guard — lazy schemas and getter-based circular references.
-  if (ancestors.has(schema)) return;
+  if (ancestors.has(schema)) {
+    // A cycle closing back onto a z.lazy() would not terminate during
+    // generation — register an auto-fix.
+    detectRecursiveLazy(schema, path, state);
+    return;
+  }
   ancestors.add(schema);
   try {
     if (safeInstanceof(schema, z.ZodObject)) {
@@ -134,14 +199,19 @@ function walk(
 }
 
 /**
- * Walk a schema tree before generation and report constructs the library
- * cannot safely mock. Returns a (possibly empty) list of diagnostics.
+ * Walk a schema tree before generation. Reports constructs the library
+ * cannot safely mock and collects minimal auto-fixes for the recoverable
+ * (warning-level) ones.
  */
 export function runPreflight(
   rootSchema: z.core.$ZodType,
   context: PreflightContext,
-): PreflightDiagnostic[] {
-  const state: WalkState = { ...context, diagnostics: [] };
+): PreflightResult {
+  const state: WalkState = {
+    ...context,
+    diagnostics: [],
+    fixes: new Map(),
+  };
   walk(rootSchema, '', false, new Set(), state);
-  return state.diagnostics;
+  return { diagnostics: state.diagnostics, fixes: state.fixes };
 }

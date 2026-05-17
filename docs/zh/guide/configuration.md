@@ -371,8 +371,25 @@ initGenerator({ preflightCheck: false }).generate(Schema)
 
 当注册了 `supply` 或 `override` 时，库无法验证其覆盖范围，因此预检会将 error 降级为 warning。
 
+### 自动修复
+
+对于存在安全、最小修正方案的问题，预检会发出 **warning** 并自动应用修复 —— 随后生成会使用修正后的 Schema 继续进行。你无需改动代码。
+
+目前涵盖以 `z.lazy()` 自身作为递归锚点的情况。深度限制器跟踪的是 object/array 等引用，而非 `z.lazy()`，所以这类 Schema 否则会栈溢出：
+
+```ts
+// 被检测、警告并自动修复 —— 生成正常终止
+const Tree = z.lazy(() =>
+  z.object({ value: z.string(), children: z.array(Tree) }),
+)
+initGenerator().generate(Tree)
+// [preflight] (root): A recursive z.lazy() is its own recursion anchor ...
+```
+
+警告同时会建议更清晰的手写形式（`z.object({ ..., children: z.lazy(() => z.array(Tree)) })`）。当 `preflightCheck` 为 `false` 时也会跳过自动修复。
+
 ::: tip
-预检也是一张前向兼容的安全网：随着 Zod 新增 Schema 类型，生成器尚不能处理的情况可以在这里暴露，而不是在生成深处失败。
+预检也是一张前向兼容的安全网：随着 Zod 新增 Schema 类型，生成器尚不能处理的情况可以在这里暴露 —— 以 error 拒绝，或以 warning + 自动修复处理 —— 而不是在生成深处失败。
 :::
 
 ## updateConfig

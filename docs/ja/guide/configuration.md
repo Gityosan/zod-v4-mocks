@@ -371,8 +371,25 @@ initGenerator({ preflightCheck: false }).generate(Schema)
 
 `supply` / `override` が登録されている場合、ライブラリは網羅性を検証できないため、プリフライトは error を warning に降格します。
 
+### 自動修正
+
+安全かつ最小限のスキーマ修正が存在する問題については、プリフライトは **warning** を出したうえで修正を自動適用し、修正後のスキーマで生成を続行します。コードを変更する必要はありません。
+
+現状は、再帰アンカーが `z.lazy()` 自身になっているケースが対象です。深さ制限は object/array 等の参照を追跡し `z.lazy()` は追跡しないため、このスキーマはそのままではスタックオーバーフローします：
+
+```ts
+// 検出 → 警告 → 自動修正され、生成は正常に終了する
+const Tree = z.lazy(() =>
+  z.object({ value: z.string(), children: z.array(Tree) }),
+)
+initGenerator().generate(Tree)
+// [preflight] (root): A recursive z.lazy() is its own recursion anchor ...
+```
+
+警告では、より明快な手書きの形（`z.object({ ..., children: z.lazy(() => z.array(Tree)) })`）も併せて提案します。`preflightCheck` が `false` のときは自動修正もスキップされます。
+
 ::: tip
-プリフライトは前方互換のセーフティネットでもあります。Zod が新しいスキーマ型を追加した際、ジェネレータがまだ扱えないケースを、生成の奥深くで失敗させる代わりにここで表面化できます。
+プリフライトは前方互換のセーフティネットでもあります。Zod が新しいスキーマ型を追加した際、ジェネレータがまだ扱えないケースを、生成の奥深くで失敗させる代わりに、ここで error として弾くか warning + 自動修正で表面化できます。
 :::
 
 ## updateConfig
