@@ -12,11 +12,96 @@ import {
 } from './calculation';
 import { OMIT_SYMBOL, regenerateIfOmitted } from './exact-optional';
 import {
+  type ChildStep,
+  type PathSegment,
+  PATH_INDEX_HARD_LIMIT,
+  descendPathSupplies,
+  findKeyInjections,
+  findMaxLiteralIndex,
+} from './path';
+import {
   isZodCheckMultipleOfBigInt,
   isZodCheckMultipleOfNumber,
   safeInstanceof,
   unwrapSchema,
 } from './schema';
+
+/**
+ * Build the child generation options for descending one level. Updates
+ * `pathSupplies` and `keyMappingKey`, and `arrayIndexes` for indexed steps.
+ */
+function pushPathSegment(
+  options: GeneraterOptions,
+  step: ChildStep,
+  keyMappingKey?: string,
+): GeneraterOptions {
+  const child: GeneraterOptions = {
+    ...options,
+    pathSupplies: descendPathSupplies(options.pathSupplies, step),
+    keyMappingKey,
+  };
+  if (step.kind === 'arrayIndex' || step.kind === 'tupleIndex') {
+    child.arrayIndexes = [...options.arrayIndexes, step.index];
+  }
+  return child;
+}
+
+/**
+ * Descend into a record/map entry for `key` and generate its value.
+ * `keyMapping` is fed the key only for named (literal/enum) string keys.
+ */
+function generateKeyedValue(
+  options: GeneraterOptions,
+  step:
+    | { kind: 'mapKey'; key: unknown }
+    | { kind: 'recordKey'; key: string | number | symbol },
+  valueType: z.core.$ZodType,
+  namedKeys: boolean,
+  generator: CustomGeneratorType,
+): unknown {
+  const keyMappingKey =
+    namedKeys && typeof step.key === 'string' ? step.key : undefined;
+  return generator(valueType, pushPathSegment(options, step, keyMappingKey));
+}
+
+/**
+ * Whether a record/map key type names its keys (so `keyMapping` may use
+ * the key). Random `z.string()` / `z.number()` keys are excluded — mapping
+ * on a randomly produced key name would be surprising and non-deterministic.
+ */
+function isNamedKeyType(keyType: z.core.$ZodType): boolean {
+  if (safeInstanceof(keyType, z.ZodLiteral)) return true;
+  if (safeInstanceof(keyType, z.ZodEnum)) return true;
+  if (safeInstanceof(keyType, z.ZodUnion)) {
+    return (keyType as z.ZodUnion).options.every((o) => isNamedKeyType(o));
+  }
+  return false;
+}
+
+function recordKeyTypeAccepts(
+  keyType: z.core.$ZodType,
+): (k: PathSegment) => boolean {
+  return (k) => {
+    const t = typeof k;
+    if (safeInstanceof(keyType, z.ZodString)) return t === 'string';
+    if (safeInstanceof(keyType, z.ZodNumber)) return t === 'number';
+    if (safeInstanceof(keyType, z.ZodSymbol)) return t === 'symbol';
+    if (safeInstanceof(keyType, z.ZodLiteral)) {
+      const values = (keyType as z.ZodLiteral).values;
+      return Array.from(values).includes(k as never);
+    }
+    if (safeInstanceof(keyType, z.ZodEnum)) {
+      const opts = (keyType as z.ZodEnum).options;
+      return opts.includes(k as never);
+    }
+    if (safeInstanceof(keyType, z.ZodUnion)) {
+      const opts = (keyType as z.ZodUnion).options;
+      return opts.some((o) => recordKeyTypeAccepts(o)(k));
+    }
+    // Permissive fallback: accept primitive matches.
+    return t === 'string' || t === 'number' || t === 'symbol';
+  };
+}
 
 const validValues = [
   'true',
@@ -166,10 +251,23 @@ export const generateUtils = {
     const { faker, config } = options;
     const { checks = [] } = schema.def;
 
-    const length = calcLengthFromChecks(checks, faker, config.array);
+    let length = calcLengthFromChecks(checks, faker, config.array);
+    const maxLiteralIdx = findMaxLiteralIndex(options.pathSupplies);
+    if (maxLiteralIdx + 1 > length) {
+      if (maxLiteralIdx + 1 > PATH_INDEX_HARD_LIMIT) {
+        throw new Error(
+          `supplyPath array index ${maxLiteralIdx} exceeds the hard limit ` +
+            `of ${PATH_INDEX_HARD_LIMIT}. Check for a typo in the supplied path.`,
+        );
+      }
+      length = maxLiteralIdx + 1;
+    }
     return Array.from({ length }, (_, arrayIndex) => {
-      const arrayIndexes = [...options.arrayIndexes, arrayIndex];
-      return generator(schema.element, { ...options, arrayIndexes });
+      const childOpts = pushPathSegment(options, {
+        kind: 'arrayIndex',
+        index: arrayIndex,
+      });
+      return generator(schema.element, childOpts);
     }).filter((v) => v !== OMIT_SYMBOL);
   },
   tuple: (
@@ -179,8 +277,11 @@ export const generateUtils = {
   ) => {
     const { items } = schema.def;
     const result = items.map((item, arrayIndex) => {
-      const arrayIndexes = [...options.arrayIndexes, arrayIndex];
-      return generator(item, { ...options, arrayIndexes });
+      const childOpts = pushPathSegment(options, {
+        kind: 'tupleIndex',
+        index: arrayIndex,
+      });
+      return generator(item, childOpts);
     });
 
     // Handle case where ZodNever returns OMIT_SYMBOL
@@ -203,11 +304,28 @@ export const generateUtils = {
     const { checks = [] } = schema.def;
 
     const length = calcLengthFromChecks(checks, faker, config.map);
-    const entries = Array.from({ length }, () => {
+    const namedKeys = isNamedKeyType(keyType);
+    const entries: [unknown, unknown][] = [];
+    const addEntry = (k: unknown) => {
+      const v = generateKeyedValue(
+        options,
+        { kind: 'mapKey', key: k },
+        valueType,
+        namedKeys,
+        generator,
+      );
+      if (v !== OMIT_SYMBOL) entries.push([k, v]);
+    };
+    for (let i = 0; i < length; i++) {
       const k = generator(keyType, options);
-      const value = generator(valueType, options);
-      return [k, value] as const;
-    }).filter(([k, v]) => k !== OMIT_SYMBOL && v !== OMIT_SYMBOL);
+      if (k !== OMIT_SYMBOL) addEntry(k);
+    }
+    for (const k of findKeyInjections(
+      options.pathSupplies,
+      recordKeyTypeAccepts(keyType),
+    )) {
+      addEntry(k);
+    }
     return new Map(entries);
   },
   set: (
@@ -220,7 +338,8 @@ export const generateUtils = {
 
     const length = calcLengthFromChecks(checks, faker, config.set);
     const values = Array.from({ length }, () => {
-      return generator(valueType, options);
+      const childOpts = pushPathSegment(options, { kind: 'setItem' });
+      return generator(valueType, childOpts);
     }).filter((v) => v !== OMIT_SYMBOL);
     return new Set(values);
   },
@@ -233,7 +352,12 @@ export const generateUtils = {
     const result: { [key: string]: unknown } = {};
 
     for (const [key, value] of Object.entries(shape)) {
-      const generated = generator(value, options);
+      const childOpts = pushPathSegment(
+        options,
+        { kind: 'objectKey', key },
+        key,
+      );
+      const generated = generator(value, childOpts);
       if (generated !== OMIT_SYMBOL) {
         result[key] = generated;
       }
@@ -248,22 +372,41 @@ export const generateUtils = {
     const { faker, config } = options;
     const { keyType, valueType } = schema;
     const length = faker.number.int(config.record);
-    return [...Array(length)].reduce((acc) => {
+    const namedKeys = isNamedKeyType(keyType);
+    const acc: Record<string | number | symbol, unknown> = {};
+    const addEntry = (k: string | number | symbol) => {
+      const value = generateKeyedValue(
+        options,
+        { kind: 'recordKey', key: k },
+        valueType,
+        namedKeys,
+        generator,
+      );
+      if (value === OMIT_SYMBOL) return;
+      acc[typeof k === 'symbol' ? String(k) : k] = value;
+    };
+
+    for (let i = 0; i < length; i++) {
       const k = generator(keyType, options);
-
-      // If keyType is ZodNever, skip this entry.
-      if (k === OMIT_SYMBOL) return acc;
-
-      const keyIsValid =
-        typeof k === 'string' || typeof k === 'number' || typeof k === 'symbol';
-      if (keyIsValid) {
-        const keyStr = typeof k === 'symbol' ? String(k) : k;
-        const value = generator(valueType, options);
-        if (value === OMIT_SYMBOL) return acc;
-        return { ...acc, [keyStr]: value };
+      if (k === OMIT_SYMBOL) continue;
+      if (
+        typeof k !== 'string' &&
+        typeof k !== 'number' &&
+        typeof k !== 'symbol'
+      ) {
+        throw new Error('Invalid record key type');
       }
-      throw new Error('Invalid record key type');
-    }, {});
+      addEntry(k);
+    }
+
+    for (const k of findKeyInjections(
+      options.pathSupplies,
+      recordKeyTypeAccepts(keyType),
+    )) {
+      addEntry(k as string | number | symbol);
+    }
+
+    return acc;
   },
   union: (
     schema: z.ZodUnion,

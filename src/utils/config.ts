@@ -42,6 +42,9 @@ export function createMockConfig(config?: Partial<MockConfig>): MockConfig {
     defaultProbability,
     lazyDepthLimit: depthLimit,
     recursiveDepthLimit: depthLimit,
+    customMockKey: 'mock',
+    keyMapping: 'off',
+    preflightCheck: true,
     ...rest,
   };
 }
@@ -61,5 +64,9 @@ export function createGeneraterOptions(
     arrayIndexes: [],
     pinnedHierarchy: new Map(),
     circularRefs: new Map(),
+    pathSupplies: [],
+    supplyRefTargets: new Set(),
+    hasOpaqueCustomizer: false,
+    preflightFixes: new Map(),
   };
 }

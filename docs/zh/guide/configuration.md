@@ -6,18 +6,21 @@
 
 ```ts
 interface MockConfig {
-  locale?: LocaleType | LocaleType[]  // default: [en, base]
-  randomizer?: Randomizer             // faker.js 的随机器
-  seed: number                        // default: 1
-  array: { min: number; max: number } // default: { min: 1, max: 3 }
-  map: { min: number; max: number }   // default: { min: 1, max: 3 }
-  set: { min: number; max: number }   // default: { min: 1, max: 3 }
+  locale?: LocaleType | LocaleType[]   // default: [en, base]
+  randomizer?: Randomizer              // faker.js 的随机器
+  seed: number                         // default: 1
+  array: { min: number; max: number }  // default: { min: 1, max: 3 }
+  map: { min: number; max: number }    // default: { min: 1, max: 3 }
+  set: { min: number; max: number }    // default: { min: 1, max: 3 }
   record: { min: number; max: number } // default: { min: 1, max: 3 }
   optionalProbability: number          // default: 0.5
   nullableProbability: number          // default: 0.5
   defaultProbability: number           // default: 0.5
   recursiveDepthLimit?: number         // default: 5
-  consistentKey?: string               // 元数据的键名
+  consistentKey?: string               // 元数据键名（一致性生成）
+  customMockKey?: string               // default: 'mock'（z.custom 的 meta 键）
+  keyMapping?: 'off' | 'auto' | KeyMapper // default: 'off'
+  preflightCheck?: boolean              // default: true
 }
 ```
 
@@ -270,6 +273,129 @@ const mock = initGenerator({ consistentKey })
   }
 ]
 ```
+
+## customMockKey
+
+从 `z.custom()` / `z.instanceof()` Schema 的 meta 中读取生成器的属性名。默认 `'mock'`。
+
+```ts
+const Schema = z.custom<File>().meta({ mock: (faker) => new File(['x'], faker.system.fileName()) })
+
+initGenerator().generate(Schema) // 调用 meta.mock
+```
+
+为避免与其他 meta 使用者冲突，可以更改键名：
+
+```ts
+const Schema = z.custom<File>().meta({ zodMock: () => new File([], 'a') })
+initGenerator({ customMockKey: 'zodMock' }).generate(Schema)
+```
+
+完整用法见 [自定义生成器 — 处理 `z.custom()`](/zh/guide/custom-generator#处理-z-custom-和-z-instanceof)。
+
+## keyMapping
+
+属性名 → `faker` 函数的可选映射，仅对原始叶子 Schema（string / number / boolean / date）生效。默认 `'off'`。
+
+- `'off'` —— 不映射（默认行为）
+- `'auto'` —— 使用内置默认映射（`firstName`, `email`, `age`, `createdAt` 等）
+- `KeyMapper` 函数 —— `(key, schema, faker, options) => value | undefined`。返回 `undefined` 时回退到内置默认
+
+```ts
+const Schema = z.object({
+  firstName: z.string(),
+  email: z.string(),
+  age: z.number(),
+  createdAt: z.date(),
+})
+
+initGenerator({ keyMapping: 'auto' }).generate(Schema)
+// => { firstName: 'Hannah', email: 'a@x', age: 37, createdAt: <Date> }
+```
+
+`keyMapping` 在 **`supplyPath` 和 `supply` / `supplyRef` / `override` 链之后**执行，所以显式覆盖始终优先。
+
+```ts
+initGenerator({ keyMapping: 'auto' })
+  .supplyPath(['email'], 'override@x')
+  .generate(Schema)
+// email 为 'override@x'，不是 faker 邮箱
+```
+
+内置映射的覆盖范围（大小写、分隔符不敏感 —— `firstName`、`first_name`、`FIRST-NAME` 都视为同一个）：
+
+| 键 | 映射到 |
+|---|---|
+| `firstName` / `lastName` / `name` | `faker.person.*` |
+| `email`, `phone`, `url`, `avatar` | `faker.internet.*` |
+| `street` / `city` / `country` / `zip` | `faker.location.*` |
+| `company`, `jobTitle`, `department` | `faker.company.*`, `faker.person.jobTitle()` |
+| `description`, `title`, `content` | `faker.lorem.*` |
+| `age`, `price`, `quantity`, `rating`, `latitude`, `longitude` | 合适范围的 `faker.number.*` |
+| `createdAt`, `updatedAt`, `birthDate` | `faker.date.*` |
+
+自定义匹配器：
+
+```ts
+import type { KeyMapper } from 'zod-v4-mocks'
+
+const myMap: KeyMapper = (key, schema, faker) => {
+  if (key === 'sku') return faker.string.alphanumeric(10).toUpperCase()
+  return undefined // 回退到内置默认
+}
+
+initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
+```
+
+## preflightCheck
+
+在生成之前，库会对 Schema 进行预检遍历。默认 `true`。它检测生成器无法安全 mock 的结构，指出具体路径并尽早失败，或在存在最小修正方案时自动修复。可通过 `initGenerator({ preflightCheck: false })` 关闭。
+
+### error 级检查（生成前抛错）
+
+- **tuple 位置的 z.custom()** —— 固定长度 tuple 内未提供 meta 的 `z.custom()` / `z.instanceof()`。tuple 无法丢弃槽位，未 mock 的值会非法。用 `.meta({ mock: ... })` 或 `supplyRef()` 解决。
+- **不兼容的 z.intersection()** —— 没有任何单一值能同时满足两侧：不同的原始类型（`z.string()` & `z.number()`）、无公共值的 enum、范围不相交的 number。
+- **非法的 z.record() 键类型** —— 无法生成 string / number / symbol 的键类型。
+
+```ts
+const Schema = z.object({
+  pair: z.tuple([z.string(), z.custom<File>()]),
+})
+initGenerator().generate(Schema)
+// throws: Preflight check found 1 issue(s):
+//   - pair[1]: z.custom()/z.instanceof() sits at a tuple position ...
+```
+
+当注册了 `supply` 或 `override` 时，库无法验证其覆盖范围，因此 error 级的发现会降级为 warning。
+
+### warning 级检查（仅报告，生成继续）
+
+- **被忽略的 .refine() / .superRefine()** —— refine 谓词在生成时被丢弃，生成值可能不满足它。若 mock 必须通过 `.parse()`，请用 `supplyPath()` / `supplyRef()` 固定有效值。
+- **不可满足的 number / bigint 范围** —— `min` 大于 `max`（如 `z.number().min(10).max(5)`）。生成器会钳制范围，但值无法通过 `.parse()`。
+- **冲突的 z.string() 检查** —— 同类的多个竞争检查（`regex` / `length` / `startsWith` / `endsWith` / `toUpperCase`·`toLowerCase`），每类只应用最后一个。
+- **不支持的 Schema 类型** —— 生成器无法处理的 Schema（`z.function()` / `z.promise()`，或较新 Zod 新增的类型）。
+- **以 z.lazy() 自身作为递归锚点** —— 会被自动修复（见下）。
+
+### 自动修复
+
+对于存在安全、最小修正方案的问题，预检会发出 **warning** 并自动应用修复 —— 随后生成会使用修正后的 Schema 继续进行。你无需改动代码。
+
+目前涵盖以 `z.lazy()` 自身作为递归锚点的情况。深度限制器跟踪的是 object/array 等引用，而非 `z.lazy()`，所以这类 Schema 否则会栈溢出：
+
+```ts
+// 被检测、警告并自动修复 —— 生成正常终止
+const Tree = z.lazy(() =>
+  z.object({ value: z.string(), children: z.array(Tree) }),
+)
+initGenerator().generate(Tree)
+// [preflight] (root): A recursive z.lazy() is its own recursion anchor ...
+```
+
+警告同时会建议更清晰的手写形式（`z.object({ ..., children: z.lazy(() => z.array(Tree)) })`）。当 `preflightCheck` 为 `false` 时也会跳过自动修复。
+
+::: tip
+预检也是一张前向兼容的安全网：随着 Zod 新增 Schema 类型，生成器尚不能处理的情况可以在这里暴露 —— 以 error 拒绝，或以 warning + 自动修复处理 —— 而不是在生成深处失败。
+:::
 
 ## updateConfig
 

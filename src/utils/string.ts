@@ -12,11 +12,7 @@ import {
   isZodCheckStartsWith,
   isZodCheckUpperCase,
 } from './schema';
-import {
-  warnCaseMismatch,
-  warnFixedLengthExceedsConstraint,
-  warnMultipleChecks,
-} from './warning';
+import { warnCaseMismatch, warnFixedLengthExceedsConstraint } from './warning';
 
 export function generateStringWithChecks(
   faker: Faker,
@@ -31,13 +27,8 @@ export function generateStringWithChecks(
   const includesChecks = checks.filter(isZodCheckIncludes);
   const regexChecks = checks.filter(isZodCheckRegex);
 
-  warnMultipleChecks({
-    length: lengthEqualsChecks.map((c) => c._zod.def.length),
-    startsWith: startsWithChecks.map((c) => c._zod.def.prefix),
-    endsWith: endsWithChecks.map((c) => c._zod.def.suffix),
-    regex: regexChecks.map((c) => c._zod.def.pattern.toString()),
-  });
-
+  // Multiple competing checks of the same kind are reported by the
+  // pre-flight check; here we just apply the last one of each.
   const lengthEqualsCheck = lengthEqualsChecks.at(-1);
   const startsWithCheck = startsWithChecks.at(-1);
   const endsWithCheck = endsWithChecks.at(-1);
@@ -79,11 +70,6 @@ export function generateStringWithChecks(
   const caseChecks = checks.filter(
     (v) => isZodCheckUpperCase(v) || isZodCheckLowerCase(v),
   );
-  if (caseChecks.length > 1) {
-    console.warn(
-      `Multiple uppercase/lowercase checks detected. Using the last one. This may cause validation failures.`,
-    );
-  }
   const caseCheck = caseChecks.at(-1);
   if (caseCheck) res = u.regex(faker, caseCheck);
 

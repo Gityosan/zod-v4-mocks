@@ -24,6 +24,19 @@
   ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "default": "./dist/config.js"
+    }
+  },
+  "bin": {
+    "zod-v4-mocks": "dist/cli.js"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -43,7 +56,12 @@
   },
   "dependencies": {
     "@faker-js/faker": "10.3.0",
+    "c12": "4.0.0-beta.4",
+    "citty": "0.2.2",
+    "consola": "3.4.2",
     "es-toolkit": "1.45.1",
+    "jiti": "2.7.0",
+    "log-update": "7.2.0",
     "randexp": "0.5.3"
   },
   "devDependencies": {

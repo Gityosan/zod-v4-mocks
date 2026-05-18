@@ -86,6 +86,23 @@ console.log(mocks.user) // { id: "...", name: "...", email: "..." }
 console.log(mocks.post) // { id: 123, title: "...", body: "...", published: true }
 ```
 
+## 複数件の生成 / ファクトリ
+
+`generateMany(schema, count)` は同じスキーマから独立した `count` 件のモックを返します。シード付き RNG により決定論的かつ重複しにくい値が得られます。
+
+```ts
+const users = initGenerator({ seed: 1 }).generateMany(userSchema, 10)
+// users.length === 10、同じシードなら毎回同じ
+```
+
+`factory(schema)` はスキーマに紐付いた小さなオブジェクトを返します。逐次生成に便利です：
+
+```ts
+const f = initGenerator().factory(userSchema)
+const user = f.next()          // 1件
+const batch = f.take(5)        // 5件
+```
+
 ## 再現性のある生成
 
 同じ `seed` 値を指定すれば、毎回同じモックデータが生成されます。テストの安定性に有用です。
@@ -157,11 +174,16 @@ const mock = initGenerator().generate(complexSchema)
 | `.refine()` | バリデーション条件は無視される |
 | `.check()` | `z.overwrite()` / `z.trim()` のみ対応。`z.regex()` / `z.minLength()` 等は非対応（メソッド形式 `.regex()` は対応済み） |
 
+### ユーザ入力が必要
+
+| スキーマ | 注意点 |
+|---------|------|
+| `z.custom()` / `z.instanceof()` | カスタムバリデーション解析不可。`.meta({ mock: ... })` または `supplyRef` で値を提供。詳しくは [カスタムジェネレータ](/ja/guide/custom-generator#z-custom-z-instanceof-の扱い) |
+
 ### 非対応
 
 | スキーマ | 理由 |
 |---------|------|
-| `z.custom()` / `z.instanceof()` | カスタムバリデーション解析不可。`override` で回避 |
 | `z.function()` | 関数のモック生成は複雑 |
 | `.catchall()` | 無視される（モック生成に影響なし） |
 | `z.nativeEnum()` | Zod v4 で非推奨。`z.enum()` を使用 |

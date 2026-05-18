@@ -6,18 +6,21 @@
 
 ```ts
 interface MockConfig {
-  locale?: LocaleType | LocaleType[]  // default: [en, base]
-  randomizer?: Randomizer             // faker.js のランダマイザー
-  seed: number                        // default: 1
-  array: { min: number; max: number } // default: { min: 1, max: 3 }
-  map: { min: number; max: number }   // default: { min: 1, max: 3 }
-  set: { min: number; max: number }   // default: { min: 1, max: 3 }
+  locale?: LocaleType | LocaleType[]   // default: [en, base]
+  randomizer?: Randomizer              // faker.js のランダマイザー
+  seed: number                         // default: 1
+  array: { min: number; max: number }  // default: { min: 1, max: 3 }
+  map: { min: number; max: number }    // default: { min: 1, max: 3 }
+  set: { min: number; max: number }    // default: { min: 1, max: 3 }
   record: { min: number; max: number } // default: { min: 1, max: 3 }
   optionalProbability: number          // default: 0.5
   nullableProbability: number          // default: 0.5
   defaultProbability: number           // default: 0.5
   recursiveDepthLimit?: number         // default: 5
-  consistentKey?: string               // メタデータのキー名
+  consistentKey?: string               // メタデータのキー名（一貫値生成用）
+  customMockKey?: string               // default: 'mock' (z.custom のメタキー)
+  keyMapping?: 'off' | 'auto' | KeyMapper // default: 'off'
+  preflightCheck?: boolean              // default: true
 }
 ```
 
@@ -270,6 +273,129 @@ const mock = initGenerator({ consistentKey })
   }
 ]
 ```
+
+## customMockKey
+
+`z.custom()` / `z.instanceof()` のスキーマから生成関数を読み取る meta 属性名。既定 `'mock'`。
+
+```ts
+const Schema = z.custom<File>().meta({ mock: (faker) => new File(['x'], faker.system.fileName()) })
+
+initGenerator().generate(Schema) // meta.mock を呼び出す
+```
+
+他の meta 利用者と衝突を避けたい場合はキー名を変更：
+
+```ts
+const Schema = z.custom<File>().meta({ zodMock: () => new File([], 'a') })
+initGenerator({ customMockKey: 'zodMock' }).generate(Schema)
+```
+
+詳しい使い方は [カスタムジェネレータ — `z.custom()` / `z.instanceof()` の扱い](/ja/guide/custom-generator#z-custom-z-instanceof-の扱い) を参照。
+
+## keyMapping
+
+プロパティ名 → `faker` 関数のオプトインマッピング。プリミティブ葉スキーマ（string / number / boolean / date）にのみ作用します。既定 `'off'`。
+
+- `'off'` — マッピング無し（既定動作）
+- `'auto'` — 組み込みのデフォルトを使用（`firstName`, `email`, `age`, `createdAt` 等）
+- `KeyMapper` 関数 — `(key, schema, faker, options) => value | undefined`。`undefined` を返すと組み込みデフォルトにフォールバック
+
+```ts
+const Schema = z.object({
+  firstName: z.string(),
+  email: z.string(),
+  age: z.number(),
+  createdAt: z.date(),
+})
+
+initGenerator({ keyMapping: 'auto' }).generate(Schema)
+// => { firstName: 'Hannah', email: 'a@x', age: 37, createdAt: <Date> }
+```
+
+`keyMapping` は **`supplyPath` および `supply` / `supplyRef` / `override` チェーンの後に**実行されるため、明示的なオーバーライドが常に優先されます。
+
+```ts
+initGenerator({ keyMapping: 'auto' })
+  .supplyPath(['email'], 'override@x')
+  .generate(Schema)
+// email は 'override@x'（faker email ではない）
+```
+
+組み込みマッピングの範囲（大文字小文字・区切り文字を無視 — `firstName`, `first_name`, `FIRST-NAME` はすべて同一視）：
+
+| キー | マッピング先 |
+|---|---|
+| `firstName` / `lastName` / `name` | `faker.person.*` |
+| `email`, `phone`, `url`, `avatar` | `faker.internet.*` |
+| `street` / `city` / `country` / `zip` | `faker.location.*` |
+| `company`, `jobTitle`, `department` | `faker.company.*`, `faker.person.jobTitle()` |
+| `description`, `title`, `content` | `faker.lorem.*` |
+| `age`, `price`, `quantity`, `rating`, `latitude`, `longitude` | 適切な範囲の `faker.number.*` |
+| `createdAt`, `updatedAt`, `birthDate` | `faker.date.*` |
+
+カスタムマッチャー：
+
+```ts
+import type { KeyMapper } from 'zod-v4-mocks'
+
+const myMap: KeyMapper = (key, schema, faker) => {
+  if (key === 'sku') return faker.string.alphanumeric(10).toUpperCase()
+  return undefined // 組み込みデフォルトへフォールバック
+}
+
+initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
+```
+
+## preflightCheck
+
+生成前に、ライブラリはスキーマをプリフライト走査します。既定は `true`。ジェネレータが安全にモックできない構造を検出し、該当パスを示して即座に失敗させるか、最小限の修正が可能なものは自動修正します。`initGenerator({ preflightCheck: false })` で無効化できます。
+
+### error レベルのチェック（生成前に throw）
+
+- **tuple 位置の z.custom()** — 固定長 tuple 内の meta 未設定 `z.custom()` / `z.instanceof()`。tuple はスロットを脱落させられないため不正値が残ります。`.meta({ mock: ... })` または `supplyRef()` で解消。
+- **非互換な z.intersection()** — どの値でも両側を満たせないケース：異なるプリミティブ型（`z.string()` & `z.number()`）、共通値の無い enum、レンジが交わらない number。
+- **不正な z.record() キー型** — string / number / symbol を生成できないキー型。
+
+```ts
+const Schema = z.object({
+  pair: z.tuple([z.string(), z.custom<File>()]),
+})
+initGenerator().generate(Schema)
+// throws: Preflight check found 1 issue(s):
+//   - pair[1]: z.custom()/z.instanceof() sits at a tuple position ...
+```
+
+`supply` / `override` が登録されている場合、ライブラリは網羅性を検証できないため、error レベルの指摘は warning に降格されます。
+
+### warning レベルのチェック（報告のみ・生成は継続）
+
+- **無視される .refine() / .superRefine()** — refine の述語は生成時に捨てられるため、生成値がそれを満たさない可能性があります。`.parse()` を通す必要があるなら `supplyPath()` / `supplyRef()` で有効値を固定してください。
+- **成立しない number / bigint レンジ** — `min` が `max` より大きい（例：`z.number().min(10).max(5)`）。ジェネレータはレンジをクランプしますが、値は `.parse()` を通りません。
+- **競合する z.string() チェック** — 同種の競合するチェックが複数（`regex` / `length` / `startsWith` / `endsWith` / `toUpperCase`・`toLowerCase`）。各種別の最後の1つだけが適用されます。
+- **未対応のスキーマ型** — ジェネレータが扱えないスキーマ（`z.function()` / `z.promise()`、または新しい Zod で追加された型）。
+- **再帰 z.lazy() が自身のアンカー** — 自動修正されます（下記）。
+
+### 自動修正
+
+安全かつ最小限のスキーマ修正が存在する問題については、プリフライトは **warning** を出したうえで修正を自動適用し、修正後のスキーマで生成を続行します。コードを変更する必要はありません。
+
+現状は、再帰アンカーが `z.lazy()` 自身になっているケースが対象です。深さ制限は object/array 等の参照を追跡し `z.lazy()` は追跡しないため、このスキーマはそのままではスタックオーバーフローします：
+
+```ts
+// 検出 → 警告 → 自動修正され、生成は正常に終了する
+const Tree = z.lazy(() =>
+  z.object({ value: z.string(), children: z.array(Tree) }),
+)
+initGenerator().generate(Tree)
+// [preflight] (root): A recursive z.lazy() is its own recursion anchor ...
+```
+
+警告では、より明快な手書きの形（`z.object({ ..., children: z.lazy(() => z.array(Tree)) })`）も併せて提案します。`preflightCheck` が `false` のときは自動修正もスキップされます。
+
+::: tip
+プリフライトは前方互換のセーフティネットでもあります。Zod が新しいスキーマ型を追加した際、ジェネレータがまだ扱えないケースを、生成の奥深くで失敗させる代わりに、ここで error として弾くか warning + 自動修正で表面化できます。
+:::
 
 ## updateConfig
 

@@ -86,6 +86,23 @@ console.log(mocks.user) // { id: "...", name: "...", email: "..." }
 console.log(mocks.post) // { id: 123, title: "...", body: "...", published: true }
 ```
 
+## Generate Many / Factory
+
+`generateMany(schema, count)` returns `count` independent mocks for the same schema. The seeded RNG produces deterministic but distinct values.
+
+```ts
+const users = initGenerator({ seed: 1 }).generateMany(userSchema, 10)
+// users.length === 10, all unique under the seed
+```
+
+`factory(schema)` returns a small object bound to a schema for incremental use:
+
+```ts
+const f = initGenerator().factory(userSchema)
+const user = f.next()          // single mock
+const batch = f.take(5)        // five mocks
+```
+
 ## Reproducible Generation
 
 By specifying the same `seed` value, the same mock data is generated every time. This is useful for test stability.
@@ -157,11 +174,16 @@ const mock = initGenerator().generate(complexSchema)
 | `.refine()` | Validation conditions are ignored |
 | `.check()` | Only `z.overwrite()` / `z.trim()` are supported. `z.regex()` / `z.minLength()` etc. are unsupported (method-style `.regex()` is supported) |
 
+### Requires user input
+
+| Schema | Notes |
+|---------|------|
+| `z.custom()` / `z.instanceof()` | Cannot analyze custom validations. Provide a generator via `.meta({ mock: ... })` or `supplyRef`; see [Custom Generator](/guide/custom-generator#handling-z-custom-and-z-instanceof) |
+
 ### Unsupported
 
 | Schema | Reason |
 |---------|------|
-| `z.custom()` / `z.instanceof()` | Cannot analyze custom validations. Use `override` as a workaround |
 | `z.function()` | Generating function mocks is complex |
 | `.catchall()` | Ignored (no impact on mock generation) |
 | `z.nativeEnum()` | Deprecated in Zod v4. Use `z.enum()` instead |
