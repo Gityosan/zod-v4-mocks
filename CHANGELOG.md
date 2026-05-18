@@ -5,7 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.3.1] - 2026-05-13
+
+### Fixed
+- Fixed `output({ binary: true })` generated wrapper using `new URL(..., import.meta.url)` which fails under Vitest/Vite (non-`file://` scheme). Now uses `path.join(import.meta.dirname, ...)` instead (requires Node.js 20.11+)
+
+## [2.3.0] - 2026-05-11
 
 ### Added
 - Added `supplyRef(subSchema, value)` — fix a value for a specific schema reference (more precise than `supply`, which targets a Zod constructor)

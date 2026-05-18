@@ -260,7 +260,7 @@ JSON では表現できない型（BigInt, Symbol, Map, Set, File, Blob）を含
 - `<name>.bin` — `v8.serialize` の生バッファ。Zod が生成するあらゆる値（循環参照を含む）を完全に保持
 - `<name>.ts` / `<name>.js` — import 時に同名の `.bin` を `v8.deserialize` で遅延復元する薄い ESM ラッパー。消費側は `import { mockData } from './user'` でそのまま使える
 
-エクスポート値は `unknown` 型です。消費側でキャストするか、ラッパーを介さず `deserialize<T>('./user.bin')` を直接呼んで型付けしてください。`.bin` のファイル名は常にラッパーのベース名から自動導出され、個別には変更できません。ラッパーは ESM (`import.meta.url`) 前提で Node.js 限定です。
+エクスポート値は `unknown` 型です。消費側でキャストするか、ラッパーを介さず `deserialize<T>('./user.bin')` を直接呼んで型付けしてください。`.bin` のファイル名は常にラッパーのベース名から自動導出され、個別には変更できません。ラッパーは ESM (`import.meta.dirname`) 前提で Node.js 20.11+ が必要です。
 :::
 
 ## 型定義

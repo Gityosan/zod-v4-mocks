@@ -259,7 +259,7 @@ With `binary: true`, `output()` writes two files:
 - `<name>.bin` — raw `v8.serialize` Buffer. Perfectly preserves every value Zod can generate, including circular references.
 - `<name>.ts` / `<name>.js` — a thin ESM wrapper that lazily `v8.deserialize`s the sibling `.bin` at import time, so consumers just do `import { mockData } from './user'` with no awareness of the binary representation.
 
-The wrapper exports the value as `unknown`; cast on the consumer side, or call `deserialize<T>('./user.bin')` directly when you want a typed value without going through the wrapper. The `.bin` filename is always derived from the wrapper's basename and cannot be customized separately. The wrapper targets ESM (`import.meta.url`) and is Node.js only.
+The wrapper exports the value as `unknown`; cast on the consumer side, or call `deserialize<T>('./user.bin')` directly when you want a typed value without going through the wrapper. The `.bin` filename is always derived from the wrapper's basename and cannot be customized separately. The wrapper targets ESM (`import.meta.dirname`) and requires Node.js 20.11+.
 :::
 
 ## Type Definitions
