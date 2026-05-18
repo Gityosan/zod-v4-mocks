@@ -269,9 +269,17 @@ describe('preflight - incompatible z.intersection', () => {
     expect(() => initGenerator().generate(Schema)).toThrow(/no common value/);
   });
 
-  it('throws for numbers with a disjoint range', () => {
+  it('warns (does not throw) for numbers with a disjoint range', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const Schema = z.intersection(z.number().min(10), z.number().max(5));
-    expect(() => initGenerator().generate(Schema)).toThrow(/disjoint range/);
+    // the generator clamps such a range rather than throwing, so this is a
+    // warning, not an error
+    expect(() => initGenerator().generate(Schema)).not.toThrow();
+    const w = warn.mock.calls.find((a) =>
+      String(a[0]).includes('disjoint range'),
+    );
+    expect(w).toBeDefined();
+    warn.mockRestore();
   });
 
   it('accepts compatible intersections', () => {
@@ -297,5 +305,109 @@ describe('preflight - incompatible z.intersection', () => {
   it('error names the offending path', () => {
     const Schema = z.object({ bad: z.intersection(z.string(), z.number()) });
     expect(() => initGenerator().generate(Schema)).toThrow(/bad&L|bad&R|bad/);
+  });
+});
+
+describe('preflight - unsatisfiable min > max range', () => {
+  it('warns for a number with min > max', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    initGenerator().generate(z.object({ n: z.number().min(10).max(5) }));
+    const w = warn.mock.calls.find(
+      (a) =>
+        String(a[0]).includes('[preflight]') &&
+        String(a[0]).includes('Unsatisfiable number range'),
+    );
+    expect(w).toBeDefined();
+    warn.mockRestore();
+  });
+
+  it('warns for a bigint with min > max', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    initGenerator().generate(z.bigint().min(100n).max(1n));
+    const w = warn.mock.calls.find((a) =>
+      String(a[0]).includes('Unsatisfiable bigint range'),
+    );
+    expect(w).toBeDefined();
+    warn.mockRestore();
+  });
+
+  it('does not warn for a valid range', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    initGenerator().generate(z.number().min(5).max(10));
+    const w = warn.mock.calls.find((a) =>
+      String(a[0]).includes('Unsatisfiable'),
+    );
+    expect(w).toBeUndefined();
+    warn.mockRestore();
+  });
+});
+
+describe('preflight - conflicting string checks', () => {
+  it('warns when a z.string() has multiple regex checks', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    initGenerator().generate(z.string().regex(/^[A-Z]/).regex(/\d$/));
+    const w = warn.mock.calls.find(
+      (a) =>
+        String(a[0]).includes('[preflight]') &&
+        String(a[0]).includes('multiple regex'),
+    );
+    expect(w).toBeDefined();
+    warn.mockRestore();
+  });
+
+  it('warns for multiple startsWith checks', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    initGenerator().generate(z.string().startsWith('a').startsWith('ab'));
+    const w = warn.mock.calls.find((a) =>
+      String(a[0]).includes('startsWith'),
+    );
+    expect(w).toBeDefined();
+    warn.mockRestore();
+  });
+
+  it('does not warn for a single regex check', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    initGenerator().generate(z.string().regex(/^[A-Z]+$/));
+    const w = warn.mock.calls.find((a) =>
+      String(a[0]).includes('multiple'),
+    );
+    expect(w).toBeUndefined();
+    warn.mockRestore();
+  });
+});
+
+describe('preflight - unsupported schema types', () => {
+  it('warns for z.promise()', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      initGenerator().generate(z.promise(z.string()) as never);
+    } catch {
+      /* generation of an unsupported type may also fail */
+    }
+    const w = warn.mock.calls.find(
+      (a) =>
+        String(a[0]).includes('[preflight]') &&
+        String(a[0]).includes('z.promise()'),
+    );
+    expect(w).toBeDefined();
+    warn.mockRestore();
+  });
+
+  it('does not warn for supported types', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    initGenerator().generate(
+      z.object({
+        a: z.string(),
+        b: z.number(),
+        c: z.array(z.boolean()),
+        d: z.union([z.string(), z.literal(1)]),
+        e: z.email(),
+      }),
+    );
+    const w = warn.mock.calls.find((a) =>
+      String(a[0]).includes('not recognized'),
+    );
+    expect(w).toBeUndefined();
+    warn.mockRestore();
   });
 });

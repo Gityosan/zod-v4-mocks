@@ -384,6 +384,14 @@ coverage, so error-level findings are downgraded to warnings.
   dropped during generation, so the generated value may not satisfy them.
   Pin a valid value with `supplyPath()` / `supplyRef()` if the mock must
   pass `.parse()`.
+- **Unsatisfiable number / bigint range** — `min` greater than `max`
+  (e.g. `z.number().min(10).max(5)`). The generator clamps the range; the
+  value will not pass `.parse()`.
+- **Conflicting z.string() checks** — multiple competing checks of the
+  same kind (`regex`, `length`, `startsWith`, `endsWith`,
+  `toUpperCase`/`toLowerCase`); only the last of each kind is applied.
+- **Unsupported schema type** — a schema the generator does not handle
+  (`z.function()`, `z.promise()`, or a type added by a newer Zod).
 - **Recursive z.lazy() as its own anchor** — auto-fixed (see below).
 
 ### Auto-fixes

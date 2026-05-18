@@ -19,21 +19,6 @@ export function warnOnceForSchema(
 /**
  * @package
  */
-export function warnMultipleChecks(
-  checks: Record<string, string[] | number[]>,
-) {
-  for (const [name, values] of Object.entries(checks)) {
-    if (values.length > 1) {
-      console.warn(
-        `Multiple ${name} checks detected: ${values.join(', ')}. Using the last one: ${values.at(-1)}. This may cause validation failures.`,
-      );
-    }
-  }
-}
-
-/**
- * @package
- */
 export function warnFixedLengthExceedsConstraint(
   fixedLength: number,
   constraintType: 'length' | 'max',

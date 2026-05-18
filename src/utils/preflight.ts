@@ -1,5 +1,14 @@
 import { z } from 'zod';
-import { isZodJsonSchema, safeInstanceof } from './schema';
+import {
+  isZodCheckEndsWith,
+  isZodCheckLengthEquals,
+  isZodCheckLowerCase,
+  isZodCheckRegex,
+  isZodCheckStartsWith,
+  isZodCheckUpperCase,
+  isZodJsonSchema,
+  safeInstanceof,
+} from './schema';
 
 export type PreflightDiagnostic = {
   level: 'error' | 'warning';
@@ -245,14 +254,109 @@ const checkIntersectionCompat: NodeCheck = (schema, path, _inTuple, state) => {
     const max = Math.min(lb.max, rb.max);
     if (min > max) {
       state.diagnostics.push({
-        level: level(state),
+        level: 'warning',
         path: here,
         message:
           `z.intersection() of numbers with a disjoint range ` +
-          `(combined min ${min} > max ${max}).`,
+          `(combined min ${min} > max ${max}). The mock will not pass .parse().`,
       });
     }
   }
+};
+
+/**
+ * A number/bigint schema with an unsatisfiable min > max range.
+ * (A string with minLength > maxLength cannot be constructed — Zod itself
+ * throws while building the length regex — so it needs no check here.)
+ */
+const checkUnsatisfiableRange: NodeCheck = (schema, path, _inTuple, state) => {
+  const report = (kind: string, lo: number | bigint, hi: number | bigint) => {
+    state.diagnostics.push({
+      level: 'warning',
+      path: path || '(root)',
+      message:
+        `Unsatisfiable ${kind} range (min ${lo} > max ${hi}). No value can ` +
+        'satisfy the schema, so the generated mock will not pass .parse().',
+    });
+  };
+  if (safeInstanceof(schema, z.ZodNumber)) {
+    const { minValue, maxValue } = schema;
+    if (minValue != null && maxValue != null && minValue > maxValue) {
+      report('number', minValue, maxValue);
+    }
+  } else if (safeInstanceof(schema, z.ZodBigInt)) {
+    const { minValue, maxValue } = schema;
+    if (minValue != null && maxValue != null && minValue > maxValue) {
+      report('bigint', minValue, maxValue);
+    }
+  }
+};
+
+/** A z.string() carrying multiple competing checks of the same kind. */
+const checkConflictingStringChecks: NodeCheck = (
+  schema,
+  path,
+  _inTuple,
+  state,
+) => {
+  if (!safeInstanceof(schema, z.ZodString)) return;
+  const checks = schema.def.checks ?? [];
+  const conflicts: string[] = [];
+  if (checks.filter(isZodCheckRegex).length > 1) conflicts.push('regex');
+  if (checks.filter(isZodCheckLengthEquals).length > 1) {
+    conflicts.push('length');
+  }
+  if (checks.filter(isZodCheckStartsWith).length > 1) {
+    conflicts.push('startsWith');
+  }
+  if (checks.filter(isZodCheckEndsWith).length > 1) {
+    conflicts.push('endsWith');
+  }
+  const caseCount = checks.filter(
+    (c) => isZodCheckUpperCase(c) || isZodCheckLowerCase(c),
+  ).length;
+  if (caseCount > 1) conflicts.push('uppercase/lowercase');
+  if (conflicts.length === 0) return;
+  state.diagnostics.push({
+    level: 'warning',
+    path: path || '(root)',
+    message:
+      `z.string() has multiple ${conflicts.join(', ')} check(s). Only the ` +
+      'last of each kind is applied, so the value may fail .parse().',
+  });
+};
+
+/**
+ * Schema `def.type` values the generator handles. `discriminatedUnion`/`xor`
+ * report `union`; `codec`/`transform`/`stringbool` report `pipe`; the string
+ * formats (email/url/uuid/iso...) report `string`.
+ */
+const SUPPORTED_TYPES = new Set<string>([
+  'string', 'number', 'boolean', 'bigint', 'date', 'nan', 'symbol', 'file',
+  'null', 'undefined', 'void', 'any', 'unknown',
+  'literal', 'enum', 'template_literal',
+  'array', 'tuple', 'object', 'record', 'map', 'set',
+  'union', 'intersection',
+  'optional', 'nonoptional', 'exactOptional', 'nullable',
+  'default', 'prefault', 'readonly',
+  'lazy', 'pipe', 'catch', 'success', 'custom', 'never',
+]);
+
+/** A schema type the generator does not support. */
+const checkUnsupportedType: NodeCheck = (schema, path, _inTuple, state) => {
+  const type = schema._zod.def.type;
+  if (SUPPORTED_TYPES.has(type)) return;
+  let message: string;
+  if (type === 'function') {
+    message = 'z.function() is not supported — function mocks are out of scope.';
+  } else if (type === 'promise') {
+    message = 'z.promise() is deprecated in Zod v4 and is not supported.';
+  } else {
+    message =
+      `Schema type '${type}' is not recognized by this version of ` +
+      'zod-v4-mocks; the generated value may be incorrect.';
+  }
+  state.diagnostics.push({ level: 'warning', path: path || '(root)', message });
 };
 
 const NODE_CHECKS: NodeCheck[] = [
@@ -260,6 +364,9 @@ const NODE_CHECKS: NodeCheck[] = [
   checkIgnoredRefinements,
   checkRecordKeyType,
   checkIntersectionCompat,
+  checkUnsatisfiableRange,
+  checkConflictingStringChecks,
+  checkUnsupportedType,
 ];
 
 /**

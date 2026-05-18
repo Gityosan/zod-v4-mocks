@@ -371,6 +371,9 @@ initGenerator().generate(Schema)
 ### warning レベルのチェック（報告のみ・生成は継続）
 
 - **無視される .refine() / .superRefine()** — refine の述語は生成時に捨てられるため、生成値がそれを満たさない可能性があります。`.parse()` を通す必要があるなら `supplyPath()` / `supplyRef()` で有効値を固定してください。
+- **成立しない number / bigint レンジ** — `min` が `max` より大きい（例：`z.number().min(10).max(5)`）。ジェネレータはレンジをクランプしますが、値は `.parse()` を通りません。
+- **競合する z.string() チェック** — 同種の競合するチェックが複数（`regex` / `length` / `startsWith` / `endsWith` / `toUpperCase`・`toLowerCase`）。各種別の最後の1つだけが適用されます。
+- **未対応のスキーマ型** — ジェネレータが扱えないスキーマ（`z.function()` / `z.promise()`、または新しい Zod で追加された型）。
 - **再帰 z.lazy() が自身のアンカー** — 自動修正されます（下記）。
 
 ### 自動修正

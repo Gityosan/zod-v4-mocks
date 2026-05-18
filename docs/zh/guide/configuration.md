@@ -371,6 +371,9 @@ initGenerator().generate(Schema)
 ### warning 级检查（仅报告，生成继续）
 
 - **被忽略的 .refine() / .superRefine()** —— refine 谓词在生成时被丢弃，生成值可能不满足它。若 mock 必须通过 `.parse()`，请用 `supplyPath()` / `supplyRef()` 固定有效值。
+- **不可满足的 number / bigint 范围** —— `min` 大于 `max`（如 `z.number().min(10).max(5)`）。生成器会钳制范围，但值无法通过 `.parse()`。
+- **冲突的 z.string() 检查** —— 同类的多个竞争检查（`regex` / `length` / `startsWith` / `endsWith` / `toUpperCase`·`toLowerCase`），每类只应用最后一个。
+- **不支持的 Schema 类型** —— 生成器无法处理的 Schema（`z.function()` / `z.promise()`，或较新 Zod 新增的类型）。
 - **以 z.lazy() 自身作为递归锚点** —— 会被自动修复（见下）。
 
 ### 自动修复

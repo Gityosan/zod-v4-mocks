@@ -60,7 +60,8 @@ export function calcMinMaxNumber(
     max = Number.MAX_SAFE_INTEGER;
   }
   if (min !== undefined && max !== undefined && min > max) {
-    console.warn('Min value should be less than max value');
+    // An unsatisfiable range is reported by the pre-flight check; here we
+    // only clamp so generation can still produce a (best-effort) value.
     max = Math.max(min, max);
   }
   return { min, max };
@@ -74,7 +75,12 @@ export function calcMinMaxBigInt(
   maxValue: bigint | null,
 ) {
   const min = minValue === null ? undefined : minValue;
-  const max = maxValue === null ? undefined : maxValue;
+  let max = maxValue === null ? undefined : maxValue;
+  if (min !== undefined && max !== undefined && min > max) {
+    // An unsatisfiable range is reported by the pre-flight check; clamp so
+    // generation can still produce a (best-effort) value.
+    max = min;
+  }
   return { min, max };
 }
 
