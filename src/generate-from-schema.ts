@@ -215,10 +215,9 @@ function generateFromSchema(
     if (candidate !== undefined) return candidate;
     warnOnceForSchema(
       s,
-      `z.custom() / z.instanceof() に mock 定義がありません. ` +
-        `\`.meta({ ${key}: (faker) => ... })\` を設定するか, ` +
-        `\`supplyRef(schema, value)\` を利用してください. ` +
-        `この値はオブジェクト/配列等のコンテナから省略されます.`,
+      'z.custom() / z.instanceof() has no mock definition. Set ' +
+        `\`.meta({ ${key}: (faker) => ... })\` or use \`supplyRef(schema, value)\`. ` +
+        'This value is omitted from object/array/etc. containers.',
     );
     return OMIT_SYMBOL;
   }

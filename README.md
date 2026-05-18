@@ -114,12 +114,35 @@ interface MockConfig {
   defaultProbability: number;
   /**
    * @default 5
+   * @deprecated Use `recursiveDepthLimit` instead.
    */
   lazyDepthLimit: number;
+  /**
+   * @default 5
+   * @description Max depth for recursive schemas (z.lazy / circular getters).
+   */
+  recursiveDepthLimit?: number;
   /**
    * @description meta's attribute name which is used to generate consistent property value
    */
   consistentKey?: string;
+  /**
+   * @default 'mock'
+   * @description meta's attribute name read for z.custom() / z.instanceof().
+   */
+  customMockKey?: string;
+  /**
+   * @default 'off'
+   * @description Map property names to faker functions for primitive leaves.
+   *  'auto' uses built-in defaults; a KeyMapper function fully customizes.
+   */
+  keyMapping?: 'off' | 'auto' | KeyMapper;
+  /**
+   * @default true
+   * @description Run a pre-flight schema walk that rejects (or auto-fixes)
+   *  constructs the generator cannot safely mock.
+   */
+  preflightCheck?: boolean;
 }
 ```
 
