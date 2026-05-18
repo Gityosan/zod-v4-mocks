@@ -15,7 +15,14 @@ import {
 import { initGenerator, type MockGenerator } from './mock-generator';
 import type { LocaleType, MockConfig } from './type';
 
-type Format = 'json' | 'ts' | 'js' | 'bin';
+const FORMATS = ['json', 'ts', 'js', 'bin'] as const;
+type Format = (typeof FORMATS)[number];
+
+const PROFILES = ['base', 'cli', 'test'] as const;
+
+function isFormat(value: string): value is Format {
+  return (FORMATS as readonly string[]).includes(value);
+}
 
 function readPkgVersion(): string {
   try {
@@ -70,16 +77,19 @@ async function loadSchema(
   return value;
 }
 
-function inferFormat(format: string | undefined, output: string | undefined): Format {
+function inferFormat(
+  format: string | undefined,
+  output: string | undefined,
+): Format {
   if (format) {
-    if (format === 'json' || format === 'ts' || format === 'js' || format === 'bin') {
-      return format;
-    }
-    throw new Error(`Unknown format: ${format} (expected: json|ts|js|bin)`);
+    if (isFormat(format)) return format;
+    throw new Error(
+      `Unknown format: ${format} (expected: ${FORMATS.join('|')})`,
+    );
   }
   if (output) {
     const ext = extname(output).slice(1).toLowerCase();
-    if (ext === 'json' || ext === 'ts' || ext === 'js' || ext === 'bin') return ext;
+    if (isFormat(ext)) return ext;
   }
   return 'json';
 }
@@ -191,9 +201,9 @@ async function runGenerate(args: {
   }
 
   const profile = (args.profile ?? 'cli') as ConfigProfile;
-  if (profile !== 'base' && profile !== 'cli' && profile !== 'test') {
+  if (!(PROFILES as readonly string[]).includes(profile)) {
     throw new Error(
-      `--profile must be one of base|cli|test (got: ${args.profile})`,
+      `--profile must be one of ${PROFILES.join('|')} (got: ${args.profile})`,
     );
   }
 

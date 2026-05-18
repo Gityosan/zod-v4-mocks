@@ -76,11 +76,12 @@ export async function loadConfig(
   options: LoadMockConfigOptions = {},
 ): Promise<LoadedMockConfig | null> {
   const cwd = options.cwd ?? process.cwd();
-  const configFile = options.configFile
-    ? isAbsolute(options.configFile)
+  let configFile: string | undefined;
+  if (options.configFile) {
+    configFile = isAbsolute(options.configFile)
       ? options.configFile
-      : resolve(cwd, options.configFile)
-    : undefined;
+      : resolve(cwd, options.configFile);
+  }
 
   const result = await c12LoadConfig<Partial<DefineMockConfigInput>>({
     name: 'zod-v4-mocks',

@@ -65,7 +65,6 @@ export function createGeneraterOptions(
     pinnedHierarchy: new Map(),
     circularRefs: new Map(),
     pathSupplies: [],
-    currentPath: [],
     supplyRefTargets: new Set(),
     hasOpaqueCustomizer: false,
     preflightFixes: new Map(),

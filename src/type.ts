@@ -1,7 +1,7 @@
 import { allLocales, type Faker, type Randomizer } from '@faker-js/faker';
 import type { z } from 'zod';
 import type { KeyMapper } from './utils/key-mapping';
-import type { PathSegment, PathSupply } from './utils/path';
+import type { PathSupply } from './utils/path';
 
 export type { Faker, Randomizer } from '@faker-js/faker';
 export type LocaleType = keyof typeof allLocales;
@@ -17,8 +17,6 @@ export type GeneraterOptions = {
   circularRefs: Map<z.core.$ZodType, number>;
   /** Path supplies still in scope at the current generation point. */
   pathSupplies: PathSupply[];
-  /** Literal path segments traversed so far (for diagnostics / future hooks). */
-  currentPath: PathSegment[];
   /**
    * Property name eligible for `keyMapping` at the current position.
    * Set only for object keys and literal/enum-typed record/map keys —

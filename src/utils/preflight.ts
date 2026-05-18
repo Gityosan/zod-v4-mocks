@@ -88,8 +88,9 @@ type Category =
   | 'literal'
   | 'complex';
 
-function categoryOf(schema: z.core.$ZodType): Category {
-  const t = coreOf(schema)._zod.def.type;
+/** Classify an already-cored schema for intersection compatibility. */
+function categoryOf(coreSchema: z.core.$ZodType): Category {
+  const t = coreSchema._zod.def.type;
   if (t === 'any' || t === 'unknown') return 'any';
   if (t === 'object' || t === 'record') return 'objectish';
   if (t === 'array' || t === 'tuple') return 'arrayish';
@@ -381,18 +382,22 @@ function detectRecursiveLazy(
 ): void {
   if (!safeInstanceof(schema, z.ZodLazy)) return; // anchored on a tracked type
   if (state.fixes.has(schema)) return; // already handled
+  // `unwrap()` re-runs the lazy getter — call it just twice: one captured
+  // reference plus a second only to test getter stability.
+  let inner: z.core.$ZodType;
+  let second: z.core.$ZodType;
+  try {
+    inner = schema.unwrap();
+    second = schema.unwrap();
+  } catch {
+    return; // cannot unwrap — not actionable
+  }
   // z.json() is a recursive lazy but the generator handles it specially.
-  if (isZodJsonSchema(schema, schema.unwrap())) return;
+  if (isZodJsonSchema(schema, inner)) return;
   // A getter returning the same reference twice is depth-trackable via that
   // stable inner schema; a fresh-each-call getter is not.
-  let stableGetter = false;
-  try {
-    stableGetter = schema.unwrap() === schema.unwrap();
-  } catch {
-    stableGetter = false;
-  }
-  if (stableGetter) return;
-  state.fixes.set(schema, schema.unwrap());
+  if (inner === second) return;
+  state.fixes.set(schema, inner);
   state.diagnostics.push({
     level: 'warning',
     path: path || '(root)',
@@ -441,12 +446,10 @@ function walk(
       });
       return;
     }
-    if (safeInstanceof(schema, z.ZodRecord)) {
-      walk(schema.keyType, `${path}[key]`, false, ancestors, state);
-      walk(schema.valueType, `${path}[*]`, false, ancestors, state);
-      return;
-    }
-    if (safeInstanceof(schema, z.ZodMap)) {
+    if (
+      safeInstanceof(schema, z.ZodRecord) ||
+      safeInstanceof(schema, z.ZodMap)
+    ) {
       walk(schema.keyType, `${path}[key]`, false, ancestors, state);
       walk(schema.valueType, `${path}[*]`, false, ancestors, state);
       return;

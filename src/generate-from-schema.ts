@@ -244,8 +244,7 @@ export function generateMocks(
     preflightFixes,
   } = options;
 
-  // Pre-flight auto-fix: substitute a problematic schema with its
-  // minimally-changed replacement before doing anything else.
+  // Pre-flight auto-fixes must apply before any other branch.
   if (preflightFixes.size > 0) {
     const fixed = preflightFixes.get(schema);
     if (fixed !== undefined) return generateMocks(fixed, options);

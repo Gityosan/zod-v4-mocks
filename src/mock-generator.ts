@@ -158,8 +158,12 @@ class MockGenerator {
           'Disable with initGenerator({ preflightCheck: false }).',
       );
     }
-    // Apply minimal auto-fixes — generation substitutes these schemas.
-    this.options.preflightFixes = fixes;
+    // Merge auto-fixes (keyed by schema reference) into the persistent map
+    // rather than replacing it — a memoized schema generated after another
+    // schema's preflight must still see its own fixes.
+    for (const [from, to] of fixes) {
+      this.options.preflightFixes.set(from, to);
+    }
     this.#preflighted.add(schema);
   }
 

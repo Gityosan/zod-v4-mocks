@@ -26,43 +26,42 @@ import {
   unwrapSchema,
 } from './schema';
 
+/**
+ * Build the child generation options for descending one level. Updates
+ * `pathSupplies` and `keyMappingKey`, and `arrayIndexes` for indexed steps.
+ */
 function pushPathSegment(
   options: GeneraterOptions,
   step: ChildStep,
   keyMappingKey?: string,
 ): GeneraterOptions {
-  let seg: PathSegment | undefined;
-  switch (step.kind) {
-    case 'objectKey':
-      seg = step.key;
-      break;
-    case 'arrayIndex':
-    case 'tupleIndex':
-      seg = step.index;
-      break;
-    case 'recordKey':
-      seg = step.key;
-      break;
-    case 'mapKey':
-      if (
-        typeof step.key === 'string' ||
-        typeof step.key === 'number' ||
-        typeof step.key === 'symbol'
-      ) {
-        seg = step.key;
-      }
-      break;
-    case 'setItem':
-      seg = undefined;
-      break;
-  }
-  return {
+  const child: GeneraterOptions = {
     ...options,
     pathSupplies: descendPathSupplies(options.pathSupplies, step),
-    currentPath:
-      seg !== undefined ? [...options.currentPath, seg] : options.currentPath,
     keyMappingKey,
   };
+  if (step.kind === 'arrayIndex' || step.kind === 'tupleIndex') {
+    child.arrayIndexes = [...options.arrayIndexes, step.index];
+  }
+  return child;
+}
+
+/**
+ * Descend into a record/map entry for `key` and generate its value.
+ * `keyMapping` is fed the key only for named (literal/enum) string keys.
+ */
+function generateKeyedValue(
+  options: GeneraterOptions,
+  step:
+    | { kind: 'mapKey'; key: unknown }
+    | { kind: 'recordKey'; key: string | number | symbol },
+  valueType: z.core.$ZodType,
+  namedKeys: boolean,
+  generator: CustomGeneratorType,
+): unknown {
+  const keyMappingKey =
+    namedKeys && typeof step.key === 'string' ? step.key : undefined;
+  return generator(valueType, pushPathSegment(options, step, keyMappingKey));
 }
 
 /**
@@ -264,11 +263,10 @@ export const generateUtils = {
       length = maxLiteralIdx + 1;
     }
     return Array.from({ length }, (_, arrayIndex) => {
-      const arrayIndexes = [...options.arrayIndexes, arrayIndex];
-      const childOpts = pushPathSegment(
-        { ...options, arrayIndexes },
-        { kind: 'arrayIndex', index: arrayIndex },
-      );
+      const childOpts = pushPathSegment(options, {
+        kind: 'arrayIndex',
+        index: arrayIndex,
+      });
       return generator(schema.element, childOpts);
     }).filter((v) => v !== OMIT_SYMBOL);
   },
@@ -279,11 +277,10 @@ export const generateUtils = {
   ) => {
     const { items } = schema.def;
     const result = items.map((item, arrayIndex) => {
-      const arrayIndexes = [...options.arrayIndexes, arrayIndex];
-      const childOpts = pushPathSegment(
-        { ...options, arrayIndexes },
-        { kind: 'tupleIndex', index: arrayIndex },
-      );
+      const childOpts = pushPathSegment(options, {
+        kind: 'tupleIndex',
+        index: arrayIndex,
+      });
       return generator(item, childOpts);
     });
 
@@ -309,31 +306,25 @@ export const generateUtils = {
     const length = calcLengthFromChecks(checks, faker, config.map);
     const namedKeys = isNamedKeyType(keyType);
     const entries: [unknown, unknown][] = [];
+    const addEntry = (k: unknown) => {
+      const v = generateKeyedValue(
+        options,
+        { kind: 'mapKey', key: k },
+        valueType,
+        namedKeys,
+        generator,
+      );
+      if (v !== OMIT_SYMBOL) entries.push([k, v]);
+    };
     for (let i = 0; i < length; i++) {
       const k = generator(keyType, options);
-      if (k === OMIT_SYMBOL) continue;
-      const childOpts = pushPathSegment(
-        options,
-        { kind: 'mapKey', key: k },
-        namedKeys && typeof k === 'string' ? k : undefined,
-      );
-      const v = generator(valueType, childOpts);
-      if (v === OMIT_SYMBOL) continue;
-      entries.push([k, v]);
+      if (k !== OMIT_SYMBOL) addEntry(k);
     }
-    const injections = findKeyInjections(
+    for (const k of findKeyInjections(
       options.pathSupplies,
       recordKeyTypeAccepts(keyType),
-    );
-    for (const k of injections) {
-      const childOpts = pushPathSegment(
-        options,
-        { kind: 'mapKey', key: k },
-        namedKeys && typeof k === 'string' ? k : undefined,
-      );
-      const v = generator(valueType, childOpts);
-      if (v === OMIT_SYMBOL) continue;
-      entries.push([k, v]);
+    )) {
+      addEntry(k);
     }
     return new Map(entries);
   },
@@ -383,40 +374,36 @@ export const generateUtils = {
     const length = faker.number.int(config.record);
     const namedKeys = isNamedKeyType(keyType);
     const acc: Record<string | number | symbol, unknown> = {};
+    const addEntry = (k: string | number | symbol) => {
+      const value = generateKeyedValue(
+        options,
+        { kind: 'recordKey', key: k },
+        valueType,
+        namedKeys,
+        generator,
+      );
+      if (value === OMIT_SYMBOL) return;
+      acc[typeof k === 'symbol' ? String(k) : k] = value;
+    };
 
     for (let i = 0; i < length; i++) {
       const k = generator(keyType, options);
       if (k === OMIT_SYMBOL) continue;
-      const keyIsValid =
-        typeof k === 'string' || typeof k === 'number' || typeof k === 'symbol';
-      if (!keyIsValid) throw new Error('Invalid record key type');
-      const typedKey = k;
-      const keyStr = typeof typedKey === 'symbol' ? String(typedKey) : typedKey;
-      const childOpts = pushPathSegment(
-        options,
-        { kind: 'recordKey', key: typedKey },
-        namedKeys && typeof typedKey === 'string' ? typedKey : undefined,
-      );
-      const value = generator(valueType, childOpts);
-      if (value === OMIT_SYMBOL) continue;
-      acc[keyStr] = value;
+      if (
+        typeof k !== 'string' &&
+        typeof k !== 'number' &&
+        typeof k !== 'symbol'
+      ) {
+        throw new Error('Invalid record key type');
+      }
+      addEntry(k);
     }
 
-    const injections = findKeyInjections(
+    for (const k of findKeyInjections(
       options.pathSupplies,
       recordKeyTypeAccepts(keyType),
-    );
-    for (const k of injections) {
-      const typedKey = k as string | number | symbol;
-      const keyStr = typeof typedKey === 'symbol' ? String(typedKey) : typedKey;
-      const childOpts = pushPathSegment(
-        options,
-        { kind: 'recordKey', key: typedKey },
-        namedKeys && typeof typedKey === 'string' ? typedKey : undefined,
-      );
-      const value = generator(valueType, childOpts);
-      if (value === OMIT_SYMBOL) continue;
-      acc[keyStr] = value;
+    )) {
+      addEntry(k as string | number | symbol);
     }
 
     return acc;
