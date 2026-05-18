@@ -217,3 +217,66 @@ describe('keyMapping interaction with consistent values', () => {
     expect(result.lastName.length).toBeGreaterThan(0);
   });
 });
+
+describe('keyMapping: auto - built-in table coverage', () => {
+  it('maps a broad sample of common keys', () => {
+    const Schema = z.object({
+      firstName: z.string(),
+      lastName: z.string(),
+      username: z.string(),
+      phone: z.string(),
+      avatar: z.string(),
+      url: z.string(),
+      uuid: z.string(),
+      slug: z.string(),
+      street: z.string(),
+      city: z.string(),
+      state: z.string(),
+      country: z.string(),
+      zipCode: z.string(),
+      company: z.string(),
+      jobTitle: z.string(),
+      department: z.string(),
+      product: z.string(),
+      description: z.string(),
+      title: z.string(),
+      content: z.string(),
+      color: z.string(),
+      currency: z.string(),
+      timezone: z.string(),
+      gender: z.string(),
+      filename: z.string(),
+      price: z.number(),
+      quantity: z.number(),
+      rating: z.number(),
+      latitude: z.number(),
+      year: z.number(),
+      createdAt: z.date(),
+      updatedAt: z.date(),
+      birthDate: z.date(),
+      isActive: z.boolean(),
+      isDeleted: z.boolean(),
+    });
+    const r = initGenerator({ keyMapping: 'auto' }).generate(Schema);
+
+    const stringKeys = [
+      'firstName', 'lastName', 'username', 'phone', 'avatar', 'url', 'uuid',
+      'slug', 'street', 'city', 'state', 'country', 'zipCode', 'company',
+      'jobTitle', 'department', 'product', 'description', 'title', 'content',
+      'color', 'currency', 'timezone', 'gender', 'filename',
+    ] as const;
+    for (const k of stringKeys) {
+      expect(typeof r[k], k).toBe('string');
+      expect((r[k] as string).length, k).toBeGreaterThan(0);
+    }
+    for (const k of ['price', 'quantity', 'rating', 'latitude', 'year'] as const) {
+      expect(typeof r[k], k).toBe('number');
+    }
+    expect(r.year).toBeGreaterThanOrEqual(1970);
+    expect(r.createdAt).toBeInstanceOf(Date);
+    expect(r.updatedAt).toBeInstanceOf(Date);
+    expect(r.birthDate).toBeInstanceOf(Date);
+    expect(r.isActive).toBe(true);
+    expect(r.isDeleted).toBe(false);
+  });
+});

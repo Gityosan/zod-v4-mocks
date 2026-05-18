@@ -411,3 +411,75 @@ describe('preflight - unsupported schema types', () => {
     warn.mockRestore();
   });
 });
+
+describe('preflight - additional coverage', () => {
+  it('warns for an ignored .superRefine()', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    initGenerator().generate(z.string().superRefine(() => {}));
+    const w = warn.mock.calls.find(
+      (a) =>
+        String(a[0]).includes('[preflight]') &&
+        String(a[0]).includes('.refine()'),
+    );
+    expect(w).toBeDefined();
+    warn.mockRestore();
+  });
+
+  it('warns for multiple length checks on a z.string()', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    initGenerator().generate(z.string().length(5).length(10));
+    const w = warn.mock.calls.find((a) => String(a[0]).includes('length'));
+    expect(w).toBeDefined();
+    warn.mockRestore();
+  });
+
+  it('warns for multiple endsWith checks on a z.string()', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    initGenerator().generate(z.string().endsWith('a').endsWith('b'));
+    const w = warn.mock.calls.find((a) => String(a[0]).includes('endsWith'));
+    expect(w).toBeDefined();
+    warn.mockRestore();
+  });
+
+  it('warns for an unsupported z.function()', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      initGenerator().generate(z.function() as never);
+    } catch {
+      /* an unsupported type may also fail to generate */
+    }
+    const w = warn.mock.calls.find(
+      (a) =>
+        String(a[0]).includes('[preflight]') &&
+        String(a[0]).includes('z.function()'),
+    );
+    expect(w).toBeDefined();
+    warn.mockRestore();
+  });
+
+  it('downgrades an intersection error to a warning under an opaque override', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const Schema = z.intersection(z.string(), z.number());
+    // an opaque override that actually handles the node — preflight cannot
+    // verify coverage, so it warns instead of throwing
+    const result = initGenerator()
+      .override((s) => (s instanceof z.ZodIntersection ? 'handled' : undefined))
+      .generate(Schema);
+    expect(result).toBe('handled');
+    const w = warn.mock.calls.find((a) => String(a[0]).includes('[preflight]'));
+    expect(w).toBeDefined();
+    warn.mockRestore();
+  });
+
+  it('downgrades an invalid record-key error to a warning under an opaque override', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const Schema = z.record(z.boolean() as never, z.string());
+    const result = initGenerator()
+      .override((s) => (s instanceof z.ZodRecord ? { ok: 1 } : undefined))
+      .generate(Schema);
+    expect(result).toEqual({ ok: 1 });
+    const w = warn.mock.calls.find((a) => String(a[0]).includes('[preflight]'));
+    expect(w).toBeDefined();
+    warn.mockRestore();
+  });
+});

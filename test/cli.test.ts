@@ -174,3 +174,47 @@ describe.runIf(HAS_BUILD)('CLI', () => {
     });
   });
 });
+
+describe.runIf(HAS_BUILD)('CLI - additional options', () => {
+  itIfBuild('--format json explicitly produces JSON', () => {
+    const r = run(['generate', schemasPath, 'User', '-f', 'json', '-s', '3']);
+    expect(r.status).toBe(0);
+    expect(() => JSON.parse(r.stdout)).not.toThrow();
+  });
+
+  itIfBuild('--locale runs and produces valid output', () => {
+    const r = run(['generate', schemasPath, 'User', '-l', 'ja', '-s', '1']);
+    expect(r.status).toBe(0);
+    expect(JSON.parse(r.stdout)).toHaveProperty('id');
+  });
+
+  itIfBuild('-f bin -o writes a non-empty binary file', () => {
+    const out = join(tmp, 'users.bin');
+    const r = run(['generate', schemasPath, 'User', '-f', 'bin', '-o', out]);
+    expect(r.status).toBe(0);
+    expect(existsSync(out)).toBe(true);
+    expect(require('node:fs').statSync(out).size).toBeGreaterThan(0);
+  });
+
+  itIfBuild('--silent still writes the output file', () => {
+    const out = join(tmp, 'silent.json');
+    const r = run([
+      'generate',
+      schemasPath,
+      'User',
+      '-c',
+      '3',
+      '-o',
+      out,
+      '--silent',
+    ]);
+    expect(r.status).toBe(0);
+    expect(existsSync(out)).toBe(true);
+  });
+
+  itIfBuild('rejects an unknown --format', () => {
+    const r = run(['generate', schemasPath, 'User', '-f', 'xml']);
+    expect(r.status).toBe(1);
+    expect(r.stderr.toLowerCase()).toMatch(/format/);
+  });
+});

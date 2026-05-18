@@ -515,3 +515,80 @@ describe('supplyPath - array index hard limit', () => {
     expect(result[50]).toBe('x');
   });
 });
+
+describe('supply (constructor-based)', () => {
+  it('sets a fixed value for all schemas of a Zod type', () => {
+    const Schema = z.object({ a: z.string(), b: z.string(), n: z.number() });
+    const result = initGenerator().supply(z.ZodString, 'FIXED').generate(Schema);
+    expect(result.a).toBe('FIXED');
+    expect(result.b).toBe('FIXED');
+    expect(typeof result.n).toBe('number');
+  });
+
+  it('targets a specific format type (z.ZodEmail)', () => {
+    const Schema = z.object({ email: z.email(), name: z.string() });
+    const result = initGenerator()
+      .supply(z.ZodEmail, 'fixed@example.com')
+      .generate(Schema);
+    expect(result.email).toBe('fixed@example.com');
+    expect(result.name).not.toBe('fixed@example.com');
+  });
+
+  it('first registration wins on conflict', () => {
+    const result = initGenerator()
+      .supply(z.ZodString, 'first')
+      .supply(z.ZodString, 'second')
+      .generate(z.string());
+    expect(result).toBe('first');
+  });
+
+  it('supply registered before override takes priority', () => {
+    const result = initGenerator()
+      .supply(z.ZodString, 'from-supply')
+      .override((schema) => (schema instanceof z.ZodString ? 'from-override' : undefined))
+      .generate(z.string());
+    expect(result).toBe('from-supply');
+  });
+});
+
+describe('updateConfig', () => {
+  it('applies the new config', () => {
+    const gen = initGenerator({ array: { min: 1, max: 1 } });
+    gen.updateConfig({ array: { min: 5, max: 5 } });
+    expect(gen.generate(z.array(z.string()))).toHaveLength(5);
+  });
+
+  it('preserves supplyPath registrations across a config change', () => {
+    const Schema = z.object({ name: z.string() });
+    const gen = initGenerator().supplyPath(['name'], 'PINNED');
+    gen.updateConfig({ seed: 999 });
+    expect(gen.generate(Schema).name).toBe('PINNED');
+  });
+
+  it('preserves supplyRef registrations across a config change', () => {
+    const Name = z.string();
+    const gen = initGenerator().supplyRef(Name, 'PINNED');
+    gen.updateConfig({ seed: 999 });
+    expect(gen.generate(z.object({ name: Name })).name).toBe('PINNED');
+  });
+
+  it('preserves supply / override across a config change', () => {
+    const gen = initGenerator().supply(z.ZodString, 'KEPT');
+    gen.updateConfig({ seed: 999 });
+    expect(gen.generate(z.string())).toBe('KEPT');
+  });
+
+  it('preserves the opaque-customizer flag (preflight still downgrades)', () => {
+    // an override is opaque -> preflight downgrades the tuple-custom error
+    // to a warning. updateConfig must keep that flag, or this would throw.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const Schema = z.tuple([
+      z.string(),
+      z.custom<File>((v) => v instanceof File),
+    ]);
+    const gen = initGenerator().override(() => undefined);
+    gen.updateConfig({ seed: 2 });
+    expect(() => gen.generate(Schema)).not.toThrow();
+    warn.mockRestore();
+  });
+});

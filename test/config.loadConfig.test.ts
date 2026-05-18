@@ -218,3 +218,33 @@ describe('loadConfig: factory propagates exceptions', () => {
     expect(() => result!.createBase()).toThrow('boom');
   });
 });
+
+describe('loadConfig: path resolution and file types', () => {
+  it('resolves a relative configFile against cwd', async () => {
+    const result = await loadConfig({
+      cwd: tmp,
+      configFile: 'zod-v4-mocks.config.mjs',
+    });
+    expect(result).not.toBeNull();
+    expect(result!.createCli().generate(Schema).email).toBe(CLI_EMAIL);
+  });
+
+  it('loads a TypeScript config file', async () => {
+    const tsDir = mkdtempSync(join(tmpdir(), 'zod-v4-mocks-ts-'));
+    try {
+      writeFileSync(
+        join(tsDir, 'zod-v4-mocks.config.ts'),
+        `export default {
+           baseConfig: ({ initGenerator }: { initGenerator: any }) =>
+             initGenerator({ seed: 3 }).supplyPath(['name'], 'TS_OK'),
+         };
+`,
+      );
+      const result = await loadConfig({ cwd: tsDir });
+      expect(result).not.toBeNull();
+      expect(result!.createBase().generate(Schema).name).toBe('TS_OK');
+    } finally {
+      rmSync(tsDir, { recursive: true, force: true });
+    }
+  });
+});
