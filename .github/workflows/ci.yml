@@ -32,3 +32,9 @@ jobs:
 
       - name: Test
         run: pnpm run test:run
+
+      - name: Type tests
+        run: pnpm run test:types
+
+      - name: Publish lint (publint)
+        run: pnpm exec publint

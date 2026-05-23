@@ -403,7 +403,7 @@ export const generateUtils = {
       options.pathSupplies,
       recordKeyTypeAccepts(keyType),
     )) {
-      addEntry(k as string | number | symbol);
+      addEntry(k);
     }
 
     return acc;
