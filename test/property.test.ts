@@ -1,7 +1,7 @@
 import fc from 'fast-check';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { initGenerator, type LocaleType } from '../src';
 import { z } from 'zod';
-import { initGenerator } from '../src';
 
 /**
  * Property-based round-trip test.
@@ -10,6 +10,14 @@ import { initGenerator } from '../src';
  * schema must satisfy that schema. We fuzz a wide space of randomly-shaped Zod
  * schemas and assert `schema.parse(generate(schema))` never throws — covering
  * combinations the example-based suites can't enumerate by hand.
+ *
+ * We also fuzz the *config* (see `safeConfig`): the default seed is fixed at 1,
+ * so without this each schema shape is only ever checked against a single
+ * deterministic value. Varying the seed, collection sizes, probabilities and
+ * locale checks many concrete draws per shape and exercises config×schema
+ * interactions. Only invariant-preserving knobs are fuzzed — value-overriding
+ * features (keyMapping / supply / override / custom generators) are excluded
+ * because they can intentionally produce values that don't match the schema.
  *
  * Known boundary (intentionally excluded): `.optional()` as a *fixed tuple
  * slot*. Optionality is implemented with an internal OMIT_SYMBOL that is
@@ -64,11 +72,37 @@ const zodSchema: fc.Arbitrary<z.ZodType> = fc.letrec<{
   ),
 })).core;
 
+// A {min,max} pair with min <= max, for collection-size config knobs.
+const sizeRange = fc
+  .tuple(fc.nat({ max: 4 }), fc.nat({ max: 4 }))
+  .map(([a, b]) => ({ min: Math.min(a, b), max: Math.max(a, b) }));
+
+// Extremes (0, 1) are deliberately included: "always omit" / "always include".
+const probability = fc.constantFrom(0, 0.5, 1);
+
+/**
+ * Invariant-preserving config: changing any of these must not make a generated
+ * mock stop satisfying its schema. Excludes value-overriding features on
+ * purpose (see file header). `seed` is the highest-value knob — it turns the
+ * single deterministic draw per shape into many.
+ */
+const safeConfig = fc.record({
+  seed: fc.integer({ min: 0, max: 2 ** 31 - 1 }),
+  array: sizeRange,
+  map: sizeRange,
+  set: sizeRange,
+  record: sizeRange,
+  optionalProbability: probability,
+  nullableProbability: probability,
+  defaultProbability: probability,
+  locale: fc.constantFrom<LocaleType>('en', 'ja', 'fr', 'de'),
+});
+
 describe('round-trip: generate(schema) always parses against schema', () => {
-  it('produces values valid for arbitrary schemas', () => {
+  it('produces values valid for arbitrary schemas and configs', () => {
     fc.assert(
-      fc.property(zodSchema, (schema) => {
-        const value = initGenerator().generate(schema);
+      fc.property(zodSchema, safeConfig, (schema, config) => {
+        const value = initGenerator(config).generate(schema);
         expect(() => schema.parse(value)).not.toThrow();
       }),
       { numRuns: 300 },
@@ -77,14 +111,44 @@ describe('round-trip: generate(schema) always parses against schema', () => {
 
   it('generateMany values are all valid', () => {
     fc.assert(
-      fc.property(zodSchema, fc.integer({ min: 0, max: 5 }), (schema, count) => {
-        const values = initGenerator().generateMany(schema, count);
-        expect(values).toHaveLength(count);
-        for (const value of values) {
-          expect(() => schema.parse(value)).not.toThrow();
-        }
-      }),
+      fc.property(
+        zodSchema,
+        safeConfig,
+        fc.integer({ min: 0, max: 5 }),
+        (schema, config, count) => {
+          const values = initGenerator(config).generateMany(schema, count);
+          expect(values).toHaveLength(count);
+          for (const value of values) {
+            expect(() => schema.parse(value)).not.toThrow();
+          }
+        },
+      ),
       { numRuns: 150 },
+    );
+  });
+});
+
+describe('determinism: identical config reproduces identical output', () => {
+  // Freeze the clock: faker anchors date generation to the current time
+  // (refDate defaults to `new Date()`), so without a fixed clock two calls land
+  // on slightly different instants even under the same seed. With time frozen,
+  // this verifies the real contract: same clock + same config => identical output.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-06-15T12:00:00.000Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('two generators with the same config produce deep-equal values', () => {
+    fc.assert(
+      fc.property(zodSchema, safeConfig, (schema, config) => {
+        const first = initGenerator(config).generate(schema);
+        const second = initGenerator(config).generate(schema);
+        expect(second).toStrictEqual(first);
+      }),
+      { numRuns: 200 },
     );
   });
 });
