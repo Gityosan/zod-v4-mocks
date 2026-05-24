@@ -7,7 +7,7 @@ import {
   defineMockConfig,
   getProfileFactory,
   loadConfig,
-} from '../src/config';
+} from '../../src/config';
 
 const Schema = z.object({ name: z.string(), email: z.string() });
 

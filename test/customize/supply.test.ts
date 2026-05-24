@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { initGenerator } from '../src';
+import { initGenerator } from '../../src';
 
 describe('supplyRef', () => {
   it('replaces a specific subschema by reference', () => {

@@ -4,7 +4,7 @@ import {
   type CustomGeneratorType,
   initGenerator,
   type MockConfig,
-} from '../src';
+} from '../../src';
 
 describe('initGenerator (functional base API)', () => {
   describe('options', () => {

@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20, 22]
+        node-version: [22, 24, 26]
 
     steps:
       - uses: actions/checkout@v6
@@ -32,3 +32,9 @@ jobs:
 
       - name: Test
         run: pnpm run test:run
+
+      - name: Type tests
+        run: pnpm run test:types
+
+      - name: Publish lint (publint)
+        run: pnpm exec publint

@@ -214,7 +214,7 @@ class MockGenerator {
     }
     const out: z.infer<T>[] = [];
     for (let i = 0; i < count; i++) {
-      out.push(this.generate(schema) as z.infer<T>);
+      out.push(this.generate(schema));
     }
     return out;
   }
@@ -227,7 +227,7 @@ class MockGenerator {
     schema: T,
   ): { next: () => z.infer<T>; take: (n: number) => z.infer<T>[] } {
     return {
-      next: () => this.generate(schema) as z.infer<T>,
+      next: () => this.generate(schema),
       take: (n: number) => this.generateMany(schema, n),
     };
   }

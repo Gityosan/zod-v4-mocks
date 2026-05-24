@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { initGenerator } from '../src/mock-generator';
+import { initGenerator } from '../../src/mock-generator';
 
 describe('ZodString - Comprehensive Tests', () => {
   const generator = initGenerator({ seed: 12345 });

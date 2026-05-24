@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-const CLI = resolve(__dirname, '..', 'dist', 'cli.js');
+const CLI = resolve(__dirname, '..', '..', 'dist', 'cli.js');
 const HAS_BUILD = existsSync(CLI);
 
 // All CLI tests are skipped when dist/cli.js is not present so that running
@@ -19,7 +19,7 @@ beforeAll(() => {
   schemasPath = join(tmp, 'schemas.mjs');
   writeFileSync(
     schemasPath,
-    `import { z } from '${join(__dirname, '..', 'node_modules/zod/v4/index.js').replace(/\\/g, '/')}';
+    `import { z } from '${join(__dirname, '..', '..', 'node_modules/zod/v4/index.js').replace(/\\/g, '/')}';
 export const User = z.object({ id: z.uuid(), name: z.string(), email: z.email() });
 export default User;
 `,

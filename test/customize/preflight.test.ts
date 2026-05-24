@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { initGenerator } from '../src';
+import { initGenerator } from '../../src';
 
 const FileCustom = () => z.custom<File>((v) => v instanceof File);
 

@@ -3,6 +3,9 @@
     "target": "ES2022",
     "module": "ESNext",
     "lib": ["ES2023"],
+    // TS6 no longer auto-includes every @types/* package; the runtime relies on
+    // Node globals (process, Buffer, URL, import.meta.url), so name them explicitly.
+    "types": ["node"],
     "declaration": true,
     "outDir": "./dist",
     "rootDir": "./src",
