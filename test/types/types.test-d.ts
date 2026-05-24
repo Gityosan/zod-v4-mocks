@@ -1,6 +1,6 @@
 import { describe, expectTypeOf, it } from 'vitest';
 import { z } from 'zod';
-import { initGenerator } from '../src';
+import { initGenerator } from '../../src';
 
 /**
  * Type-level tests (checked by `pnpm run test:types`, i.e. vitest --typecheck).

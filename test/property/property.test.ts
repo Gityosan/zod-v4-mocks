@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { initGenerator, type LocaleType } from '../src';
+import { initGenerator, type LocaleType } from '../../src';
 import { z } from 'zod';
 
 /**

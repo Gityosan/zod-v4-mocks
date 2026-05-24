@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { initGenerator } from '../src';
+import { initGenerator } from '../../src';
 
 describe('keyMapping: off (default)', () => {
   it('does not apply when omitted', () => {

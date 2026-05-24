@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { initGenerator } from '../src';
+import { initGenerator } from '../../src';
 
 const testOutputDir = './__test_output__';
 
