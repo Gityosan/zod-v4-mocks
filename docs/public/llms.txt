@@ -181,6 +181,25 @@ const restored = generator.deserialize<User>('./mocks/user.bin');
 const restored = generator.deserialize<User>(generator.serializeBinary(data));
 ```
 
+### generator.serializePortable(data, options?) / generator.serializePortableAsync(data, options?)
+
+Serializes data to a portable string via seroval. Unlike `serializeBinary` (Node-only v8), the result round-trips across any JS runtime — Node↔browser and browser↔browser. Preserves Date, RegExp, Map, Set, BigInt, TypedArray, `undefined`, NaN/Infinity, circular/shared references, and (via bundled plugins) URL, URLSearchParams, Headers. `File`/`Blob`/`FormData` are async-only — use `serializePortableAsync`; the sync form throws a clear error pointing to it. `Symbol` is supported: registry symbols (`Symbol.for`) keep their identity, and described symbols (`Symbol('x')`, e.g. `z.symbol()`) round-trip by description with identity preserved within one payload; an anonymous symbol's cross-runtime `===` identity and symbols used as object property keys are not preserved. Pass `{ base64: true }` for a text-safe encoding.
+
+```ts
+const str = generator.serializePortable(data);
+const b64 = generator.serializePortable(data, { base64: true });
+const asyncStr = await generator.serializePortableAsync(data); // File/Blob/FormData
+```
+
+### generator.deserializePortable\<T = unknown\>(input, options?)
+
+Restores a value produced by `serializePortable`/`serializePortableAsync`, in any JS runtime. Pass `{ base64: true }` if it was encoded that way. The string is evaluated on restore — only deserialize data you produced yourself, never untrusted input.
+
+```ts
+const restored = generator.deserializePortable<User>(str);
+const restoredFromB64 = generator.deserializePortable<User>(b64, { base64: true });
+```
+
 ### generator.output(data, options?)
 
 Outputs generated data to a file. Supports JSON, JavaScript, and TypeScript formats. Set `binary: true` with ts/js to additionally write a sibling `.bin` and turn the script into a thin ESM wrapper that `v8.deserialize`s it at import time.
