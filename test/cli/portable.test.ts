@@ -203,3 +203,161 @@ describe('serializePortable / deserializePortable (seroval, cross-runtime)', () 
     expect(await restored.blob.text()).toBe('blob-body');
   });
 });
+
+describe('serializePortable — web types, async combos & symbol corners', () => {
+  it('round-trips URL, URLSearchParams, and Headers', () => {
+    const generator = initGenerator();
+    const data = {
+      url: new URL('https://example.test/path?x=1#frag'),
+      params: new URLSearchParams('a=1&b=2'),
+      headers: new Headers({ 'content-type': 'application/json' }),
+    };
+
+    const r = generator.deserializePortable<typeof data>(
+      generator.serializePortable(data),
+    );
+    expect(r.url).toBeInstanceOf(URL);
+    expect(r.url.href).toBe('https://example.test/path?x=1#frag');
+    expect(r.params).toBeInstanceOf(URLSearchParams);
+    expect(r.params.get('b')).toBe('2');
+    expect(r.headers).toBeInstanceOf(Headers);
+    expect(r.headers.get('content-type')).toBe('application/json');
+  });
+
+  it('async variant round-trips FormData', async () => {
+    const generator = initGenerator();
+    const form = new FormData();
+    form.append('field', 'value');
+    form.append('n', '42');
+
+    const r = generator.deserializePortable<{ form: FormData }>(
+      await generator.serializePortableAsync({ form }),
+    );
+    expect(r.form).toBeInstanceOf(FormData);
+    expect(r.form.get('field')).toBe('value');
+    expect(r.form.get('n')).toBe('42');
+  });
+
+  it('round-trips a Symbol through base64', () => {
+    const generator = initGenerator();
+    const encoded = generator.serializePortable({ s: Symbol('b64') }, { base64: true });
+    expect(encoded).toMatch(/^[A-Za-z0-9+/]+={0,2}$/);
+
+    const r = generator.deserializePortable<{ s: symbol }>(encoded, { base64: true });
+    expect(r.s.description).toBe('b64');
+  });
+
+  it('async variant round-trips described and registry Symbols', async () => {
+    const generator = initGenerator();
+    const data = { s: Symbol('async-sym'), reg: Symbol.for('zv4m:async') };
+
+    const r = generator.deserializePortable<typeof data>(
+      await generator.serializePortableAsync(data),
+    );
+    expect(r.s.description).toBe('async-sym');
+    expect(r.reg).toBe(Symbol.for('zv4m:async'));
+  });
+
+  it('distinguishes Symbol() (no description) from Symbol("")', () => {
+    const generator = initGenerator();
+    const data = { none: Symbol(), empty: Symbol('') };
+
+    const r = generator.deserializePortable<typeof data>(
+      generator.serializePortable(data),
+    );
+    expect(r.none.description).toBeUndefined();
+    expect(r.empty.description).toBe('');
+  });
+
+  it('passes well-known symbols through and boxes described ones alongside', () => {
+    const generator = initGenerator();
+    const data = { wk: Symbol.iterator, described: Symbol('mix') };
+
+    const r = generator.deserializePortable<typeof data>(
+      generator.serializePortable(data),
+    );
+    expect(r.wk).toBe(Symbol.iterator);
+    expect(r.described.description).toBe('mix');
+  });
+
+  it('round-trips a top-level Symbol', () => {
+    const generator = initGenerator();
+    const r = generator.deserializePortable<symbol>(
+      generator.serializePortable(Symbol('top')),
+    );
+    expect(typeof r).toBe('symbol');
+    expect(r.description).toBe('top');
+  });
+
+  it('round-trips circular structures while the boxing transform is active', () => {
+    const generator = initGenerator();
+
+    // A symbol forces boxing; the cycle runs through an array.
+    const arr: unknown[] = [Symbol('in-array')];
+    arr.push(arr);
+    const ra = generator.deserializePortable<unknown[]>(
+      generator.serializePortable(arr),
+    );
+    expect((ra[0] as symbol).description).toBe('in-array');
+    expect(ra[1]).toBe(ra);
+
+    // …and through a Map (cycle on a value).
+    const map = new Map<string, unknown>([['sym', Symbol('in-map')]]);
+    map.set('self', map);
+    const rm = generator.deserializePortable<Map<string, unknown>>(
+      generator.serializePortable(map),
+    );
+    expect((rm.get('sym') as symbol).description).toBe('in-map');
+    expect(rm.get('self')).toBe(rm);
+  });
+
+  it('round-trips assorted TypedArrays, ArrayBuffer, and empty collections', () => {
+    const generator = initGenerator();
+    const data = {
+      f64: new Float64Array([1.5, -2.25]),
+      i16: new Int16Array([-1, 2, 3]),
+      buf: new Uint8Array([9, 8, 7]).buffer,
+      emptyMap: new Map(),
+      emptySet: new Set(),
+    };
+
+    const r = generator.deserializePortable<typeof data>(
+      generator.serializePortable(data),
+    );
+    expect(Array.from(r.f64)).toEqual([1.5, -2.25]);
+    expect(Array.from(r.i16)).toEqual([-1, 2, 3]);
+    expect(r.buf).toBeInstanceOf(ArrayBuffer);
+    expect(Array.from(new Uint8Array(r.buf))).toEqual([9, 8, 7]);
+    expect(r.emptyMap.size).toBe(0);
+    expect(r.emptySet.size).toBe(0);
+  });
+
+  it('does not corrupt the marker string when it appears as a value', () => {
+    const generator = initGenerator();
+    const data = {
+      note: '$$zod-v4-mocks/symbol$$',
+      list: ['$$zod-v4-mocks/symbol$$'],
+    };
+
+    const r = generator.deserializePortable<typeof data>(
+      generator.serializePortable(data),
+    );
+    expect(r.note).toBe('$$zod-v4-mocks/symbol$$');
+    expect(r.list[0]).toBe('$$zod-v4-mocks/symbol$$');
+  });
+
+  // Known limitation: symbols are boxed into a plain object keyed by an
+  // internal marker. A hand-crafted object shaped exactly like that marker is
+  // therefore reconstructed as a Symbol. The marker key is deliberately obscure
+  // and generated mocks never produce it, so this only affects look-alike data
+  // supplied by hand. Documented in the API reference. This test pins the
+  // behavior so any future change is intentional.
+  it('KNOWN LIMITATION: a marker-shaped plain object deserializes as a Symbol', () => {
+    const generator = initGenerator();
+    const lookAlike = { '$$zod-v4-mocks/symbol$$': ['desc', 'collision'] };
+
+    const r = generator.deserializePortable(generator.serializePortable(lookAlike));
+    expect(typeof r).toBe('symbol');
+    expect((r as symbol).description).toBe('collision');
+  });
+});

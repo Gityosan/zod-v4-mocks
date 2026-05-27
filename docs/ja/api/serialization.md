@@ -79,7 +79,7 @@ serializePortableAsync(data: unknown, options?: PortableOptions): Promise<string
 
 `File`・`Blob`・`FormData` はバイトを非同期に読み出すため、`serializePortableAsync` でのみ往復できます（同期版がこれらに遭遇した場合は、非同期版を使うよう促す明示エラーを投げます）。
 
-`Symbol` は対応しています。レジストリシンボル（`Symbol.for`）は同一性を保ったまま往復し、記述付きシンボル（`Symbol('x')`、例: `z.symbol()`）は description で往復します（**同一ペイロード内**の参照については同一性も維持）。原理的な制約が 2 つあります: 無名シンボルの**プロセス跨ぎの `===` 同一性**は復元不可（定義上一意）で、**オブジェクトのキー**に使った Symbol は非保持です（値・Map キー・Set 要素のみ対応）。
+`Symbol` は対応しています。レジストリシンボル（`Symbol.for`）は同一性を保ったまま往復し、記述付きシンボル（`Symbol('x')`、例: `z.symbol()`）は description で往復します（**同一ペイロード内**の参照については同一性も維持）。原理的な制約が 2 つあります: 無名シンボルの**プロセス跨ぎの `===` 同一性**は復元不可（定義上一意）で、**オブジェクトのキー**に使った Symbol は非保持です（値・Map キー・Set 要素のみ対応）。実装上の注意として、Symbol は内部マーカーキーで符号化されるため、**唯一のキー**がそのマーカー（`$$zod-v4-mocks/symbol$$`）である手作りの plain object は復元時に `Symbol` になります。生成モックがそのキーを作ることはないので、手で組んだ同形データのみが対象です。
 
 ```ts
 const data = generator.generate(schema)

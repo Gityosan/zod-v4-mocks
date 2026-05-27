@@ -76,7 +76,7 @@ serializePortableAsync(data: unknown, options?: PortableOptions): Promise<string
 
 `File`、`Blob` 和 `FormData` 需异步读取字节，因此只能通过 `serializePortableAsync` 往返（同步版本遇到它们时会抛出明确错误，提示改用异步版本）。
 
-`Symbol` **受支持**：注册表符号（`Symbol.for`）可保持身份往返；带描述的符号（`Symbol('x')`，例如 `z.symbol()`）按描述往返，并在**同一负载内**保持引用之间的身份一致。有两个固有限制：匿名符号的**跨运行时 `===` 身份**无法恢复（按定义它是唯一的），用作对象属性**键**的符号不会被保留（仅支持作为值、Map 键和 Set 成员）。
+`Symbol` **受支持**：注册表符号（`Symbol.for`）可保持身份往返；带描述的符号（`Symbol('x')`，例如 `z.symbol()`）按描述往返，并在**同一负载内**保持引用之间的身份一致。有两个固有限制：匿名符号的**跨运行时 `===` 身份**无法恢复（按定义它是唯一的），用作对象属性**键**的符号不会被保留（仅支持作为值、Map 键和 Set 成员）。实现注意：Symbol 以内部标记键编码，因此**唯一键**为该标记（`$$zod-v4-mocks/symbol$$`）的手工 plain object 在反序列化时会变成 `Symbol`。生成的 Mock 永远不会产生该键，所以这只影响手工构造的同形数据。
 
 ```ts
 const data = generator.generate(schema)

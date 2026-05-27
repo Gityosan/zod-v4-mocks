@@ -79,7 +79,7 @@ Serializes data to a **portable string** via [seroval](https://github.com/lxsmns
 
 `File`, `Blob`, and `FormData` read their bytes asynchronously, so they only round-trip through `serializePortableAsync` — the sync form throws a clear error pointing to the async variant when it meets them.
 
-`Symbol` is supported: registry symbols (`Symbol.for`) round-trip with identity intact, and described symbols (`Symbol('x')`, e.g. from `z.symbol()`) round-trip by description — with identity preserved among references **within the same payload**. Two limits are inherent: an anonymous symbol's cross-runtime `===` identity cannot be recovered (it is unique by definition), and symbols used as object property **keys** are not preserved (only as values, Map keys, and Set members).
+`Symbol` is supported: registry symbols (`Symbol.for`) round-trip with identity intact, and described symbols (`Symbol('x')`, e.g. from `z.symbol()`) round-trip by description — with identity preserved among references **within the same payload**. Two limits are inherent: an anonymous symbol's cross-runtime `===` identity cannot be recovered (it is unique by definition), and symbols used as object property **keys** are not preserved (only as values, Map keys, and Set members). One implementation caveat: symbols are encoded under an internal marker key, so a hand-crafted plain object whose **only** key is that marker (`$$zod-v4-mocks/symbol$$`) deserializes back as a `Symbol` — generated mocks never produce such a key, so this only affects look-alike data built by hand.
 
 ```ts
 const data = generator.generate(schema)
