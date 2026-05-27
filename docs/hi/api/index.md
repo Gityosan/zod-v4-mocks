@@ -1,5 +1,16 @@
 # API संदर्भ
 
+`zod-v4-mocks` एक ही फैक्ट्री, `initGenerator`, एक्सपोज़ करता है, जो एक
+`MockGenerator` लौटाती है। बाकी हर क्षमता — जनरेशन, कस्टमाइज़ेशन,
+सीरियलाइज़ेशन और फ़ाइल आउटपुट — उस इंस्टेंस पर एक मेथड है।
+
+यह संदर्भ केंद्रित पेजों में बंटा है:
+
+- **[जेनरेशन](/hi/api/generation)** — `generate`, `multiGenerate`, `generateMany`, `factory`
+- **[कस्टमाइज़ेशन](/hi/api/customization)** — `supply`, `supplyRef`, `supplyPath`, `override`, `register`, `updateConfig`
+- **[सीरियलाइज़ेशन और आउटपुट](/hi/api/serialization)** — `serialize`, `serializeBinary`, `deserialize`, `serializePortable`, `deserializePortable`, `output`
+- **[टाइप](/hi/api/types)** — `MockConfig`, `CustomGeneratorType`, `GeneraterOptions`, `OutputOptions`, `PortableOptions`, `PathSegment`, और re-exports
+
 ## initGenerator
 
 ```ts
@@ -22,284 +33,52 @@ const generator = initGenerator({
 })
 ```
 
+हर ऑप्शन के लिए [`MockConfig`](/hi/api/types#mockconfig) देखें, या विवरण के लिए
+[कॉन्फ़िगरेशन गाइड](/hi/guide/configuration) देखें।
+
 ## MockGenerator
 
-`initGenerator()` द्वारा लौटाया गया क्लास इंस्टेंस है। मॉक डेटा की जनरेशन, कस्टमाइज़ेशन और आउटपुट करता है। सभी मेथड (`generate` / `multiGenerate` को छोड़कर) मेथड चेनिंग सपोर्ट करते हैं।
+`initGenerator()` द्वारा लौटाया गया क्लास इंस्टेंस है। यह मॉक डेटा की
+जनरेशन, कस्टमाइज़ेशन और आउटपुट को संभालता है।
 
-### generate
+### मेथड चेनिंग
 
-```ts
-generate<T extends z.ZodType>(schema: T): z.infer<T>
-```
+कस्टमाइज़ेशन और कॉन्फ़िगरेशन मेथड वही इंस्टेंस लौटाते हैं, इसलिए उन्हें
+चेन किया जा सकता है। टर्मिनल मेथड — जो डेटा या स्ट्रिंग उत्पन्न करते हैं — नहीं करते।
 
-स्कीमा से एक मॉक डेटा जनरेट करता है। रिटर्न वैल्यू का टाइप स्कीमा के `z.infer<T>` के आधार पर इन्फर होता है।
-
-```ts
-const schema = z.object({
-  id: z.uuid(),
-  name: z.string(),
-  email: z.email(),
-})
-
-const mock = generator.generate(schema)
-// टाइप: { id: string; name: string; email: string }
-```
-
-::: info Branded टाइप
-`z.string().brand<'UserId'>()` जैसे Branded टाइप भी सही ढंग से इन्फर होते हैं। जनरेट होने वाली वैल्यू आंतरिक स्कीमा (इस मामले में `string`) के अनुसार होती है, लेकिन TypeScript पर टाइप में ब्रांड शामिल होता है।
+| मेथड | लौटाता है | चेन करने योग्य |
+|--------|---------|-----------|
+| `supply` / `supplyRef` / `supplyPath` | `MockGenerator` | ✅ |
+| `override` | `MockGenerator` | ✅ |
+| `register` | `MockGenerator` | ✅ |
+| `updateConfig` | `MockGenerator` | ✅ |
+| `generate` / `multiGenerate` / `generateMany` | data | ❌ |
+| `factory` | `{ next, take }` | ❌ |
+| `serialize` / `serializeBinary` / `serializePortable*` | `string` / `Buffer` | ❌ |
+| `deserialize` / `deserializePortable` | data | ❌ |
+| `output` | आउटपुट पथ `string` | ❌ |
 
 ```ts
-const BrandedUserId = z.string().brand<'UserId'>()
-const val = generator.generate(BrandedUserId)
-// val का टाइप string & { __brand: 'UserId' } है
-```
-:::
-
-### multiGenerate
-
-```ts
-multiGenerate<T extends Record<string, z.ZodType>>(
-  schemas: T
-): { [K in keyof T]: z.infer<T[K]> }
-```
-
-कई स्कीमा से एक साथ मॉक डेटा जनरेट करता है। कुंजी नाम सीधे परिणाम की कुंजी बनते हैं।
-
-```ts
-const mocks = generator.multiGenerate({
-  user: z.object({ id: z.uuid(), name: z.string() }),
-  post: z.object({ id: z.number().int(), title: z.string() }),
-})
-
-console.log(mocks.user) // { id: "...", name: "..." }
-console.log(mocks.post) // { id: 123, title: "..." }
-```
-
-### supply
-
-```ts
-supply(constructor: z.core.$constructor<any>, value: any): MockGenerator
-```
-
-विशिष्ट Zod टाइप को फिक्स्ड वैल्यू सेट करता है। एक ही टाइप को कई बार सेट करने पर, पहले सेट की गई वैल्यू प्राथमिक होती है।
-
-```ts
-generator
-  .supply(z.ZodString, 'テスト文字列')
-  .supply(z.ZodEmail, 'test@example.com')
+const data = initGenerator({ seed: 42 })
+  .supply(z.ZodString, 'fixed')
+  .override(customGen)
   .generate(schema)
-```
-
-### override
-
-```ts
-override(customGenerator: CustomGeneratorType): MockGenerator
-```
-
-कस्टम जेनरेटर फंक्शन रजिस्टर करता है। फंक्शन `undefined` लौटाने पर, डिफ़ॉल्ट जनरेशन लॉजिक में फॉलबैक होता है।
-
-```ts
-const customGen: CustomGeneratorType = (schema, options) => {
-  if (schema instanceof z.ZodString) {
-    return options.faker.person.fullName()
-  }
-}
-
-generator.override(customGen).generate(schema)
-```
-
-### register
-
-```ts
-register(schemas: z.ZodType[]): MockGenerator
-```
-
-सुसंगत डेटा जनरेशन के लिए स्कीमा रजिस्टर करता है। `consistentKey` के साथ संयोजन में, समान मेटाडेटा कुंजी वाले फ़ील्ड को एक ही वैल्यू असाइन करता है।
-
-```ts
-const UserId = z.uuid().meta({ name: 'UserId' })
-
-generator
-  .register([UserId])
-  .generate(z.object({ userId: UserId }))
-```
-
-`register` आंतरिक रूप से प्रत्येक स्कीमा की वैल्यू को `config.array.max` की संख्या में प्री-जनरेट करके valueStore में सेव करता है। जनरेशन के समय समान मेटाडेटा कुंजी का स्कीमा मिलने पर, सेव की गई वैल्यू से ऐरे इंडेक्स के अनुसार वैल्यू निकाली जाती है।
-
-### updateConfig
-
-```ts
-updateConfig(newConfig?: Partial<MockConfig>): MockGenerator
-```
-
-सेटिंग्स अपडेट करता है। मौजूदा `supply` / `override` सेटिंग्स बरकरार रहती हैं।
-
-```ts
-generator.updateConfig({ seed: 42, array: { min: 5, max: 10 } })
-```
-
-### serialize
-
-```ts
-serialize(data: unknown, options?: OutputOptions): string
-```
-
-मॉक डेटा को फ़ाइल में लिखे बिना स्ट्रिंग के रूप में सीरियलाइज़ करता है। `output` जो कंटेंट लिखता है वही स्ट्रिंग लौटाता है। जब आपको आउटपुट को और कस्टमाइज़ करके खुद फ़ाइल में लिखना हो तो यह उपयोगी है।
-
-```ts
-const data = generator.generate(schema)
-
-// सीरियलाइज़ की गई स्ट्रिंग प्राप्त करें (डिफ़ॉल्ट: TypeScript फॉर्मेट)
-const content = generator.serialize(data)
-// => "export const mockData = {\n  \"id\": \"...\",\n  ...\n};\n"
-
-// कस्टम एक्सपोर्ट नाम और हेडर/फुटर
-const content = generator.serialize(data, {
-  exportName: 'generatedMockData',
-  header: "import type { User } from './types';",
-  footer: 'export type MockData = typeof generatedMockData;',
-})
-```
-
-### output
-
-```ts
-output(data: unknown, options?: OutputOptions): string
-```
-
-मॉक डेटा को फ़ाइल में आउटपुट करता है। केवल Node.js एनवायरनमेंट में काम करता है। आउटपुट पथ स्ट्रिंग के रूप में लौटाता है।
-
-```ts
-const data = generator.generate(schema)
-
-// TypeScript फ़ाइल के रूप में आउटपुट (डिफ़ॉल्ट)
-generator.output(data)
-// => "./__generated__/generated-mock-data.ts"
-
-// पथ और एक्सटेंशन निर्दिष्ट करें
-generator.output(data, { path: './mocks/user.json' })
-generator.output(data, { path: './mocks/user.ts' })
-generator.output(data, { path: './mocks/user.js' })
-
-// कस्टम एक्सपोर्ट नाम और हेडर/फुटर
-generator.output(data, {
-  path: './mocks/user.ts',
-  exportName: 'generatedMockData',
-  header: "import type { User } from './types';",
-  footer: 'export type MockData = typeof generatedMockData;',
-})
-```
-
-#### OutputOptions
-
-```ts
-type OutputOptions = {
-  path?: string                // आउटपुट पथ (डिफ़ॉल्ट: ./__generated__/generated-mock-data.ts)
-  ext?: 'json' | 'js' | 'ts'  // एक्सटेंशन (path से अनुमानित, निर्दिष्ट न होने पर 'ts')
-  exportName?: string          // कस्टम एक्सपोर्ट वेरिएबल नाम (डिफ़ॉल्ट: 'mockData', केवल ts/js)
-  header?: string              // आउटपुट कंटेंट के शुरू में जोड़ी जाने वाली स्ट्रिंग (JSON में अनदेखा)
-  footer?: string              // आउटपुट कंटेंट के अंत में जोड़ी जाने वाली स्ट्रिंग (JSON में अनदेखा)
-}
-```
-
-#### आउटपुट फॉर्मेट
-
-| एक्सटेंशन | फॉर्मेट | विशेष टाइप का हैंडलिंग |
-|--------|------|-------------|
-| `.ts` / `.js` | `export const <exportName> = ...` | Date, BigInt, Map, Set, Symbol, File, Blob को सटीक रूप से सीरियलाइज़ करता है |
-| `.json` | JSON | Date ISO स्ट्रिंग के रूप में, BigInt स्ट्रिंग में, Map/Set/Symbol में जानकारी का नुकसान (चेतावनी सहित) |
-
-::: warning JSON आउटपुट में डेटा लॉस
-JSON में प्रस्तुत न किए जा सकने वाले टाइप (BigInt, Symbol, Map, Set, File, Blob) वाले डेटा को `.json` में आउटपुट करने पर, डेटा की सटीकता खो जाती है। चेतावनी संदेश आउटपुट होता है, इसलिए `.ts` या `.js` फॉर्मेट के उपयोग पर विचार करें।
-:::
-
-## टाइप परिभाषाएँ
-
-### MockConfig
-
-```ts
-interface MockConfig {
-  /** @default [en, base] */
-  locale?: LocaleType | LocaleType[]
-  /** @default generateMersenne53Randomizer() from faker.js */
-  randomizer?: Randomizer
-  /** @default 1 */
-  seed: number
-  /** @default { min: 1, max: 3 } */
-  array: { min: number; max: number }
-  /** @default { min: 1, max: 3 } */
-  map: { min: number; max: number }
-  /** @default { min: 1, max: 3 } */
-  set: { min: number; max: number }
-  /** @default { min: 1, max: 3 } */
-  record: { min: number; max: number }
-  /** @default 0.5 */
-  optionalProbability: number
-  /** @default 0.5 */
-  nullableProbability: number
-  /** @default 0.5 */
-  defaultProbability: number
-  /** @default 5 @deprecated recursiveDepthLimit का उपयोग करें */
-  lazyDepthLimit: number
-  /** @default 5 */
-  recursiveDepthLimit?: number
-  /** मेटाडेटा का कुंजी नाम (register के साथ संयोजन में) */
-  consistentKey?: string
-}
-```
-
-प्रत्येक सेटिंग का विवरण [कॉन्फ़िगरेशन गाइड](/hi/guide/configuration) में देखें।
-
-### CustomGeneratorType
-
-```ts
-type CustomGeneratorType = (
-  schema: z.core.$ZodType,
-  options: GeneraterOptions,
-) => unknown | undefined
-```
-
-`undefined` लौटाने पर, डिफ़ॉल्ट जनरेशन लॉजिक का उपयोग होता है।
-
-### GeneraterOptions
-
-```ts
-type GeneraterOptions = {
-  faker: Faker                          // seeded faker इंस्टेंस
-  config: MockConfig                    // वर्तमान सेटिंग्स
-  customGenerator?: CustomGeneratorType // कस्टम जेनरेटर
-  registry: z.core.$ZodRegistry | null  // स्कीमा रजिस्ट्री
-  valueStore?: Map<string, unknown[]>   // register द्वारा प्री-जनरेट की गई वैल्यू
-  arrayIndexes: number[]                // ऐरे का वर्तमान इंडेक्स
-  pinnedHierarchy: Map<string, number>  // सुसंगतता जनरेशन का हायरार्की
-  circularRefs: Map<z.core.$ZodType, number> // सर्कुलर रेफरेंस की गहराई ट्रैकिंग
-}
-```
-
-`override` के कस्टम जेनरेटर में मुख्य रूप से `faker` और `config` का उपयोग होता है।
-
-### OutputOptions
-
-```ts
-type OutputOptions = {
-  path?: string
-  ext?: 'json' | 'js' | 'ts'
-  exportName?: string
-  header?: string
-  footer?: string
-}
 ```
 
 ## एक्सपोर्ट सूची
 
 ```ts
 import {
-  initGenerator,        // फैक्ट्री फंक्शन
-  type MockGenerator,   // जेनरेटर क्लास का टाइप
-  type MockConfig,      // सेटिंग्स का टाइप
-  type CustomGeneratorType,  // कस्टम जेनरेटर का टाइप
-  type GeneraterOptions,     // जनरेशन ऑप्शन का टाइप
-  type OutputOptions,        // आउटपुट ऑप्शन का टाइप
+  initGenerator,             // फैक्ट्री फंक्शन
+  ITEM_MARKER,               // '$item' — array/set/tuple एलिमेंट्स के लिए supplyPath मार्कर
+  VALUE_MARKER,              // '$value' — record/map वैल्यूज़ के लिए supplyPath मार्कर
+  type MockGenerator,        // जेनरेटर क्लास का टाइप
+  type MockConfig,           // कॉन्फ़िगरेशन टाइप
+  type CustomGeneratorType,  // कस्टम जेनरेटर टाइप
+  type GeneraterOptions,     // जनरेशन ऑप्शन टाइप
+  type OutputOptions,        // आउटपुट ऑप्शन टाइप
+  type PortableOptions,      // पोर्टेबल सीरियलाइज़ेशन ऑप्शन टाइप
+  type PathSegment,          // supplyPath सेगमेंट टाइप
   type LocaleType,           // लोकेल टाइप
   type Faker,                // faker.js का Faker टाइप (re-export)
   type Randomizer,           // faker.js का Randomizer टाइप (re-export)

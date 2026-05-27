@@ -4,15 +4,19 @@ import type { CustomGeneratorType, GeneraterOptions, MockConfig } from './type';
 import {
   createGeneraterOptions,
   deserializeBinary,
+  deserializePortable,
   makePathSupply,
   OMIT_SYMBOL,
   outputToFile,
+  type OutputOptions,
   type PathSegment,
+  type PortableOptions,
   regenerateIfOmitted,
   runPreflight,
   serializeBinary,
   serializeOutput,
-  type OutputOptions,
+  serializePortable,
+  serializePortableAsync,
 } from './utils';
 
 class MockGenerator {
@@ -255,6 +259,42 @@ class MockGenerator {
    */
   deserialize<T = unknown>(input: Buffer | Uint8Array | string): T {
     return deserializeBinary<T>(input);
+  }
+
+  /**
+   * Serialize data to a portable string (seroval) that round-trips across any
+   * JS runtime — Node↔browser and browser↔browser — unlike `serializeBinary`,
+   * which is Node-only. Preserves Date, RegExp, Map, Set, BigInt, TypedArray,
+   * `undefined`, `NaN`/`Infinity`, circular/shared references, and `Symbol`.
+   *
+   * `File`, `Blob`, and `Promise` require async byte access — use
+   * `serializePortableAsync` for those. Pass `{ base64: true }` to get a
+   * text-safe encoding for embedding in JSON/env vars/headers.
+   */
+  serializePortable(data: unknown, options?: PortableOptions): string {
+    return serializePortable(data, options);
+  }
+
+  /**
+   * Async variant of `serializePortable` that additionally supports `File`,
+   * `Blob`, and `Promise`.
+   */
+  serializePortableAsync(
+    data: unknown,
+    options?: PortableOptions,
+  ): Promise<string> {
+    return serializePortableAsync(data, options);
+  }
+
+  /**
+   * Deserialize a string produced by `serializePortable` /
+   * `serializePortableAsync` back into the original value. Runs in any JS
+   * runtime. Pass `{ base64: true }` if it was encoded that way.
+   *
+   * Only feed it data you produced yourself — the string path is evaluated.
+   */
+  deserializePortable<T = unknown>(input: string, options?: PortableOptions): T {
+    return deserializePortable<T>(input, options);
   }
 
   output(data: unknown, options?: OutputOptions): string {

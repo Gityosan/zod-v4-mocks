@@ -152,3 +152,108 @@ describe('determinism: identical config reproduces identical output', () => {
     );
   });
 });
+
+/**
+ * Portable serialization round-trips losslessly. The value space `zodSchema`
+ * draws from (primitives, Date, BigInt, arrays, tuples, unions, objects with
+ * optional/nullable) is exactly what `serializePortable` handles synchronously
+ * and without loss, so strict deep-equality must hold. Symbols, File/Blob and
+ * Map/Set need identity / async / content care and are covered separately
+ * (example tests + the Symbol property below).
+ */
+describe('portable round-trip: deserializePortable(serializePortable(x)) deep-equals x', () => {
+  it('round-trips arbitrary generated mocks', () => {
+    fc.assert(
+      fc.property(zodSchema, safeConfig, (schema, config) => {
+        const g = initGenerator(config);
+        const value = g.generate(schema);
+        expect(g.deserializePortable(g.serializePortable(value))).toStrictEqual(value);
+      }),
+      { numRuns: 300 },
+    );
+  });
+
+  it('round-trips through base64 encoding', () => {
+    fc.assert(
+      fc.property(zodSchema, safeConfig, (schema, config) => {
+        const g = initGenerator(config);
+        const value = g.generate(schema);
+        const encoded = g.serializePortable(value, { base64: true });
+        expect(g.deserializePortable(encoded, { base64: true })).toStrictEqual(value);
+      }),
+      { numRuns: 150 },
+    );
+  });
+});
+
+/**
+ * The v8 binary path (Node-only) must round-trip the same value space —
+ * hardening `serializeBinary` / `deserialize`, previously only example-tested.
+ */
+describe('binary round-trip: deserialize(serializeBinary(x)) deep-equals x', () => {
+  it('round-trips arbitrary generated mocks', () => {
+    fc.assert(
+      fc.property(zodSchema, safeConfig, (schema, config) => {
+        const g = initGenerator(config);
+        const value = g.generate(schema);
+        expect(g.deserialize(g.serializeBinary(value))).toStrictEqual(value);
+      }),
+      { numRuns: 200 },
+    );
+  });
+});
+
+/**
+ * Symbols cannot use a plain deep-equality round-trip: a described symbol's
+ * identity intentionally changes across the boundary. We instead assert the
+ * documented guarantees over arbitrary symbol sets — description preserved,
+ * registry identity recovered, and identity shared within one payload kept.
+ * Each symbol is index-prefixed so it stays unique (distinct Set/Map keys).
+ */
+const symbolSpec = fc.oneof(
+  fc.string().map((d) => ({ tag: 'desc' as const, d })),
+  fc.string({ minLength: 1, maxLength: 8 }).map((k) => ({ tag: 'for' as const, k })),
+);
+
+describe('portable Symbol round-trip (property)', () => {
+  it('preserves description, registry identity, and shared identity', () => {
+    fc.assert(
+      fc.property(fc.array(symbolSpec, { minLength: 1, maxLength: 6 }), (specs) => {
+        const g = initGenerator();
+        const symbols = specs.map((s, i) =>
+          s.tag === 'for' ? Symbol.for(`zv4m-prop:${i}:${s.k}`) : Symbol(`${i}:${s.d}`),
+        );
+        const payload = {
+          list: symbols,
+          dup: symbols[0],
+          nested: { again: symbols[0] },
+          set: new Set(symbols),
+          map: new Map(symbols.map((sym, i) => [sym, i] as const)),
+        };
+
+        const restored = g.deserializePortable<typeof payload>(
+          g.serializePortable(payload),
+        );
+
+        specs.forEach((spec, i) => {
+          const sym = restored.list[i];
+          expect(typeof sym).toBe('symbol');
+          if (spec.tag === 'for') {
+            expect(sym).toBe(Symbol.for(`zv4m-prop:${i}:${spec.k}`));
+          } else {
+            expect(sym.description).toBe(`${i}:${spec.d}`);
+          }
+          // The same restored symbol is reused as the Map key and Set member.
+          expect(restored.map.get(sym)).toBe(i);
+          expect(restored.set.has(sym)).toBe(true);
+        });
+
+        // Identity shared within the payload survives the round-trip.
+        expect(restored.dup).toBe(restored.list[0]);
+        expect(restored.nested.again).toBe(restored.list[0]);
+        expect(restored.set.size).toBe(symbols.length);
+      }),
+      { numRuns: 200 },
+    );
+  });
+});

@@ -41,7 +41,13 @@ export default defineConfig({
           '/api/': [
             {
               text: 'API Reference',
-              items: [{ text: 'Overview', link: '/api/' }],
+              items: [
+                { text: 'Overview', link: '/api/' },
+                { text: 'Generation', link: '/api/generation' },
+                { text: 'Customization', link: '/api/customization' },
+                { text: 'Serialization & Output', link: '/api/serialization' },
+                { text: 'Types', link: '/api/types' },
+              ],
             },
           ],
         },
@@ -78,7 +84,13 @@ export default defineConfig({
           '/ja/api/': [
             {
               text: 'API リファレンス',
-              items: [{ text: '概要', link: '/ja/api/' }],
+              items: [
+                { text: '概要', link: '/ja/api/' },
+                { text: '生成', link: '/ja/api/generation' },
+                { text: 'カスタマイズ', link: '/ja/api/customization' },
+                { text: 'シリアライズと出力', link: '/ja/api/serialization' },
+                { text: '型定義', link: '/ja/api/types' },
+              ],
             },
           ],
         },
@@ -109,7 +121,13 @@ export default defineConfig({
           '/zh/api/': [
             {
               text: 'API 参考',
-              items: [{ text: '概述', link: '/zh/api/' }],
+              items: [
+                { text: '概述', link: '/zh/api/' },
+                { text: '生成', link: '/zh/api/generation' },
+                { text: '自定义', link: '/zh/api/customization' },
+                { text: '序列化与输出', link: '/zh/api/serialization' },
+                { text: '类型定义', link: '/zh/api/types' },
+              ],
             },
           ],
         },
@@ -140,7 +158,13 @@ export default defineConfig({
           '/hi/api/': [
             {
               text: 'API संदर्भ',
-              items: [{ text: 'अवलोकन', link: '/hi/api/' }],
+              items: [
+                { text: 'अवलोकन', link: '/hi/api/' },
+                { text: 'जेनरेशन', link: '/hi/api/generation' },
+                { text: 'कस्टमाइज़ेशन', link: '/hi/api/customization' },
+                { text: 'सीरियलाइज़ेशन और आउटपुट', link: '/hi/api/serialization' },
+                { text: 'टाइप परिभाषाएँ', link: '/hi/api/types' },
+              ],
             },
           ],
         },
