@@ -6,6 +6,7 @@ export * from './generator';
 export * from './key-mapping';
 export * from './output';
 export * from './path';
+export * from './portable';
 export * from './preflight';
 export * from './schema';
 export * from './string';

@@ -1,6 +1,6 @@
 {
   "name": "zod-v4-mocks",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -67,7 +67,9 @@
     "es-toolkit": "1.45.1",
     "jiti": "2.7.0",
     "log-update": "7.2.0",
-    "randexp": "0.5.3"
+    "randexp": "0.5.3",
+    "seroval": "1.5.4",
+    "seroval-plugins": "1.5.4"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "5.10.0",
