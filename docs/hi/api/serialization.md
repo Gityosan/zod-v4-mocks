@@ -167,6 +167,7 @@ type OutputOptions = {
   header?: string                  // आउटपुट कंटेंट के शुरू में जोड़ी जाने वाली स्ट्रिंग (JSON में अनदेखा)
   footer?: string                  // आउटपुट कंटेंट के अंत में जोड़ी जाने वाली स्ट्रिंग (JSON में अनदेखा)
   binary?: boolean                 // ts/js के लिए, एक <name>.bin और उसे डिसीरियलाइज़ करने वाला रैपर लिखता है; JSON में अनदेखा
+  portable?: boolean               // केवल outputAsync: ts/js में क्रॉस-रनटाइम एक्सप्रेशन इनलाइन; File/Blob/FormData व सर्कुलर समर्थित; Symbol नहीं; JSON में अनदेखा
 }
 ```
 
@@ -176,6 +177,7 @@ type OutputOptions = {
 |--------|------|-------------|
 | `.ts` / `.js` | `export const <exportName> = ...` | Date, BigInt, Map, Set, Symbol, File, Blob को सटीक रूप से सीरियलाइज़ करता है |
 | `.ts` / `.js` + `binary: true` | ESM रैपर + साथ में `.bin` (v8 स्ट्रक्चर्ड क्लोन) | Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, सर्कुलर रेफ़रेंस को सुरक्षित रखता है। रैपर मान को `unknown` के रूप में एक्सपोर्ट करता है; उपभोक्ता पक्ष पर कास्ट करें या टाइपिंग के लिए `deserialize<T>()` का उपयोग करें। केवल Node.js। |
+| `.ts` / `.js` + `portable: true` (**`outputAsync`**) | इनलाइन `export const <name> = <seroval एक्सप्रेशन>` | क्रॉस-रनटाइम (Node↔ब्राउज़र), कोई sibling फ़ाइल नहीं और consumer पर कोई निर्भरता नहीं। File/Blob/FormData की **सामग्री**, Date, Map, Set, BigInt, TypedArray, सर्कुलर/साझा रेफ़रेंस सुरक्षित। **`Symbol` नहीं।** |
 | `.json` | JSON | Date ISO स्ट्रिंग के रूप में, BigInt स्ट्रिंग में, Map/Set/Symbol में जानकारी का नुकसान (चेतावनी सहित)। `binary` अनदेखा किया जाता है। |
 
 ::: warning JSON आउटपुट में डेटा लॉस
@@ -189,4 +191,29 @@ JSON में प्रस्तुत न किए जा सकने वा
 - `<name>.ts` / `<name>.js` — एक हल्का ESM रैपर जो इम्पोर्ट के समय साथ वाली `.bin` को आलस्यपूर्वक `v8.deserialize` करता है, इसलिए उपभोक्ता केवल `import { mockData } from './user'` करते हैं और बाइनरी प्रतिनिधित्व से अनजान रहते हैं।
 
 रैपर मान को `unknown` के रूप में एक्सपोर्ट करता है; उपभोक्ता पक्ष पर कास्ट करें, या रैपर के बिना टाइप किया हुआ मान चाहने पर सीधे `deserialize<T>('./user.bin')` कॉल करें। `.bin` फ़ाइल का नाम हमेशा रैपर के बेसनेम से प्राप्त होता है और अलग से कस्टमाइज़ नहीं किया जा सकता। रैपर ESM (`import.meta.dirname`) को लक्षित करता है और Node.js 20.11+ की आवश्यकता है।
+:::
+
+## outputAsync
+
+```ts
+outputAsync(data: unknown, options?: OutputOptions): Promise<string>
+```
+
+`output` का एसिंक्रोनस समकक्ष। `{ portable: true }` के लिए आवश्यक है, क्योंकि `File`/`Blob`/`FormData` के बाइट्स एसिंक्रोनस रूप से पढ़े जाते हैं। non-portable मोड (`json` / `ts` / `js` / `binary`) `output` जैसा ही व्यवहार करते हैं, बस एसिंक्रोनस fs से लिखते हैं। आउटपुट पथ लौटाता है।
+
+`portable: true` (ts/js) के साथ यह एक स्व-निहित, क्रॉस-रनटाइम एक्सप्रेशन इनलाइन करता है — `export const <name> = <seroval एक्सप्रेशन>` — जिसे किसी भी JS रनटाइम (Node↔ब्राउज़र) में सामान्य `import` से पुनर्स्थापित किया जा सकता है। `binary: true` (केवल Node का v8 + sibling `.bin`) के विपरीत, **कोई sibling फ़ाइल नहीं और उपभोक्ता के लिए कोई रनटाइम निर्भरता नहीं**, और `File`/`Blob`/`FormData` अपनी **सामग्री सहित** राउंड-ट्रिप करते हैं, साथ ही Date, Map, Set, BigInt, TypedArray और सर्कुलर/साझा रेफ़रेंस भी।
+
+```ts
+const data = generator.generate(schema)
+
+// क्रॉस-रनटाइम, बिना हानि वाला fixture (File/Blob सामग्री सहित)
+const path = await generator.outputAsync(data, {
+  path: './mocks/user.ts',
+  portable: true,
+})
+// कहीं भी उपयोग करें: import { mockData } from './mocks/user'
+```
+
+::: warning portable आउटपुट में Symbol समर्थित नहीं
+सामान्य `import` में unbox चरण नहीं होता, इसलिए `portable: true` **`Symbol` मानों को अस्वीकार करता है** (वे plain object के रूप में डिसीरियलाइज़ होंगे)। Symbol वाले डेटा के लिए `portable` के बिना `ext: 'ts'`/`'js'` (जो `Symbol(...)` लिटरल देता है), या `serializePortable` / `deserializePortable` स्ट्रिंग जोड़ी का उपयोग करें। सिंक्रोनस `output()` को `portable` पास करने पर त्रुटि होती है — `outputAsync` का उपयोग करें।
 :::

@@ -214,6 +214,7 @@ Outputs generated data to a file. Supports JSON, JavaScript, and TypeScript form
 | header | string | undefined | String prepended to the generated wrapper/text (ignored for json) |
 | footer | string | undefined | String appended to the generated wrapper/text (ignored for json) |
 | binary | boolean | false | For ts/js: also write a `<name>.bin` and make the script a v8.deserialize wrapper. Ignored for json. |
+| portable | boolean | false | **`outputAsync` only.** For ts/js: inline a cross-runtime `export const <name> = <seroval expr>` (no sibling file, no consumer dep). File/Blob/FormData + circular; rejects Symbol; ignored for json. |
 
 ```ts
 const generator = initGenerator();
@@ -249,6 +250,17 @@ generator.output(data, {
 - `binary: true` perfectly round-trips Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, and circular references via `v8.serialize`. The generated wrapper targets ESM (`import.meta.dirname`) and is Node.js 20.11+ only
 - The sibling `.bin` basename is always derived from the wrapper path; it cannot be customized separately
 - `binary` is silently ignored for `ext: 'json'`
+
+### generator.outputAsync(data, options?)
+
+Async counterpart of `output` returning `Promise<string>` (the path). Required for `{ portable: true }`, which reads File/Blob/FormData bytes asynchronously; non-portable modes (json/ts/js/binary) behave like `output` but write with async fs.
+
+With `portable: true` (ts/js) it inlines a self-contained, cross-runtime expression — `export const <name> = <seroval expr>` — reconstructed by a plain `import` in any JS runtime (Node↔browser). Unlike `binary: true` (Node-only v8 + sibling `.bin`), there is no sibling file and no consumer dependency, and File/Blob/FormData round-trip with their contents (plus Date, Map, Set, BigInt, TypedArray, circular/shared refs). `Symbol` is rejected in portable mode (an inline import has no unbox step) — use ext ts/js without `portable`, or serializePortable/deserializePortable. Passing `portable` to the sync `output()` throws.
+
+```ts
+const path = await generator.outputAsync(data, { path: './mocks/user.ts', portable: true });
+// consume anywhere: import { mockData } from './mocks/user'
+```
 
 ## Supported Zod Types
 

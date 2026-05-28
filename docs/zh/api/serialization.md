@@ -163,6 +163,7 @@ type OutputOptions = {
   header?: string                  // 添加到输出内容头部的字符串（JSON 格式时忽略）
   footer?: string                  // 添加到输出内容尾部的字符串（JSON 格式时忽略）
   binary?: boolean                 // 对于 ts/js，写出 <name>.bin 和一个反序列化它的包装器；JSON 时忽略
+  portable?: boolean               // 仅 outputAsync：在 ts/js 中内联跨运行时表达式；支持 File/Blob/FormData 与循环引用；不支持 Symbol；JSON 时忽略
 }
 ```
 
@@ -172,6 +173,7 @@ type OutputOptions = {
 |--------|------|-------------|
 | `.ts` / `.js` | `export const <exportName> = ...` | 准确序列化 Date, BigInt, Map, Set, Symbol, File, Blob |
 | `.ts` / `.js` + `binary: true` | ESM 包装器 + 同名 `.bin`（v8 结构化克隆）| 保留 Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, 循环引用。导出值类型为 `unknown`；请在消费端断言或使用 `deserialize<T>()` 指定类型。仅限 Node.js。 |
+| `.ts` / `.js` + `portable: true`（**`outputAsync`**）| 内联 `export const <name> = <seroval 表达式>` | 跨运行时（Node↔浏览器），无 sibling 文件、无 consumer 依赖。保留 File/Blob/FormData 的**内容**、Date、Map、Set、BigInt、TypedArray、循环/共享引用。**不支持 `Symbol`。** |
 | `.json` | JSON | Date 转为 ISO 字符串，BigInt 转为字符串，Map/Set/Symbol 会丢失信息（有警告）。`binary` 会被忽略。 |
 
 ::: warning JSON 输出时的数据丢失
@@ -185,4 +187,29 @@ type OutputOptions = {
 - `<name>.ts` / `<name>.js` —— 一个轻量 ESM 包装器，在导入时惰性 `v8.deserialize` 同名 `.bin`，因此消费者只需 `import { mockData } from './user'`，无需关心二进制表示。
 
 导出值的类型为 `unknown`；请在消费端断言，或在需要类型化的值时直接调用 `deserialize<T>('./user.bin')`（无需经过包装器）。`.bin` 文件名始终从包装器的基础名派生，无法单独自定义。包装器面向 ESM（`import.meta.dirname`），需要 Node.js 20.11+。
+:::
+
+## outputAsync
+
+```ts
+outputAsync(data: unknown, options?: OutputOptions): Promise<string>
+```
+
+`output` 的异步版本。`{ portable: true }` 需要它，因为要异步读取 `File`/`Blob`/`FormData` 的字节。非 portable 模式（`json` / `ts` / `js` / `binary`）的行为与 `output` 相同，只是用异步 fs 写入。返回输出路径。
+
+在 `portable: true`（ts/js）下，它内联一个自包含、跨运行时的表达式——`export const <name> = <seroval 表达式>`——可在**任意 JS 运行时**（Node↔浏览器）通过普通 `import` 还原。与 `binary: true`（仅限 Node 的 v8 + sibling `.bin`）不同，**没有 sibling 文件，consumer 也无需任何依赖**，并且 `File`/`Blob`/`FormData` 会**连同内容**一起往返，同时保留 Date、Map、Set、BigInt、TypedArray、循环/共享引用。
+
+```ts
+const data = generator.generate(schema)
+
+// 跨运行时、无损的 fixture（包含 File/Blob 内容）
+const path = await generator.outputAsync(data, {
+  path: './mocks/user.ts',
+  portable: true,
+})
+// 在任何地方消费：import { mockData } from './mocks/user'
+```
+
+::: warning portable 输出不支持 Symbol
+普通 `import` 没有 unbox 步骤，因此 `portable: true` 会**拒绝 `Symbol` 值**（否则会被还原为普通对象）。对于包含 Symbol 的数据，请使用不带 `portable` 的 `ext: 'ts'`/`'js'`（会输出 `Symbol(...)` 字面量），或使用 `serializePortable` / `deserializePortable` 字符串对。向同步的 `output()` 传入 `portable` 会抛出错误——请改用 `outputAsync`。
 :::

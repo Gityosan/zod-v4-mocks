@@ -168,6 +168,7 @@ type OutputOptions = {
   header?: string                  // 出力内容の先頭に追加する文字列（json では無視）
   footer?: string                  // 出力内容の末尾に追加する文字列（json では無視）
   binary?: boolean                 // ts/js に対し、<name>.bin とそれを復元するラッパーを書き出す。json では無視
+  portable?: boolean               // outputAsync 専用: ts/js にクロスランタイムな式をインライン。File/Blob/FormData・循環対応。Symbol 不可。json では無視
 }
 ```
 
@@ -177,6 +178,7 @@ type OutputOptions = {
 |--------|------|-------------|
 | `.ts` / `.js` | `export const <exportName> = ...` | Date, BigInt, Map, Set, Symbol, File, Blob を正確にシリアライズ |
 | `.ts` / `.js` + `binary: true` | ESM ラッパー + 同名 `.bin`（v8 structured clone）| Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, 循環参照を保持。エクスポートは `unknown` 型なので、消費側でキャストするか `deserialize<T>()` を直接使用。Node.js 限定 |
+| `.ts` / `.js` + `portable: true`（**`outputAsync`**）| `export const <name> = <seroval 式>` をインライン | クロスランタイム（Node↔ブラウザ）、sibling ファイル・consumer 依存なし。File/Blob/FormData の**中身**、Date, Map, Set, BigInt, TypedArray, 循環/共有参照を保持。**`Symbol` 不可。** |
 | `.json` | JSON | Date は ISO文字列、BigInt は文字列化、Map/Set/Symbol は情報損失（警告あり）。`binary` は無視 |
 
 ::: warning JSON 出力時のデータ損失
@@ -190,4 +192,29 @@ JSON では表現できない型（BigInt, Symbol, Map, Set, File, Blob）を含
 - `<name>.ts` / `<name>.js` — import 時に同名の `.bin` を `v8.deserialize` で遅延復元する薄い ESM ラッパー。消費側は `import { mockData } from './user'` でそのまま使える
 
 エクスポート値は `unknown` 型です。消費側でキャストするか、ラッパーを介さず `deserialize<T>('./user.bin')` を直接呼んで型付けしてください。`.bin` のファイル名は常にラッパーのベース名から自動導出され、個別には変更できません。ラッパーは ESM (`import.meta.dirname`) 前提で Node.js 20.11+ が必要です。
+:::
+
+## outputAsync
+
+```ts
+outputAsync(data: unknown, options?: OutputOptions): Promise<string>
+```
+
+`output` の非同期版です。`{ portable: true }` に必要で、`File`/`Blob`/`FormData` のバイトを非同期に読み出します。portable 以外（`json` / `ts` / `js` / `binary`）は `output` と同じ挙動で、書き込みのみ非同期 fs を使います。出力パスを返します。
+
+`portable: true`（ts/js）では、自己完結したクロスランタイムな式 — `export const <name> = <seroval 式>` — をインライン出力します。素の `import` で**あらゆる JS ランタイム**（Node↔ブラウザ）で復元できます。`binary: true`（Node 専用の v8 ＋ sibling `.bin`）と違い、**sibling ファイルも consumer 側の依存も不要**で、`File`/`Blob`/`FormData` は**中身ごと**往復し、Date・Map・Set・BigInt・TypedArray・循環/共有参照も保持します。
+
+```ts
+const data = generator.generate(schema)
+
+// クロスランタイムで無損失なフィクスチャ（File/Blob の中身を含む）
+const path = await generator.outputAsync(data, {
+  path: './mocks/user.ts',
+  portable: true,
+})
+// どこでも: import { mockData } from './mocks/user'
+```
+
+::: warning portable 出力では Symbol 非対応
+素の `import` には unbox 工程が無いため、`portable: true` は **`Symbol` を拒否**します（plain object として復元されてしまうため）。Symbol を含むデータは `portable` なしの `ext: 'ts'`/`'js'`（`Symbol(...)` リテラルを出力）か、`serializePortable` / `deserializePortable` の文字列ペアを使ってください。sync の `output()` に `portable` を渡すと throw します — `outputAsync` を使ってください。
 :::
