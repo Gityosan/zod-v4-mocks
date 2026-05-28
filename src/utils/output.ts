@@ -14,9 +14,11 @@ import {
   isUndefined,
 } from 'es-toolkit';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
 import { deserialize as v8Deserialize, serialize as v8Serialize } from 'node:v8';
 import { z } from 'zod';
+import { serializePortableSourceAsync } from './portable';
 
 const outputExtSchema = z.literal(['json', 'js', 'ts']);
 type OutputExt = z.infer<typeof outputExtSchema>;
@@ -54,6 +56,19 @@ export type OutputOptions = {
    * Ignored for `ext: 'json'`.
    */
   binary?: boolean;
+  /**
+   * Honored by `outputAsync` only (it requires async byte access). For
+   * `ext: 'ts'`/`'js'`, inlines a self-contained, cross-runtime expression
+   * (`export const <name> = <expr>`) produced by seroval — no sibling file and
+   * no runtime dependency for consumers, unlike `binary` (Node-only v8).
+   * Losslessly preserves File/Blob/FormData (incl. contents), Date, Map, Set,
+   * BigInt, TypedArray, circular/shared refs, and URL/URLSearchParams/Headers.
+   *
+   * `Symbol` is rejected (an inline import has no unbox step); use `ext` ts/js
+   * without `portable` for symbol data. Passing `portable` to the sync
+   * `output()` throws — use `outputAsync`. Ignored for `ext: 'json'`.
+   */
+  portable?: boolean;
 };
 
 const DEFAULT_OUTPUT_DIR = './__generated__';
@@ -306,6 +321,21 @@ function buildContent(
   return parts.join('\n');
 }
 
+/** Wrap an inline seroval source expression as an ESM export (ts/js). */
+function buildPortableContent(expr: string, options: OutputOptions): string {
+  const exportName = options.exportName ?? 'mockData';
+  const header = options.header ?? '';
+  const footer = options.footer ?? '';
+  const body = `export const ${exportName} = ${expr};\n`;
+
+  const parts: string[] = [];
+  if (header) parts.push(header);
+  parts.push(body);
+  if (footer) parts.push(footer);
+
+  return parts.join('\n');
+}
+
 /**
  * Serialize data to a string without writing to a file.
  * Returns the same content that `outputToFile` would write.
@@ -359,6 +389,13 @@ export function outputToFile(data: unknown, options?: OutputOptions) {
   const outputPath =
     options?.path ?? `${DEFAULT_OUTPUT_DIR}/${DEFAULT_OUTPUT_FILENAME}.${ext}`;
 
+  if (options?.portable && ext !== 'json') {
+    throw new Error(
+      `output(): portable output requires async byte access. Use ` +
+        `outputAsync(data, { portable: true }) instead.`,
+    );
+  }
+
   const dir = dirname(outputPath);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
@@ -375,5 +412,44 @@ export function outputToFile(data: unknown, options?: OutputOptions) {
 
   const content = buildContent(data, { ...options, ext });
   writeFileSync(outputPath, content, 'utf-8');
+  return outputPath;
+}
+
+/**
+ * Async counterpart of `outputToFile`. Required for `portable: true`, which
+ * reads File/Blob/FormData bytes asynchronously and writes a self-contained,
+ * cross-runtime ESM module (`export const <name> = <expr>`). Non-portable
+ * modes (json / ts / js / binary) behave like `outputToFile` but write with
+ * async fs.
+ */
+export async function outputToFileAsync(
+  data: unknown,
+  options?: OutputOptions,
+): Promise<string> {
+  const ext = options?.ext ?? getExtFromPath(options?.path) ?? 'ts';
+  const outputPath =
+    options?.path ?? `${DEFAULT_OUTPUT_DIR}/${DEFAULT_OUTPUT_FILENAME}.${ext}`;
+
+  const dir = dirname(outputPath);
+  await mkdir(dir, { recursive: true });
+
+  if (options?.portable && (ext === 'ts' || ext === 'js')) {
+    const expr = await serializePortableSourceAsync(data);
+    const content = buildPortableContent(expr, options ?? {});
+    await writeFile(outputPath, content, 'utf-8');
+    return outputPath;
+  }
+
+  if (options?.binary && (ext === 'ts' || ext === 'js')) {
+    const binName = wrapperBinRelativeName(outputPath);
+    const binPath = join(dir, binName);
+    await writeFile(binPath, serializeBinary(data));
+    const wrapper = buildBinWrapper(outputPath, options ?? {}, ext);
+    await writeFile(outputPath, wrapper, 'utf-8');
+    return outputPath;
+  }
+
+  const content = buildContent(data, { ...options, ext });
+  await writeFile(outputPath, content, 'utf-8');
   return outputPath;
 }

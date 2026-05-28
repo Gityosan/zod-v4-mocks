@@ -167,6 +167,7 @@ type OutputOptions = {
   header?: string                  // string prepended to the output content (ignored for json)
   footer?: string                  // string appended to the output content (ignored for json)
   binary?: boolean                 // for ts/js, write a <name>.bin and a wrapper that deserializes it; ignored for json
+  portable?: boolean               // outputAsync only: inline cross-runtime expr (ts/js); File/Blob/FormData + circular; no Symbol; ignored for json
 }
 ```
 
@@ -176,6 +177,7 @@ type OutputOptions = {
 |--------|------|-------------|
 | `.ts` / `.js` | `export const <exportName> = ...` | Accurately serializes Date, BigInt, Map, Set, Symbol, File, Blob |
 | `.ts` / `.js` + `binary: true` | ESM wrapper + sibling `.bin` (v8 structured clone) | Preserves Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, circular refs. The wrapper exports the value as `unknown`; cast on the consumer side or use `deserialize<T>()` for typing. Node.js only. |
+| `.ts` / `.js` + `portable: true` (**`outputAsync`**) | inline `export const <name> = <seroval expr>` | Cross-runtime (Node↔browser), no sibling file and no consumer dependency. Preserves File/Blob/FormData **contents**, Date, Map, Set, BigInt, TypedArray, circular/shared refs. **No `Symbol`.** |
 | `.json` | JSON | Date as ISO string, BigInt as string, Map/Set/Symbol lose information (with warnings). `binary` is ignored. |
 
 ::: warning Data Loss in JSON Output
@@ -189,4 +191,29 @@ With `binary: true`, `output()` writes two files:
 - `<name>.ts` / `<name>.js` — a thin ESM wrapper that lazily `v8.deserialize`s the sibling `.bin` at import time, so consumers just do `import { mockData } from './user'` with no awareness of the binary representation.
 
 The wrapper exports the value as `unknown`; cast on the consumer side, or call `deserialize<T>('./user.bin')` directly when you want a typed value without going through the wrapper. The `.bin` filename is always derived from the wrapper's basename and cannot be customized separately. The wrapper targets ESM (`import.meta.dirname`) and requires Node.js 20.11+.
+:::
+
+## outputAsync
+
+```ts
+outputAsync(data: unknown, options?: OutputOptions): Promise<string>
+```
+
+Async counterpart of `output`. Required for `{ portable: true }`, which reads `File`/`Blob`/`FormData` bytes asynchronously. Non-portable modes (`json` / `ts` / `js` / `binary`) behave like `output` but write with async fs. Returns the output path.
+
+With `portable: true` (ts/js) it inlines a self-contained, cross-runtime expression — `export const <name> = <seroval expr>` — that reconstructs on a plain `import` in **any JS runtime** (Node↔browser). Unlike `binary: true` (Node-only v8 + sibling `.bin`), there is **no sibling file and no runtime dependency for consumers**, and `File`/`Blob`/`FormData` round-trip **with their contents**, alongside Date, Map, Set, BigInt, TypedArray, and circular/shared references.
+
+```ts
+const data = generator.generate(schema)
+
+// Cross-runtime, lossless fixture — including File/Blob contents
+const path = await generator.outputAsync(data, {
+  path: './mocks/user.ts',
+  portable: true,
+})
+// consume anywhere: import { mockData } from './mocks/user'
+```
+
+::: warning Symbol is not supported in portable output
+An inline `import` has no unbox step, so `portable: true` **rejects `Symbol` values** (they would deserialize as plain objects). Use `ext: 'ts'`/`'js'` without `portable` (it emits `Symbol(...)` literals), or the `serializePortable` / `deserializePortable` string pair. Passing `portable` to the synchronous `output()` throws — use `outputAsync`.
 :::

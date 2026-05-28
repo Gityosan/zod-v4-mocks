@@ -855,3 +855,105 @@ describe('Output serialization - special types', () => {
     expect(content).toContain('new Map([');
   });
 });
+
+describe('outputAsync (portable, cross-runtime)', () => {
+  const importFresh = async (path: string) => {
+    const url = `${new URL(`file://${process.cwd()}/${path}`).href}?t=${Date.now()}`;
+    return import(url);
+  };
+
+  it('writes an inline ESM module that round-trips File contents on import', async () => {
+    const generator = initGenerator();
+    const data = {
+      id: 'u1',
+      file: new File(['file-body'], 'a.txt', { type: 'text/plain' }),
+      blob: new Blob(['blob-body'], { type: 'application/json' }),
+    };
+    const outputPath = `${testOutputDir}/portable-file.js`;
+
+    const result = await generator.outputAsync(data, { path: outputPath, portable: true });
+    expect(result).toBe(outputPath);
+    expect(existsSync(outputPath)).toBe(true);
+
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toContain('export const mockData =');
+    // Self-contained: no sibling .bin and no runtime import.
+    expect(existsSync(`${testOutputDir}/portable-file.bin`)).toBe(false);
+    expect(content).not.toContain('import');
+
+    const mod = (await importFresh(outputPath)) as { mockData: typeof data };
+    expect(mod.mockData.id).toBe('u1');
+    expect(mod.mockData.file).toBeInstanceOf(File);
+    expect(mod.mockData.file.name).toBe('a.txt');
+    expect(await mod.mockData.file.text()).toBe('file-body');
+    expect(mod.mockData.blob).toBeInstanceOf(Blob);
+    expect(await mod.mockData.blob.text()).toBe('blob-body');
+  });
+
+  it('round-trips Date/Map/Set/BigInt and circular refs via the inline module', async () => {
+    const generator = initGenerator();
+    const data: Record<string, unknown> = {
+      createdAt: new Date('2025-01-01T00:00:00.000Z'),
+      tags: new Set(['a', 'b']),
+      meta: new Map<string, unknown>([['n', 1n]]),
+    };
+    data.self = data; // circular
+    const outputPath = `${testOutputDir}/portable-rich.js`;
+
+    await generator.outputAsync(data, { path: outputPath, portable: true });
+    const mod = (await importFresh(outputPath)) as { mockData: typeof data };
+
+    expect((mod.mockData.createdAt as Date).toISOString()).toBe('2025-01-01T00:00:00.000Z');
+    expect(mod.mockData.tags).toBeInstanceOf(Set);
+    expect(mod.mockData.meta).toBeInstanceOf(Map);
+    expect((mod.mockData.meta as Map<string, unknown>).get('n')).toBe(1n);
+    expect(mod.mockData.self).toBe(mod.mockData);
+  });
+
+  it('respects exportName / header / footer in portable output', async () => {
+    const generator = initGenerator();
+    const outputPath = `${testOutputDir}/portable-custom.ts`;
+
+    await generator.outputAsync(
+      { id: 1 },
+      {
+        path: outputPath,
+        portable: true,
+        exportName: 'userMock',
+        header: '// top',
+        footer: '// end',
+      },
+    );
+
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toMatch(/^\/\/ top/);
+    expect(content).toContain('export const userMock =');
+    expect(content).toMatch(/\/\/ end\s*$/);
+  });
+
+  it('rejects Symbol data in portable mode with a clear error', async () => {
+    const generator = initGenerator();
+    await expect(
+      generator.outputAsync(
+        { tag: Symbol('x') },
+        { path: `${testOutputDir}/portable-symbol.js`, portable: true },
+      ),
+    ).rejects.toThrow(/Symbol/);
+  });
+
+  it('sync output() throws when portable is requested for ts/js', () => {
+    const generator = initGenerator();
+    expect(() =>
+      generator.output({ id: 1 }, { path: `${testOutputDir}/x.ts`, portable: true }),
+    ).toThrow(/outputAsync/);
+  });
+
+  it('outputAsync without portable writes JSON like output()', async () => {
+    const generator = initGenerator();
+    const outputPath = `${testOutputDir}/async-plain.json`;
+
+    const result = await generator.outputAsync({ name: 'test' }, { path: outputPath });
+    expect(result).toBe(outputPath);
+    expect(JSON.parse(readFileSync(outputPath, 'utf-8'))).toEqual({ name: 'test' });
+  });
+});
