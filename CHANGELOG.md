@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-05-28
+
+### Added
+- Added `serializePortable(data)` / `serializePortableAsync(data)` / `deserializePortable<T>(input)` methods on `MockGenerator` — cross-runtime serialization backed by `seroval`. Unlike the Node-only `serializeBinary` (v8), output round-trips across any JS runtime (Node ↔ browser, browser ↔ browser) and preserves `Date`, `RegExp`, `Map`, `Set`, `BigInt`, `TypedArray`, `undefined`, `NaN` / `Infinity`, circular / shared references, and `URL` / `URLSearchParams` / `Headers`. `File` / `Blob` / `FormData` round-trip via the async variant. `Symbol` is supported: registry symbols keep identity; described symbols round-trip by description with shared identity preserved within a payload
+- Added `base64` option to the portable methods — text-safe encoding for embedding in JSON, environment variables, or transports that disallow binary
+- Added `outputAsync()` method on `MockGenerator` — async counterpart of `output()`. With `{ portable: true }` (`ts` / `js`) it inlines a self-contained `seroval` expression — `export const <name> = <expr>` — that a plain `import` reconstructs in any JS runtime, with no sibling file and no consumer dependency (unlike `binary: true`, which is Node-only v8 + a `.bin`). `File` / `Blob` / `FormData` round-trip with their contents
+
+### Changed
+- `output()` (sync) now throws when `portable: true` is requested; use `outputAsync()` instead. Portable mode rejects `Symbol` in this path because an inline `import` has no unbox step
+
+## [3.1.0] - 2026-05-24
+
+### Changed
+- Declared `engines.node: ">=20"`. The published package is still plain ESM and runs on Node 20+. No public API changes from 3.0.0 — `import`s, `bin`, and types are identical
+
 ## [3.0.0] - 2026-05-19
 
 ### Added
