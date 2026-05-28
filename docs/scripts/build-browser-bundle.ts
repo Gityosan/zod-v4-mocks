@@ -53,7 +53,15 @@ await build({
             export const existsSync = () => false;
             export const mkdirSync = () => {};
             export const writeFileSync = () => {};
+            export const readFileSync = () => '';
+            export const mkdir = async () => {};
+            export const writeFile = async () => {};
             export const dirname = (p) => p;
+            export const basename = (p) => p;
+            export const extname = () => '';
+            export const join = (...parts) => parts.join('/');
+            export const serialize = (v) => v;
+            export const deserialize = (v) => v;
             export default {};
           `,
           loader: 'js',
