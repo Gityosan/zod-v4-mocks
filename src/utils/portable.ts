@@ -332,6 +332,34 @@ export async function serializePortableAsync(
 }
 
 /**
+ * Produce a self-contained JS *source expression* for inline file output —
+ * the string evaluates to the value directly (no deserialize/unbox step), so
+ * it can be written as `export const mock = <expr>` and consumed by a plain
+ * `import` in any runtime. Handles File/Blob/FormData (async), Date, Map, Set,
+ * BigInt, TypedArray, circular/shared refs, URL/URLSearchParams/Headers.
+ *
+ * `Symbol` is rejected: it is encoded by boxing, which only reverses inside
+ * `deserializePortable` — an inline `import` skips that step and would yield a
+ * plain object. Use `ext: 'ts'`/`'js'` (which emits `Symbol(...)` literals) or
+ * the `serializePortable` + `deserializePortable` pair for symbol data.
+ */
+export async function serializePortableSourceAsync(data: unknown): Promise<string> {
+  if (containsBoxableSymbol(data, new Set())) {
+    throw new Error(
+      'outputAsync({ portable: true }): cannot inline Symbol values as source ' +
+        '(an inline import has no unbox step, so they would deserialize as plain ' +
+        "objects). Use ext 'ts'/'js' (emits Symbol literals), or serializePortable " +
+        '+ deserializePortable instead.',
+    );
+  }
+  try {
+    return await serializeAsync(data, { plugins: PLUGINS });
+  } catch (error) {
+    throw toFriendlyError(error, 'async');
+  }
+}
+
+/**
  * Deserialize a string produced by `serializePortable` /
  * `serializePortableAsync` back into the original value. Runs in any JS
  * runtime. Pass `{ base64: true }` if it was encoded that way.

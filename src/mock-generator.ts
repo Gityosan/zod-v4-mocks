@@ -8,6 +8,7 @@ import {
   makePathSupply,
   OMIT_SYMBOL,
   outputToFile,
+  outputToFileAsync,
   type OutputOptions,
   type PathSegment,
   type PortableOptions,
@@ -299,6 +300,18 @@ class MockGenerator {
 
   output(data: unknown, options?: OutputOptions): string {
     return outputToFile(data, options);
+  }
+
+  /**
+   * Async counterpart of `output`. Required for `{ portable: true }`, which
+   * writes a self-contained, cross-runtime ESM module (`export const <name> =
+   * <expr>`) that round-trips File/Blob/FormData (incl. contents), Date, Map,
+   * Set, BigInt, TypedArray and circular/shared refs with no sibling file and
+   * no consumer dependency — unlike `output({ binary: true })` (Node-only v8).
+   * `Symbol` data is rejected in portable mode; use `ext` ts/js instead.
+   */
+  outputAsync(data: unknown, options?: OutputOptions): Promise<string> {
+    return outputToFileAsync(data, options);
   }
 }
 
