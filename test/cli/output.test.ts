@@ -710,6 +710,125 @@ describe('output with binary flag (wrapper + .bin)', () => {
   });
 });
 
+describe('serializeGraft / deserializeGraft (greft-codec, cross-language)', () => {
+  it('round-trips primitives, Date, BigInt, Map, Set, RegExp, Symbol, NaN/Infinity', () => {
+    const generator = initGenerator();
+    const sym = Symbol.for('kind');
+    const data = {
+      str: 'hello',
+      und: undefined,
+      bi: 123456789012345678901234567890n,
+      d: new Date('2025-01-01T00:00:00.000Z'),
+      m: new Map<string, unknown>([['a', 1]]),
+      s: new Set([1, 2, 3]),
+      re: /abc/gi,
+      bytes: new Uint8Array([1, 2, 3, 4]),
+      sym,
+      nan: NaN,
+      inf: Infinity,
+    };
+
+    const bytes = generator.serializeGraft(data);
+    expect(bytes).toBeInstanceOf(Uint8Array);
+
+    const restored = generator.deserializeGraft<typeof data>(bytes);
+    expect(restored.str).toBe('hello');
+    expect(restored.und).toBeUndefined();
+    expect(restored.bi).toBe(123456789012345678901234567890n);
+    expect(restored.d).toBeInstanceOf(Date);
+    expect(restored.m).toBeInstanceOf(Map);
+    expect(restored.s).toBeInstanceOf(Set);
+    expect(restored.re.flags).toBe('gi');
+    expect(Array.from(restored.bytes)).toEqual([1, 2, 3, 4]);
+    expect(restored.sym).toBe(Symbol.for('kind'));
+    expect(Number.isNaN(restored.nan)).toBe(true);
+    expect(restored.inf).toBe(Infinity);
+  });
+
+  it('round-trips circular references', () => {
+    const generator = initGenerator();
+    const a: Record<string, unknown> = { name: 'a' };
+    const b: Record<string, unknown> = { name: 'b', a };
+    a.b = b;
+
+    const restored = generator.deserializeGraft<typeof a>(
+      generator.serializeGraft(a),
+    );
+    expect((restored.b as typeof b).a).toBe(restored);
+  });
+
+  it('bytes can be written manually and read back via deserializeGraft(path)', () => {
+    const generator = initGenerator();
+    const data = { count: 7n, when: new Date('2026-04-23T00:00:00.000Z') };
+    const outputPath = `${testOutputDir}/mock.bin`;
+
+    mkdirSync(testOutputDir, { recursive: true });
+    writeFileSync(outputPath, generator.serializeGraft(data));
+
+    const restored = generator.deserializeGraft<typeof data>(outputPath);
+    expect(restored.count).toBe(7n);
+    expect(restored.when.toISOString()).toBe('2026-04-23T00:00:00.000Z');
+  });
+});
+
+describe("output with binary: 'graft' (greft-codec wrapper + .bin)", () => {
+  it('writes a wrapper that decodes via greft-codec plus a sibling .bin', () => {
+    const generator = initGenerator();
+    const schema = z.object({
+      id: z.string(),
+      createdAt: z.date(),
+      count: z.bigint(),
+      tags: z.set(z.string()),
+    });
+    const data = generator.generate(schema);
+    const outputPath = `${testOutputDir}/user.ts`;
+
+    const result = generator.output(data, { path: outputPath, binary: 'graft' });
+
+    expect(result).toBe(outputPath);
+    expect(existsSync(`${testOutputDir}/user.bin`)).toBe(true);
+
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toContain("import { decode } from 'greft-codec';");
+    expect(content).not.toContain("from 'node:v8'");
+    expect(content).toContain('export const mockData: unknown = decode(');
+  });
+
+  it('round-trips via the generated greft wrapper at runtime', async () => {
+    const generator = initGenerator();
+    const schema = z.object({
+      id: z.string(),
+      createdAt: z.date(),
+      count: z.bigint(),
+      tags: z.set(z.string()),
+    });
+    const data = generator.generate(schema);
+    const outputPath = `${testOutputDir}/runtime-graft.js`;
+
+    generator.output(data, { path: outputPath, binary: 'graft' });
+
+    const moduleUrl = new URL(`file://${process.cwd()}/${outputPath}`).href;
+    const mod = (await import(moduleUrl)) as { mockData: typeof data };
+
+    expect(mod.mockData.id).toBe(data.id);
+    expect(mod.mockData.createdAt).toBeInstanceOf(Date);
+    expect(typeof mod.mockData.count).toBe('bigint');
+    expect([...mod.mockData.tags]).toEqual([...data.tags]);
+  });
+
+  it("the js wrapper omits the unknown annotation for binary: 'graft'", () => {
+    const generator = initGenerator();
+    const data = generator.generate(z.object({ id: z.string() }));
+    const outputPath = `${testOutputDir}/user.js`;
+
+    generator.output(data, { path: outputPath, binary: 'graft' });
+
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toContain('export const mockData = decode(');
+    expect(content).not.toMatch(/:\s*unknown/);
+  });
+});
+
 describe('Output serialization - special types', () => {
   it('serializes Map correctly', () => {
     const generator = initGenerator({ seed: 123 });

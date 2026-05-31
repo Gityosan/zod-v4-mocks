@@ -204,6 +204,23 @@ describe('binary round-trip: deserialize(serializeBinary(x)) deep-equals x', () 
 });
 
 /**
+ * The greft-codec path (cross-runtime / cross-language) must round-trip the
+ * same value space — hardening `serializeGraft` / `deserializeGraft`.
+ */
+describe('graft round-trip: deserializeGraft(serializeGraft(x)) deep-equals x', () => {
+  it('round-trips arbitrary generated mocks', () => {
+    fc.assert(
+      fc.property(zodSchema, safeConfig, (schema, config) => {
+        const g = initGenerator(config);
+        const value = g.generate(schema);
+        expect(g.deserializeGraft(g.serializeGraft(value))).toStrictEqual(value);
+      }),
+      { numRuns: 200 },
+    );
+  });
+});
+
+/**
  * Symbols cannot use a plain deep-equality round-trip: a described symbol's
  * identity intentionally changes across the boundary. We instead assert the
  * documented guarantees over arbitrary symbol sets — description preserved,

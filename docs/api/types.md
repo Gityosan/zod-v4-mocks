@@ -92,7 +92,7 @@ type OutputOptions = {
   exportName?: string
   header?: string
   footer?: string
-  binary?: boolean
+  binary?: boolean | 'v8' | 'graft'
 }
 ```
 

@@ -196,6 +196,29 @@ describe.runIf(HAS_BUILD)('CLI - additional options', () => {
     expect(require('node:fs').statSync(out).size).toBeGreaterThan(0);
   });
 
+  itIfBuild('-f graft -o writes a wrapper + a greft-codec .bin', () => {
+    const out = join(tmp, 'users.ts');
+    const r = run(['generate', schemasPath, 'User', '-f', 'graft', '-o', out]);
+    expect(r.status).toBe(0);
+    expect(existsSync(out)).toBe(true);
+    expect(existsSync(join(tmp, 'users.bin'))).toBe(true);
+    expect(require('node:fs').readFileSync(out, 'utf-8')).toContain(
+      "from 'greft-codec'",
+    );
+  });
+
+  itIfBuild('-f graft (stdout) writes a greft byte stream', () => {
+    // The shared `run` helper decodes stdout as utf8, which would corrupt
+    // binary; spawn directly with buffer encoding to inspect raw bytes.
+    const r = spawnSync('node', [CLI, 'generate', schemasPath, 'User', '-f', 'graft'], {
+      cwd: tmp,
+      env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+    });
+    expect(r.status).toBe(0);
+    // greft streams start with the "GRF1" magic + version byte.
+    expect(Array.from(r.stdout.subarray(0, 5))).toEqual([71, 82, 70, 49, 1]);
+  });
+
   itIfBuild('--silent still writes the output file', () => {
     const out = join(tmp, 'silent.json');
     const r = run([

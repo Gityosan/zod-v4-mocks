@@ -53,8 +53,8 @@ const generator = initGenerator({
 | `updateConfig` | `MockGenerator` | ✅ |
 | `generate` / `multiGenerate` / `generateMany` | データ | ❌ |
 | `factory` | `{ next, take }` | ❌ |
-| `serialize` / `serializeBinary` / `serializePortable*` | `string` / `Buffer` | ❌ |
-| `deserialize` / `deserializePortable` | データ | ❌ |
+| `serialize` / `serializeBinary` / `serializeGraft` / `serializePortable*` | `string` / `Buffer` / `Uint8Array` | ❌ |
+| `deserialize` / `deserializeGraft` / `deserializePortable` | データ | ❌ |
 | `output` | 出力パス `string` | ❌ |
 
 ```ts

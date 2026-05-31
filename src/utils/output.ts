@@ -13,6 +13,7 @@ import {
   isSymbol,
   isUndefined,
 } from 'es-toolkit';
+import { decode, encode } from 'greft-codec';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
@@ -44,23 +45,34 @@ export type OutputOptions = {
    */
   footer?: string;
   /**
-   * When combined with `ext: 'ts'` or `'js'`, writes a v8.serialize binary
-   * (`.bin`) alongside the script file. The script itself becomes a thin
-   * ESM wrapper that lazily `v8.deserialize`s the sibling `.bin` at import
-   * time, preserving `Date`, `Map`, `Set`, `RegExp`, `BigInt`, `TypedArray`,
-   * `undefined`, and circular references with no information loss.
+   * When combined with `ext: 'ts'` or `'js'`, writes a binary (`.bin`)
+   * alongside the script file. The script itself becomes a thin ESM wrapper
+   * that lazily reconstructs the sibling `.bin` at import time, preserving
+   * `Date`, `Map`, `Set`, `RegExp`, `BigInt`, `TypedArray`, `undefined`, and
+   * circular references with no information loss.
    *
-   * The wrapper exports the deserialized value as `unknown`. Cast on the
-   * consumer side or use `deserialize<T>()` directly if you need typing.
+   * Pick the backend:
+   * - `true` / `'v8'` (default): Node's `v8.serialize`. Zero extra runtime
+   *   dependency, but the `.bin` and the wrapper are **Node-only**.
+   * - `'graft'`: [`greft-codec`](https://github.com/Gityosan/greft)'s
+   *   language-agnostic format. The `.bin` round-trips across any JS runtime
+   *   and can also be decoded in other languages (Python / Rust / Go / …),
+   *   and additionally preserves `Symbol` and `NaN`/`Infinity`. The generated
+   *   wrapper imports `decode` from `greft-codec`, so consumers of the wrapper
+   *   need that (zero-dependency) package installed at runtime.
+   *
+   * The wrapper exports the value as `unknown`. Cast on the consumer side or
+   * use `deserialize<T>()` / `deserializeGraft<T>()` directly if you need
+   * typing.
    *
    * Ignored for `ext: 'json'`.
    */
-  binary?: boolean;
+  binary?: boolean | 'v8' | 'graft';
   /**
    * Honored by `outputAsync` only (it requires async byte access). For
    * `ext: 'ts'`/`'js'`, inlines a self-contained, cross-runtime expression
    * (`export const <name> = <expr>`) produced by seroval — no sibling file and
-   * no runtime dependency for consumers, unlike `binary` (Node-only v8).
+   * no runtime dependency for consumers, unlike `binary` (a sibling `.bin`).
    * Losslessly preserves File/Blob/FormData (incl. contents), Date, Map, Set,
    * BigInt, TypedArray, circular/shared refs, and URL/URLSearchParams/Headers.
    *
@@ -265,30 +277,56 @@ function wrapperBinRelativeName(outputPath: string): string {
   return `${base}.bin`;
 }
 
+/** Binary backend used by `binary: true | 'v8' | 'graft'`. */
+type BinaryFormat = 'v8' | 'graft';
+
+/**
+ * Resolve the `binary` option to a backend, or `null` when binary output is
+ * not requested. `true` keeps its historical meaning (`v8`).
+ */
+function resolveBinaryFormat(
+  binary: OutputOptions['binary'],
+): BinaryFormat | null {
+  if (binary === 'graft') return 'graft';
+  if (binary === true || binary === 'v8') return 'v8';
+  return null;
+}
+
+/** Encode `data` to bytes for the chosen binary backend. */
+function encodeBinary(data: unknown, format: BinaryFormat): Uint8Array {
+  return format === 'graft' ? encode(data) : v8Serialize(data);
+}
+
 function buildBinWrapper(
   outputPath: string,
   options: OutputOptions,
   ext: 'ts' | 'js',
+  format: BinaryFormat,
 ): string {
   const exportName = options.exportName ?? 'mockData';
   const header = options.header ?? '';
   const footer = options.footer ?? '';
   const binRef = wrapperBinRelativeName(outputPath);
 
+  // v8 reconstructs via Node's built-in `deserialize`; graft via greft-codec's
+  // cross-runtime / cross-language `decode`.
+  const importLine =
+    format === 'graft'
+      ? "import { decode } from 'greft-codec';"
+      : "import { deserialize } from 'node:v8';";
+  const reconstruct = format === 'graft' ? 'decode' : 'deserialize';
+
   const imports = [
     "import { readFileSync } from 'node:fs';",
     "import { join } from 'node:path';",
-    "import { deserialize } from 'node:v8';",
+    importLine,
   ].join('\n');
 
+  const typeAnnotation = ext === 'ts' ? ': unknown' : '';
   const body =
-    ext === 'ts'
-      ? `export const ${exportName}: unknown = deserialize(\n` +
-        `  readFileSync(join(import.meta.dirname, ${JSON.stringify(binRef)})),\n` +
-        `);\n`
-      : `export const ${exportName} = deserialize(\n` +
-        `  readFileSync(join(import.meta.dirname, ${JSON.stringify(binRef)})),\n` +
-        `);\n`;
+    `export const ${exportName}${typeAnnotation} = ${reconstruct}(\n` +
+    `  readFileSync(join(import.meta.dirname, ${JSON.stringify(binRef)})),\n` +
+    `);\n`;
 
   const parts: string[] = [];
   if (header) parts.push(header);
@@ -362,7 +400,8 @@ export function serializeOutput(data: unknown, options?: OutputOptions): string 
  * `undefined`, and circular references with no information loss.
  *
  * The resulting Buffer is only readable in a Node.js environment via
- * `deserializeBinary` (or `v8.deserialize` directly).
+ * `deserializeBinary` (or `v8.deserialize` directly). For a cross-runtime /
+ * cross-language binary, use `serializeGraft` instead.
  */
 export function serializeBinary(data: unknown): Buffer {
   return v8Serialize(data);
@@ -372,7 +411,8 @@ export function serializeBinary(data: unknown): Buffer {
  * Deserialize a binary Buffer produced by `serializeBinary` (or `v8.serialize`)
  * back into the original JavaScript value.
  *
- * Accepts either a Buffer or a path to a `.bin` file written by `outputToFile`.
+ * Accepts either a Buffer or a path to a `.bin` file written by `outputToFile`
+ * with `binary: true` / `binary: 'v8'`.
  *
  * Pass a generic type parameter to cast the result, e.g.
  * `deserializeBinary<User>('./user.bin')`.
@@ -382,6 +422,39 @@ export function deserializeBinary<T = unknown>(
 ): T {
   const buffer = typeof input === 'string' ? readFileSync(input) : input;
   return v8Deserialize(buffer) as T;
+}
+
+/**
+ * Serialize data to a binary `Uint8Array` using
+ * [`greft-codec`](https://github.com/Gityosan/greft)'s language-agnostic
+ * lossless format. Preserves Date, Map, Set, RegExp, BigInt, TypedArray,
+ * Symbol, `undefined`, `NaN`/`Infinity`, and circular/shared references with
+ * no information loss.
+ *
+ * Unlike `serializeBinary` (Node-only `v8.serialize`), the result round-trips
+ * across any JS runtime and can also be decoded in other languages (Python /
+ * Rust / Go / …) via a greft-codec port — handy for reusing mock data as a
+ * cross-language test fixture. Decode it back with `deserializeGraft`.
+ */
+export function serializeGraft(data: unknown): Uint8Array {
+  return encode(data);
+}
+
+/**
+ * Deserialize bytes produced by `serializeGraft` (or any `greft-codec`
+ * `encode`) back into the original JavaScript value.
+ *
+ * Accepts a `Uint8Array`/`Buffer`, or a path to a `.bin` file written by
+ * `outputToFile` with `binary: 'graft'`.
+ *
+ * Pass a generic type parameter to cast the result, e.g.
+ * `deserializeGraft<User>('./user.bin')`.
+ */
+export function deserializeGraft<T = unknown>(
+  input: Uint8Array | string,
+): T {
+  const bytes = typeof input === 'string' ? readFileSync(input) : input;
+  return decode(bytes) as T;
 }
 
 export function outputToFile(data: unknown, options?: OutputOptions) {
@@ -401,11 +474,12 @@ export function outputToFile(data: unknown, options?: OutputOptions) {
     mkdirSync(dir, { recursive: true });
   }
 
-  if (options?.binary && (ext === 'ts' || ext === 'js')) {
+  const binaryFormat = resolveBinaryFormat(options?.binary);
+  if (binaryFormat && (ext === 'ts' || ext === 'js')) {
     const binName = wrapperBinRelativeName(outputPath);
     const binPath = join(dir, binName);
-    writeFileSync(binPath, serializeBinary(data));
-    const wrapper = buildBinWrapper(outputPath, options, ext);
+    writeFileSync(binPath, encodeBinary(data, binaryFormat));
+    const wrapper = buildBinWrapper(outputPath, options ?? {}, ext, binaryFormat);
     writeFileSync(outputPath, wrapper, 'utf-8');
     return outputPath;
   }
@@ -440,11 +514,12 @@ export async function outputToFileAsync(
     return outputPath;
   }
 
-  if (options?.binary && (ext === 'ts' || ext === 'js')) {
+  const binaryFormat = resolveBinaryFormat(options?.binary);
+  if (binaryFormat && (ext === 'ts' || ext === 'js')) {
     const binName = wrapperBinRelativeName(outputPath);
     const binPath = join(dir, binName);
-    await writeFile(binPath, serializeBinary(data));
-    const wrapper = buildBinWrapper(outputPath, options ?? {}, ext);
+    await writeFile(binPath, encodeBinary(data, binaryFormat));
+    const wrapper = buildBinWrapper(outputPath, options ?? {}, ext, binaryFormat);
     await writeFile(outputPath, wrapper, 'utf-8');
     return outputPath;
   }

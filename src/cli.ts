@@ -15,7 +15,7 @@ import {
 import { initGenerator, type MockGenerator } from './mock-generator';
 import type { LocaleType, MockConfig } from './type';
 
-const FORMATS = ['json', 'ts', 'js', 'bin'] as const;
+const FORMATS = ['json', 'ts', 'js', 'bin', 'graft'] as const;
 type Format = (typeof FORMATS)[number];
 
 const PROFILES = ['base', 'cli', 'test'] as const;
@@ -142,7 +142,8 @@ const generateCmd = defineCommand({
     format: {
       type: 'string',
       alias: 'f',
-      description: 'Output format: json | ts | js | bin (overrides extension).',
+      description:
+        'Output format: json | ts | js | bin (v8) | graft (cross-language) (overrides extension).',
     },
     locale: {
       type: 'string',
@@ -271,6 +272,10 @@ async function runGenerate(args: {
       process.stdout.write(gen.serializeBinary(data));
       return;
     }
+    if (fmt === 'graft') {
+      process.stdout.write(gen.serializeGraft(data));
+      return;
+    }
     if (fmt === 'json') {
       process.stdout.write(
         JSON.stringify(data, jsonReplacer, args.pretty ? 2 : 0) + '\n',
@@ -289,6 +294,8 @@ async function runGenerate(args: {
 
   if (fmt === 'bin') {
     gen.output(data, { path: absOut, binary: true });
+  } else if (fmt === 'graft') {
+    gen.output(data, { path: absOut, binary: 'graft' });
   } else {
     gen.output(data, { path: absOut });
   }
