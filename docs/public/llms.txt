@@ -163,7 +163,7 @@ const content = generator.serialize(data, {
 
 ### generator.serializeBinary(data)
 
-Serializes data to a binary `Buffer` using Node.js's `v8.serialize` (structured clone). Preserves Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, and circular references with no information loss. Node.js only. For a cross-runtime / cross-language binary, use `serializeGraft`.
+Serializes data to a binary `Buffer` using Node.js's `v8.serialize` (structured clone). Preserves Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, and circular references with no information loss. Node.js only. For a cross-runtime / cross-language binary, use `serializeGreft`.
 
 ```ts
 const buf = generator.serializeBinary(data); // Buffer
@@ -181,18 +181,18 @@ const restored = generator.deserialize<User>('./mocks/user.bin');
 const restored = generator.deserialize<User>(generator.serializeBinary(data));
 ```
 
-### generator.serializeGraft(data) / generator.deserializeGraft\<T = unknown\>(input)
+### generator.serializeGreft(data) / generator.deserializeGreft\<T = unknown\>(input)
 
-Serializes data to a binary `Uint8Array` using greft-codec's language-agnostic lossless format. Preserves Date, Map, Set, RegExp, BigInt, TypedArray, Symbol, `undefined`, `NaN`/`Infinity`, and circular/shared references with no information loss. Unlike `serializeBinary` (Node-only v8), it round-trips across any JS runtime and is decodable in other languages (Python / Rust / Go / …) via a greft-codec port. `deserializeGraft` restores it; accepts a `Uint8Array`/`Buffer` or a `.bin` file path.
+Serializes data to a binary `Uint8Array` using greft-codec's language-agnostic lossless format. Preserves Date, Map, Set, RegExp, BigInt, TypedArray, Symbol, `undefined`, `NaN`/`Infinity`, and circular/shared references with no information loss. Unlike `serializeBinary` (Node-only v8), it round-trips across any JS runtime and is decodable in other languages (Python / Rust / Go / …) via a greft-codec port. `deserializeGreft` restores it; accepts a `Uint8Array`/`Buffer` or a `.bin` file path.
 
 ```ts
-const bytes = generator.serializeGraft(data); // Uint8Array
-const restored = generator.deserializeGraft<User>(bytes);
+const bytes = generator.serializeGreft(data); // Uint8Array
+const restored = generator.deserializeGreft<User>(bytes);
 ```
 
 ### generator.serializePortable(data, options?) / generator.serializePortableAsync(data, options?)
 
-Serializes data to a portable string via seroval. Like `serializeGraft`, the result round-trips across any JS runtime — Node↔browser and browser↔browser. Preserves Date, RegExp, Map, Set, BigInt, TypedArray, `undefined`, NaN/Infinity, circular/shared references, and (via bundled plugins) URL, URLSearchParams, Headers. `File`/`Blob`/`FormData` are async-only — use `serializePortableAsync`; the sync form throws a clear error pointing to it. `Symbol` is supported: registry symbols (`Symbol.for`) keep their identity, and described symbols (`Symbol('x')`, e.g. `z.symbol()`) round-trip by description with identity preserved within one payload; an anonymous symbol's cross-runtime `===` identity and symbols used as object property keys are not preserved. Implementation caveat: symbols are encoded under an internal marker key, so a hand-crafted plain object whose only key is that marker (`$$zod-v4-mocks/symbol$$`) deserializes back as a Symbol; generated mocks never produce such a key. Pass `{ base64: true }` for a text-safe encoding.
+Serializes data to a portable string via seroval. Like `serializeGreft`, the result round-trips across any JS runtime — Node↔browser and browser↔browser. Preserves Date, RegExp, Map, Set, BigInt, TypedArray, `undefined`, NaN/Infinity, circular/shared references, and (via bundled plugins) URL, URLSearchParams, Headers. `File`/`Blob`/`FormData` are async-only — use `serializePortableAsync`; the sync form throws a clear error pointing to it. `Symbol` is supported: registry symbols (`Symbol.for`) keep their identity, and described symbols (`Symbol('x')`, e.g. `z.symbol()`) round-trip by description with identity preserved within one payload; an anonymous symbol's cross-runtime `===` identity and symbols used as object property keys are not preserved. Implementation caveat: symbols are encoded under an internal marker key, so a hand-crafted plain object whose only key is that marker (`$$zod-v4-mocks/symbol$$`) deserializes back as a Symbol; generated mocks never produce such a key. Pass `{ base64: true }` for a text-safe encoding.
 
 ```ts
 const str = generator.serializePortable(data);
@@ -211,7 +211,7 @@ const restoredFromB64 = generator.deserializePortable<User>(b64, { base64: true 
 
 ### generator.output(data, options?)
 
-Outputs generated data to a file. Supports JSON, JavaScript, and TypeScript formats. Set `binary: true` (`'v8'`) with ts/js to additionally write a sibling `.bin` (Node-only v8.serialize) and turn the script into a thin ESM wrapper that `v8.deserialize`s it at import time. Use `binary: 'graft'` for a cross-language `.bin` (greft-codec) whose wrapper `decode`s it instead.
+Outputs generated data to a file. Supports JSON, JavaScript, and TypeScript formats. Set `binary: true` (`'v8'`) with ts/js to additionally write a sibling `.bin` (Node-only v8.serialize) and turn the script into a thin ESM wrapper that `v8.deserialize`s it at import time. Use `binary: 'greft'` for a cross-language `.bin` (greft-codec) whose wrapper `decode`s it instead.
 
 **Options:**
 
@@ -222,7 +222,7 @@ Outputs generated data to a file. Supports JSON, JavaScript, and TypeScript form
 | exportName | string | 'mockData' | Custom export variable name (ts/js only) |
 | header | string | undefined | String prepended to the generated wrapper/text (ignored for json) |
 | footer | string | undefined | String appended to the generated wrapper/text (ignored for json) |
-| binary | boolean \| 'v8' \| 'graft' | false | For ts/js: also write a `<name>.bin` + a wrapper that reconstructs it. `true`/`'v8'` = v8.serialize (Node-only); `'graft'` = greft-codec (cross-language). Ignored for json. |
+| binary | boolean \| 'v8' \| 'greft' | false | For ts/js: also write a `<name>.bin` + a wrapper that reconstructs it. `true`/`'v8'` = v8.serialize (Node-only); `'greft'` = greft-codec (cross-language). Ignored for json. |
 | portable | boolean | false | **`outputAsync` only.** For ts/js: inline a cross-runtime `export const <name> = <seroval expr>` (no sibling file, no consumer dep). File/Blob/FormData + circular; rejects Symbol; ignored for json. |
 
 ```ts
@@ -243,8 +243,8 @@ generator.output(data, { path: './mocks/user.ts', binary: true }); // v8 (Node-o
 generator.output(data, { path: './mocks/user.js', binary: true });
 
 // Cross-language .bin via greft-codec (wrapper decodes with `decode`);
-// type with deserializeGraft<T>() when reading the .bin directly
-generator.output(data, { path: './mocks/user.ts', binary: 'graft' });
+// type with deserializeGreft<T>() when reading the .bin directly
+generator.output(data, { path: './mocks/user.ts', binary: 'greft' });
 
 // Custom export name with header/footer
 generator.output(data, {
@@ -260,7 +260,7 @@ generator.output(data, {
 - Date objects are serialized as `new Date("...")` in JS/TS format
 - Directory is created automatically if it doesn't exist
 - `header`, `footer`, `exportName` are ignored for JSON. For ts/js + `binary`, they apply to the generated wrapper file
-- `binary: true`/`'v8'` perfectly round-trips Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, and circular references via `v8.serialize` (Node-only, no extra dependency). `binary: 'graft'` does the same via greft-codec and additionally preserves Symbol and `NaN`/`Infinity`; its `.bin` is decodable in any JS runtime or other languages (Python / Rust / Go), and the generated wrapper imports `decode` from `greft-codec` (so consumers of that wrapper need it). Both wrappers target ESM (`import.meta.dirname`) and are Node.js 20.11+ only
+- `binary: true`/`'v8'` perfectly round-trips Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, and circular references via `v8.serialize` (Node-only, no extra dependency). `binary: 'greft'` does the same via greft-codec and additionally preserves Symbol and `NaN`/`Infinity`; its `.bin` is decodable in any JS runtime or other languages (Python / Rust / Go), and the generated wrapper imports `decode` from `greft-codec` (so consumers of that wrapper need it). Both wrappers target ESM (`import.meta.dirname`) and are Node.js 20.11+ only
 - The sibling `.bin` basename is always derived from the wrapper path; it cannot be customized separately
 - `binary` is silently ignored for `ext: 'json'`
 

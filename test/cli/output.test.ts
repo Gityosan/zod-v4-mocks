@@ -710,7 +710,7 @@ describe('output with binary flag (wrapper + .bin)', () => {
   });
 });
 
-describe('serializeGraft / deserializeGraft (greft-codec, cross-language)', () => {
+describe('serializeGreft / deserializeGreft (greft-codec, cross-language)', () => {
   it('round-trips primitives, Date, BigInt, Map, Set, RegExp, Symbol, NaN/Infinity', () => {
     const generator = initGenerator();
     const sym = Symbol.for('kind');
@@ -728,10 +728,10 @@ describe('serializeGraft / deserializeGraft (greft-codec, cross-language)', () =
       inf: Infinity,
     };
 
-    const bytes = generator.serializeGraft(data);
+    const bytes = generator.serializeGreft(data);
     expect(bytes).toBeInstanceOf(Uint8Array);
 
-    const restored = generator.deserializeGraft<typeof data>(bytes);
+    const restored = generator.deserializeGreft<typeof data>(bytes);
     expect(restored.str).toBe('hello');
     expect(restored.und).toBeUndefined();
     expect(restored.bi).toBe(123456789012345678901234567890n);
@@ -751,27 +751,27 @@ describe('serializeGraft / deserializeGraft (greft-codec, cross-language)', () =
     const b: Record<string, unknown> = { name: 'b', a };
     a.b = b;
 
-    const restored = generator.deserializeGraft<typeof a>(
-      generator.serializeGraft(a),
+    const restored = generator.deserializeGreft<typeof a>(
+      generator.serializeGreft(a),
     );
     expect((restored.b as typeof b).a).toBe(restored);
   });
 
-  it('bytes can be written manually and read back via deserializeGraft(path)', () => {
+  it('bytes can be written manually and read back via deserializeGreft(path)', () => {
     const generator = initGenerator();
     const data = { count: 7n, when: new Date('2026-04-23T00:00:00.000Z') };
     const outputPath = `${testOutputDir}/mock.bin`;
 
     mkdirSync(testOutputDir, { recursive: true });
-    writeFileSync(outputPath, generator.serializeGraft(data));
+    writeFileSync(outputPath, generator.serializeGreft(data));
 
-    const restored = generator.deserializeGraft<typeof data>(outputPath);
+    const restored = generator.deserializeGreft<typeof data>(outputPath);
     expect(restored.count).toBe(7n);
     expect(restored.when.toISOString()).toBe('2026-04-23T00:00:00.000Z');
   });
 });
 
-describe("output with binary: 'graft' (greft-codec wrapper + .bin)", () => {
+describe("output with binary: 'greft' (greft-codec wrapper + .bin)", () => {
   it('writes a wrapper that decodes via greft-codec plus a sibling .bin', () => {
     const generator = initGenerator();
     const schema = z.object({
@@ -783,7 +783,7 @@ describe("output with binary: 'graft' (greft-codec wrapper + .bin)", () => {
     const data = generator.generate(schema);
     const outputPath = `${testOutputDir}/user.ts`;
 
-    const result = generator.output(data, { path: outputPath, binary: 'graft' });
+    const result = generator.output(data, { path: outputPath, binary: 'greft' });
 
     expect(result).toBe(outputPath);
     expect(existsSync(`${testOutputDir}/user.bin`)).toBe(true);
@@ -803,9 +803,9 @@ describe("output with binary: 'graft' (greft-codec wrapper + .bin)", () => {
       tags: z.set(z.string()),
     });
     const data = generator.generate(schema);
-    const outputPath = `${testOutputDir}/runtime-graft.js`;
+    const outputPath = `${testOutputDir}/runtime-greft.js`;
 
-    generator.output(data, { path: outputPath, binary: 'graft' });
+    generator.output(data, { path: outputPath, binary: 'greft' });
 
     const moduleUrl = new URL(`file://${process.cwd()}/${outputPath}`).href;
     const mod = (await import(moduleUrl)) as { mockData: typeof data };
@@ -816,12 +816,12 @@ describe("output with binary: 'graft' (greft-codec wrapper + .bin)", () => {
     expect([...mod.mockData.tags]).toEqual([...data.tags]);
   });
 
-  it("the js wrapper omits the unknown annotation for binary: 'graft'", () => {
+  it("the js wrapper omits the unknown annotation for binary: 'greft'", () => {
     const generator = initGenerator();
     const data = generator.generate(z.object({ id: z.string() }));
     const outputPath = `${testOutputDir}/user.js`;
 
-    generator.output(data, { path: outputPath, binary: 'graft' });
+    generator.output(data, { path: outputPath, binary: 'greft' });
 
     const content = readFileSync(outputPath, 'utf-8');
     expect(content).toContain('export const mockData = decode(');

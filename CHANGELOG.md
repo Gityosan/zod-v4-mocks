@@ -8,11 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.3.0] - 2026-05-31
 
 ### Added
-- Added `serializeGraft(data)` / `deserializeGraft<T>(input)` methods on `MockGenerator` — lossless binary serialization backed by [`greft-codec`](https://github.com/Gityosan/greft). Unlike the Node-only `serializeBinary` (v8), the `Uint8Array` output round-trips across any JS runtime and can also be decoded in other languages (Python / Rust / Go / …) via a greft-codec port — handy for reusing generated mocks as cross-language test fixtures. Preserves `Date` / `Map` / `Set` / `RegExp` / `BigInt` / `TypedArray` / `undefined` / circular references like `serializeBinary`, plus `Symbol` and `NaN` / `Infinity`
-- Added `binary: 'graft'` to `OutputOptions` (and a `graft` CLI format) — writes a sibling `.bin` encoded with greft-codec and an ESM wrapper that reconstructs it via `decode` from `greft-codec`. The `.bin` is a portable, cross-language artifact; consumers of the generated wrapper need the (zero-dependency) `greft-codec` package installed. The existing `binary: true` is unchanged and now also accepts the explicit alias `binary: 'v8'`
+- Added `serializeGreft(data)` / `deserializeGreft<T>(input)` methods on `MockGenerator` — lossless binary serialization backed by [`greft-codec`](https://github.com/Gityosan/greft). Unlike the Node-only `serializeBinary` (v8), the `Uint8Array` output round-trips across any JS runtime and can also be decoded in other languages (Python / Rust / Go / …) via a greft-codec port — handy for reusing generated mocks as cross-language test fixtures. Preserves `Date` / `Map` / `Set` / `RegExp` / `BigInt` / `TypedArray` / `undefined` / circular references like `serializeBinary`, plus `Symbol` and `NaN` / `Infinity`
+- Added `binary: 'greft'` to `OutputOptions` (and a `greft` CLI format) — writes a sibling `.bin` encoded with greft-codec and an ESM wrapper that reconstructs it via `decode` from `greft-codec`. The `.bin` is a portable, cross-language artifact; consumers of the generated wrapper need the (zero-dependency) `greft-codec` package installed. The existing `binary: true` is unchanged and now also accepts the explicit alias `binary: 'v8'`
 
 ### Changed
-- `OutputOptions.binary` is now `boolean | 'v8' | 'graft'` (was `boolean`). Fully backward compatible: `true` continues to mean the Node-only `v8.serialize` backend
+- `OutputOptions.binary` is now `boolean | 'v8' | 'greft'` (was `boolean`). Fully backward compatible: `true` continues to mean the Node-only `v8.serialize` backend
 
 ## [3.2.0] - 2026-05-28
 

@@ -54,7 +54,7 @@ export type OutputOptions = {
    * Pick the backend:
    * - `true` / `'v8'` (default): Node's `v8.serialize`. Zero extra runtime
    *   dependency, but the `.bin` and the wrapper are **Node-only**.
-   * - `'graft'`: [`greft-codec`](https://github.com/Gityosan/greft)'s
+   * - `'greft'`: [`greft-codec`](https://github.com/Gityosan/greft)'s
    *   language-agnostic format. The `.bin` round-trips across any JS runtime
    *   and can also be decoded in other languages (Python / Rust / Go / …),
    *   and additionally preserves `Symbol` and `NaN`/`Infinity`. The generated
@@ -62,12 +62,12 @@ export type OutputOptions = {
    *   need that (zero-dependency) package installed at runtime.
    *
    * The wrapper exports the value as `unknown`. Cast on the consumer side or
-   * use `deserialize<T>()` / `deserializeGraft<T>()` directly if you need
+   * use `deserialize<T>()` / `deserializeGreft<T>()` directly if you need
    * typing.
    *
    * Ignored for `ext: 'json'`.
    */
-  binary?: boolean | 'v8' | 'graft';
+  binary?: boolean | 'v8' | 'greft';
   /**
    * Honored by `outputAsync` only (it requires async byte access). For
    * `ext: 'ts'`/`'js'`, inlines a self-contained, cross-runtime expression
@@ -277,8 +277,8 @@ function wrapperBinRelativeName(outputPath: string): string {
   return `${base}.bin`;
 }
 
-/** Binary backend used by `binary: true | 'v8' | 'graft'`. */
-type BinaryFormat = 'v8' | 'graft';
+/** Binary backend used by `binary: true | 'v8' | 'greft'`. */
+type BinaryFormat = 'v8' | 'greft';
 
 /**
  * Resolve the `binary` option to a backend, or `null` when binary output is
@@ -287,14 +287,14 @@ type BinaryFormat = 'v8' | 'graft';
 function resolveBinaryFormat(
   binary: OutputOptions['binary'],
 ): BinaryFormat | null {
-  if (binary === 'graft') return 'graft';
+  if (binary === 'greft') return 'greft';
   if (binary === true || binary === 'v8') return 'v8';
   return null;
 }
 
 /** Encode `data` to bytes for the chosen binary backend. */
 function encodeBinary(data: unknown, format: BinaryFormat): Uint8Array {
-  return format === 'graft' ? encode(data) : v8Serialize(data);
+  return format === 'greft' ? encode(data) : v8Serialize(data);
 }
 
 function buildBinWrapper(
@@ -308,13 +308,13 @@ function buildBinWrapper(
   const footer = options.footer ?? '';
   const binRef = wrapperBinRelativeName(outputPath);
 
-  // v8 reconstructs via Node's built-in `deserialize`; graft via greft-codec's
+  // v8 reconstructs via Node's built-in `deserialize`; greft via greft-codec's
   // cross-runtime / cross-language `decode`.
   const importLine =
-    format === 'graft'
+    format === 'greft'
       ? "import { decode } from 'greft-codec';"
       : "import { deserialize } from 'node:v8';";
-  const reconstruct = format === 'graft' ? 'decode' : 'deserialize';
+  const reconstruct = format === 'greft' ? 'decode' : 'deserialize';
 
   const imports = [
     "import { readFileSync } from 'node:fs';",
@@ -401,7 +401,7 @@ export function serializeOutput(data: unknown, options?: OutputOptions): string 
  *
  * The resulting Buffer is only readable in a Node.js environment via
  * `deserializeBinary` (or `v8.deserialize` directly). For a cross-runtime /
- * cross-language binary, use `serializeGraft` instead.
+ * cross-language binary, use `serializeGreft` instead.
  */
 export function serializeBinary(data: unknown): Buffer {
   return v8Serialize(data);
@@ -434,23 +434,23 @@ export function deserializeBinary<T = unknown>(
  * Unlike `serializeBinary` (Node-only `v8.serialize`), the result round-trips
  * across any JS runtime and can also be decoded in other languages (Python /
  * Rust / Go / …) via a greft-codec port — handy for reusing mock data as a
- * cross-language test fixture. Decode it back with `deserializeGraft`.
+ * cross-language test fixture. Decode it back with `deserializeGreft`.
  */
-export function serializeGraft(data: unknown): Uint8Array {
+export function serializeGreft(data: unknown): Uint8Array {
   return encode(data);
 }
 
 /**
- * Deserialize bytes produced by `serializeGraft` (or any `greft-codec`
+ * Deserialize bytes produced by `serializeGreft` (or any `greft-codec`
  * `encode`) back into the original JavaScript value.
  *
  * Accepts a `Uint8Array`/`Buffer`, or a path to a `.bin` file written by
- * `outputToFile` with `binary: 'graft'`.
+ * `outputToFile` with `binary: 'greft'`.
  *
  * Pass a generic type parameter to cast the result, e.g.
- * `deserializeGraft<User>('./user.bin')`.
+ * `deserializeGreft<User>('./user.bin')`.
  */
-export function deserializeGraft<T = unknown>(
+export function deserializeGreft<T = unknown>(
   input: Uint8Array | string,
 ): T {
   const bytes = typeof input === 'string' ? readFileSync(input) : input;

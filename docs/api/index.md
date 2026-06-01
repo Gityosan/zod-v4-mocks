@@ -54,8 +54,8 @@ be chained. The terminal methods — those that produce data or strings — do n
 | `updateConfig` | `MockGenerator` | ✅ |
 | `generate` / `multiGenerate` / `generateMany` | data | ❌ |
 | `factory` | `{ next, take }` | ❌ |
-| `serialize` / `serializeBinary` / `serializeGraft` / `serializePortable*` | `string` / `Buffer` / `Uint8Array` | ❌ |
-| `deserialize` / `deserializeGraft` / `deserializePortable` | data | ❌ |
+| `serialize` / `serializeBinary` / `serializeGreft` / `serializePortable*` | `string` / `Buffer` / `Uint8Array` | ❌ |
+| `deserialize` / `deserializeGreft` / `deserializePortable` | data | ❌ |
 | `output` | output path `string` | ❌ |
 
 ```ts

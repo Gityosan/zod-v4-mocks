@@ -205,15 +205,15 @@ describe('binary round-trip: deserialize(serializeBinary(x)) deep-equals x', () 
 
 /**
  * The greft-codec path (cross-runtime / cross-language) must round-trip the
- * same value space — hardening `serializeGraft` / `deserializeGraft`.
+ * same value space — hardening `serializeGreft` / `deserializeGreft`.
  */
-describe('graft round-trip: deserializeGraft(serializeGraft(x)) deep-equals x', () => {
+describe('greft round-trip: deserializeGreft(serializeGreft(x)) deep-equals x', () => {
   it('round-trips arbitrary generated mocks', () => {
     fc.assert(
       fc.property(zodSchema, safeConfig, (schema, config) => {
         const g = initGenerator(config);
         const value = g.generate(schema);
-        expect(g.deserializeGraft(g.serializeGraft(value))).toStrictEqual(value);
+        expect(g.deserializeGreft(g.serializeGreft(value))).toStrictEqual(value);
       }),
       { numRuns: 200 },
     );

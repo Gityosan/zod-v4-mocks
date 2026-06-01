@@ -4,7 +4,7 @@ import type { CustomGeneratorType, GeneraterOptions, MockConfig } from './type';
 import {
   createGeneraterOptions,
   deserializeBinary,
-  deserializeGraft,
+  deserializeGreft,
   deserializePortable,
   makePathSupply,
   OMIT_SYMBOL,
@@ -16,7 +16,7 @@ import {
   regenerateIfOmitted,
   runPreflight,
   serializeBinary,
-  serializeGraft,
+  serializeGreft,
   serializeOutput,
   serializePortable,
   serializePortableAsync,
@@ -248,7 +248,7 @@ class MockGenerator {
    * algorithm (`v8.serialize`). Preserves Date, Map, Set, RegExp, BigInt,
    * TypedArray, `undefined`, and circular references with no information loss.
    * The result is only readable in a Node.js environment. For a cross-runtime /
-   * cross-language binary, use `serializeGraft` instead.
+   * cross-language binary, use `serializeGreft` instead.
    */
   serializeBinary(data: unknown): Buffer {
     return serializeBinary(data);
@@ -275,22 +275,22 @@ class MockGenerator {
    * Unlike `serializeBinary` (Node-only `v8.serialize`), the result round-trips
    * across any JS runtime and can also be decoded in other languages (Python /
    * Rust / Go / …) via a greft-codec port — handy for reusing mock data as a
-   * cross-language test fixture. Decode it back with `deserializeGraft`.
+   * cross-language test fixture. Decode it back with `deserializeGreft`.
    */
-  serializeGraft(data: unknown): Uint8Array {
-    return serializeGraft(data);
+  serializeGreft(data: unknown): Uint8Array {
+    return serializeGreft(data);
   }
 
   /**
    * Deserialize bytes (`Uint8Array`/`Buffer`, or a `.bin` file path) produced
-   * by `serializeGraft` or `output({ binary: 'graft' })` back into the
+   * by `serializeGreft` or `output({ binary: 'greft' })` back into the
    * original JavaScript value.
    *
    * Pass a generic type parameter to cast the result, e.g.
-   * `generator.deserializeGraft<User>('./user.bin')`.
+   * `generator.deserializeGreft<User>('./user.bin')`.
    */
-  deserializeGraft<T = unknown>(input: Uint8Array | string): T {
-    return deserializeGraft<T>(input);
+  deserializeGreft<T = unknown>(input: Uint8Array | string): T {
+    return deserializeGreft<T>(input);
   }
 
   /**
