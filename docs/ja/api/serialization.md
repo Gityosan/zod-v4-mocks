@@ -75,22 +75,29 @@ const restored = generator.deserialize<User>(generator.serializeBinary(data))
 
 ```ts
 serializeGreft(data: unknown): Uint8Array
+serializeGreft(data: unknown, options: { base64: true }): string
 ```
 
 [greft-codec](https://github.com/Gityosan/greft) の言語非依存なロスレス形式を使ってデータをバイナリ `Uint8Array` にシリアライズします。`Date` / `Map` / `Set` / `RegExp` / `BigInt` / `TypedArray` / `Symbol` / `undefined` / `NaN`/`Infinity` / 循環・共有参照を情報損失なく保持できます。`serializeBinary`（Node 専用の `v8.serialize`）と異なり、出力は **任意の JS ランタイム** で round-trip でき、greft-codec のポート経由で他言語（Python / Rust / Go など）でもデコードできます。モックデータを他言語のテストフィクスチャとして再利用するのに最適です。
 
+`{ base64: true }` を渡すと、生バイトの代わりにテキスト安全な **文字列** を返します。これは純粋なデータ（`node:fs` 依存なし）なので、JSON・環境変数・バイナリ非対応の経路にそのまま埋め込めます。言語非依存性も保たれます（各言語の greft ポートで base64 デコード → `decode`）。
+
 ```ts
 const data = generator.generate(schema)
 const bytes = generator.serializeGreft(data) // Uint8Array
+
+// クロス言語 + node 非依存: base64 文字列をどこにでも埋め込める（例: JSON）
+const fixture = JSON.stringify({ $greft: generator.serializeGreft(data, { base64: true }) })
 ```
 
 ## deserializeGreft
 
 ```ts
 deserializeGreft<T = unknown>(input: Uint8Array | string): T
+deserializeGreft<T = unknown>(input: string, options: { base64: true }): T
 ```
 
-`serializeGreft` または `output({ binary: 'greft' })` で書き出した値を復元します。`Uint8Array`/`Buffer` または `.bin` ファイルのパスを受け取れます。型引数を渡すと結果をその型としてキャストします。
+`serializeGreft` または `output({ binary: 'greft' })` で書き出した値を復元します。`Uint8Array`/`Buffer` または `.bin` ファイルのパスを受け取れます。`{ base64: true }` を渡すと `serializeGreft(data, { base64: true })` が返した base64 文字列をデコードします（その場合、文字列はファイルパスではなくデータとして扱われます）。型引数を渡すと結果をその型としてキャストします。
 
 ```ts
 // 型引数で結果に型を付ける
@@ -98,6 +105,10 @@ const restored = generator.deserializeGreft<User>('./mocks/user.bin')
 
 // バイト列から
 const restored = generator.deserializeGreft<User>(generator.serializeGreft(data))
+
+// JSON から取り出した base64 文字列から（どの JS ランタイムでも動く）
+const { $greft } = JSON.parse(fixture)
+const restored = generator.deserializeGreft<User>($greft, { base64: true })
 ```
 
 ## serializePortable / serializePortableAsync

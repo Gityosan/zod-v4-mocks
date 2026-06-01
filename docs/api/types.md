@@ -98,6 +98,16 @@ type OutputOptions = {
 
 Used by [`serialize`](/api/serialization#serialize) and [`output`](/api/serialization#output). Field-by-field notes are on the [Serialization & Output](/api/serialization#outputoptions) page.
 
+## GreftOptions
+
+```ts
+type GreftOptions = {
+  base64?: boolean // return/accept a base64 string instead of raw bytes (text-safe, node-free, cross-language)
+}
+```
+
+Used by [`serializeGreft`](/api/serialization#serializegreft) and [`deserializeGreft`](/api/serialization#deserializegreft). Pass the same flag to both sides.
+
 ## PortableOptions
 
 ```ts

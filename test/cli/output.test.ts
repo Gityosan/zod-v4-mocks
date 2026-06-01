@@ -769,6 +769,33 @@ describe('serializeGreft / deserializeGreft (greft-codec, cross-language)', () =
     expect(restored.count).toBe(7n);
     expect(restored.when.toISOString()).toBe('2026-04-23T00:00:00.000Z');
   });
+
+  it('round-trips through a base64 string (no node:fs, embeddable in JSON)', () => {
+    const generator = initGenerator();
+    const data = {
+      id: 9n,
+      when: new Date('2026-01-02T03:04:05.000Z'),
+      tags: new Set(['a', 'b']),
+      kind: Symbol.for('k'),
+      nan: NaN,
+    };
+
+    const b64 = generator.serializeGreft(data, { base64: true });
+    expect(typeof b64).toBe('string');
+    // Plain text: survives JSON round-tripping untouched.
+    const fromJson = JSON.parse(JSON.stringify({ $greft: b64 })) as {
+      $greft: string;
+    };
+
+    const restored = generator.deserializeGreft<typeof data>(fromJson.$greft, {
+      base64: true,
+    });
+    expect(restored.id).toBe(9n);
+    expect(restored.when.toISOString()).toBe('2026-01-02T03:04:05.000Z');
+    expect([...restored.tags]).toEqual(['a', 'b']);
+    expect(restored.kind).toBe(Symbol.for('k'));
+    expect(Number.isNaN(restored.nan)).toBe(true);
+  });
 });
 
 describe("output with binary: 'greft' (greft-codec wrapper + .bin)", () => {

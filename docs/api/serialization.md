@@ -76,22 +76,29 @@ const restored = generator.deserialize<User>(generator.serializeBinary(data))
 
 ```ts
 serializeGreft(data: unknown): Uint8Array
+serializeGreft(data: unknown, options: { base64: true }): string
 ```
 
 Serializes data to a binary `Uint8Array` using [greft-codec](https://github.com/Gityosan/greft)'s language-agnostic lossless format. Preserves `Date`, `Map`, `Set`, `RegExp`, `BigInt`, `TypedArray`, `Symbol`, `undefined`, `NaN`/`Infinity`, and circular/shared references with no information loss. Unlike `serializeBinary` (Node-only `v8.serialize`), the bytes round-trip across **any JS runtime** and can also be decoded in other languages (Python / Rust / Go / …) via a greft-codec port — ideal for reusing mock data as a cross-language test fixture.
 
+Pass `{ base64: true }` to get a text-safe **string** instead of raw bytes. The string is pure data — no `node:fs` dependency — so you can embed it directly in JSON, an env var, or any transport that rejects binary, while it stays cross-language (any greft port can base64-decode then `decode`).
+
 ```ts
 const data = generator.generate(schema)
 const bytes = generator.serializeGreft(data) // Uint8Array
+
+// Cross-language + node-free: embed the base64 string anywhere (e.g. JSON)
+const fixture = JSON.stringify({ $greft: generator.serializeGreft(data, { base64: true }) })
 ```
 
 ## deserializeGreft
 
 ```ts
 deserializeGreft<T = unknown>(input: Uint8Array | string): T
+deserializeGreft<T = unknown>(input: string, options: { base64: true }): T
 ```
 
-Restores a value previously serialized via `serializeGreft` or `output({ binary: 'greft' })`. Pass either a `Uint8Array`/`Buffer` or a path to a `.bin` file. Pass a generic type parameter to type the result.
+Restores a value previously serialized via `serializeGreft` or `output({ binary: 'greft' })`. Pass either a `Uint8Array`/`Buffer` or a path to a `.bin` file. Pass `{ base64: true }` to decode a base64 string from `serializeGreft(data, { base64: true })` — the string is then treated as data, not a file path. Pass a generic type parameter to type the result.
 
 ```ts
 // Type the result via a generic parameter
@@ -99,6 +106,10 @@ const restored = generator.deserializeGreft<User>('./mocks/user.bin')
 
 // From bytes
 const restored = generator.deserializeGreft<User>(generator.serializeGreft(data))
+
+// From a base64 string pulled out of JSON (works in any JS runtime)
+const { $greft } = JSON.parse(fixture)
+const restored = generator.deserializeGreft<User>($greft, { base64: true })
 ```
 
 ## serializePortable / serializePortableAsync

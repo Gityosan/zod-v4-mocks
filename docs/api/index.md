@@ -8,8 +8,8 @@ This reference is split into focused pages:
 
 - **[Generation](/api/generation)** — `generate`, `multiGenerate`, `generateMany`, `factory`
 - **[Customization](/api/customization)** — `supply`, `supplyRef`, `supplyPath`, `override`, `register`, `updateConfig`
-- **[Serialization & Output](/api/serialization)** — `serialize`, `serializeBinary`, `deserialize`, `serializePortable`, `deserializePortable`, `output`
-- **[Types](/api/types)** — `MockConfig`, `CustomGeneratorType`, `GeneraterOptions`, `OutputOptions`, `PortableOptions`, `PathSegment`, and re-exports
+- **[Serialization & Output](/api/serialization)** — `serialize`, `serializeBinary`, `deserialize`, `serializeGreft`, `deserializeGreft`, `serializePortable`, `deserializePortable`, `output`
+- **[Types](/api/types)** — `MockConfig`, `CustomGeneratorType`, `GeneraterOptions`, `OutputOptions`, `GreftOptions`, `PortableOptions`, `PathSegment`, and re-exports
 
 ## initGenerator
 

@@ -428,6 +428,37 @@ export function deserializeBinary<T = unknown>(
 }
 
 /**
+ * Options for the greft codec helpers.
+ */
+export type GreftOptions = {
+  /**
+   * Return / accept a base64 **string** instead of raw `Uint8Array` bytes.
+   * The string is pure text — embed it in JSON, an env var, or anywhere binary
+   * is unwelcome. It stays language-agnostic (any greft port can base64-decode
+   * then `decode`) and carries no `node:fs` dependency. Pass the same flag to
+   * `deserializeGreft`.
+   * @default false
+   */
+  base64?: boolean;
+};
+
+/** Cross-runtime base64 for raw bytes (Buffer in Node, btoa elsewhere). */
+function bytesToBase64(bytes: Uint8Array): string {
+  if (typeof Buffer !== 'undefined') return Buffer.from(bytes).toString('base64');
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function base64ToBytes(input: string): Uint8Array {
+  if (typeof Buffer !== 'undefined') return new Uint8Array(Buffer.from(input, 'base64'));
+  const binary = atob(input);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+/**
  * Serialize data to a binary `Uint8Array` using
  * [`greft-codec`](https://github.com/Gityosan/greft)'s language-agnostic
  * lossless format. Preserves Date, Map, Set, RegExp, BigInt, TypedArray,
@@ -438,9 +469,19 @@ export function deserializeBinary<T = unknown>(
  * across any JS runtime and can also be decoded in other languages (Python /
  * Rust / Go / …) via a greft-codec port — handy for reusing mock data as a
  * cross-language test fixture. Decode it back with `deserializeGreft`.
+ *
+ * Pass `{ base64: true }` to get a text-safe `string` instead: pure data with
+ * no `node:fs` dependency that you can embed directly in JSON / env vars, while
+ * staying cross-language.
  */
-export function serializeGreft(data: unknown): Uint8Array {
-  return encode(data);
+export function serializeGreft(data: unknown, options?: { base64?: false }): Uint8Array;
+export function serializeGreft(data: unknown, options: { base64: true }): string;
+export function serializeGreft(
+  data: unknown,
+  options?: GreftOptions,
+): Uint8Array | string {
+  const bytes = encode(data);
+  return options?.base64 ? bytesToBase64(bytes) : bytes;
 }
 
 /**
@@ -448,15 +489,28 @@ export function serializeGreft(data: unknown): Uint8Array {
  * `encode`) back into the original JavaScript value.
  *
  * Accepts a `Uint8Array`/`Buffer`, or a path to a `.bin` file written by
- * `outputToFile` with `binary: 'greft'`.
+ * `outputToFile` with `binary: 'greft'`. Pass `{ base64: true }` to decode a
+ * base64 string produced by `serializeGreft(data, { base64: true })` (the
+ * string is then treated as data, not a file path).
  *
  * Pass a generic type parameter to cast the result, e.g.
  * `deserializeGreft<User>('./user.bin')`.
  */
+export function deserializeGreft<T = unknown>(input: Uint8Array | string): T;
+export function deserializeGreft<T = unknown>(
+  input: string,
+  options: { base64: true },
+): T;
 export function deserializeGreft<T = unknown>(
   input: Uint8Array | string,
+  options?: GreftOptions,
 ): T {
-  const bytes = typeof input === 'string' ? readFileSync(input) : input;
+  let bytes: Uint8Array;
+  if (typeof input === 'string') {
+    bytes = options?.base64 ? base64ToBytes(input) : readFileSync(input);
+  } else {
+    bytes = input;
+  }
   return decode(bytes) as T;
 }
 

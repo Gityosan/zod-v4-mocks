@@ -6,7 +6,7 @@ export type {
   MockConfig,
   Randomizer,
 } from './type';
-export type { OutputOptions } from './utils/output';
+export type { GreftOptions, OutputOptions } from './utils/output';
 export type { PathSegment } from './utils/path';
 export type { PortableOptions } from './utils/portable';
 export { ITEM_MARKER, VALUE_MARKER } from './utils/path';

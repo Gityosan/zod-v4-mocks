@@ -183,11 +183,15 @@ const restored = generator.deserialize<User>(generator.serializeBinary(data));
 
 ### generator.serializeGreft(data) / generator.deserializeGreft\<T = unknown\>(input)
 
-Serializes data to a binary `Uint8Array` using greft-codec's language-agnostic lossless format. Preserves Date, Map, Set, RegExp, BigInt, TypedArray, Symbol, `undefined`, `NaN`/`Infinity`, and circular/shared references with no information loss. Unlike `serializeBinary` (Node-only v8), it round-trips across any JS runtime and is decodable in other languages (Python / Rust / Go / …) via a greft-codec port. `deserializeGreft` restores it; accepts a `Uint8Array`/`Buffer` or a `.bin` file path.
+Serializes data to a binary `Uint8Array` using greft-codec's language-agnostic lossless format. Preserves Date, Map, Set, RegExp, BigInt, TypedArray, Symbol, `undefined`, `NaN`/`Infinity`, and circular/shared references with no information loss. Unlike `serializeBinary` (Node-only v8), it round-trips across any JS runtime and is decodable in other languages (Python / Rust / Go / …) via a greft-codec port. `deserializeGreft` restores it; accepts a `Uint8Array`/`Buffer` or a `.bin` file path. Pass `{ base64: true }` to `serializeGreft` to get a text-safe string instead (pure data, no node:fs, embeddable in JSON/env, still cross-language); pass the same `{ base64: true }` to `deserializeGreft` (the string is then treated as data, not a file path).
 
 ```ts
 const bytes = generator.serializeGreft(data); // Uint8Array
 const restored = generator.deserializeGreft<User>(bytes);
+
+// base64 string — embed in JSON, decode anywhere (no node:fs)
+const b64 = generator.serializeGreft(data, { base64: true });
+const back = generator.deserializeGreft<User>(b64, { base64: true });
 ```
 
 ### generator.serializePortable(data, options?) / generator.serializePortableAsync(data, options?)

@@ -6,6 +6,7 @@ import {
   deserializeBinary,
   deserializeGreft,
   deserializePortable,
+  type GreftOptions,
   makePathSupply,
   OMIT_SYMBOL,
   outputToFile,
@@ -276,21 +277,38 @@ class MockGenerator {
    * across any JS runtime and can also be decoded in other languages (Python /
    * Rust / Go / …) via a greft-codec port — handy for reusing mock data as a
    * cross-language test fixture. Decode it back with `deserializeGreft`.
+   *
+   * Pass `{ base64: true }` to get a text-safe `string` instead — pure data
+   * with no `node:fs` dependency, embeddable in JSON / env vars, still
+   * cross-language.
    */
-  serializeGreft(data: unknown): Uint8Array {
-    return serializeGreft(data);
+  serializeGreft(data: unknown, options?: { base64?: false }): Uint8Array;
+  serializeGreft(data: unknown, options: { base64: true }): string;
+  serializeGreft(data: unknown, options?: GreftOptions): Uint8Array | string {
+    return options?.base64
+      ? serializeGreft(data, { base64: true })
+      : serializeGreft(data);
   }
 
   /**
    * Deserialize bytes (`Uint8Array`/`Buffer`, or a `.bin` file path) produced
    * by `serializeGreft` or `output({ binary: 'greft' })` back into the
-   * original JavaScript value.
+   * original JavaScript value. Pass `{ base64: true }` to decode a base64
+   * string from `serializeGreft(data, { base64: true })` (treated as data, not
+   * a file path).
    *
    * Pass a generic type parameter to cast the result, e.g.
    * `generator.deserializeGreft<User>('./user.bin')`.
    */
-  deserializeGreft<T = unknown>(input: Uint8Array | string): T {
-    return deserializeGreft<T>(input);
+  deserializeGreft<T = unknown>(input: Uint8Array | string): T;
+  deserializeGreft<T = unknown>(input: string, options: { base64: true }): T;
+  deserializeGreft<T = unknown>(
+    input: Uint8Array | string,
+    options?: GreftOptions,
+  ): T {
+    return options?.base64
+      ? deserializeGreft<T>(input as string, { base64: true })
+      : deserializeGreft<T>(input);
   }
 
   /**
