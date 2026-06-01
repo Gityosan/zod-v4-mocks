@@ -22,7 +22,7 @@ const shared = {
 export default defineConfig([
   {
     ...shared,
-    entry: { index: 'src/index.ts', config: 'src/config.ts' },
+    entry: { index: 'src/index.ts', config: 'src/config.ts', greft: 'src/greft.ts' },
     dts: true,
     clean: true,
   },

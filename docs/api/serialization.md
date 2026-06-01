@@ -184,8 +184,8 @@ generator.output(data, { path: './mocks/user.js', binary: true })
 // `binary: 'greft'` — same wrapper + sibling .bin, but encoded with greft-codec.
 // The .bin is a cross-language artifact (decodable in any JS runtime, or in
 // Python / Rust / Go via a greft-codec port) and additionally preserves Symbol
-// and NaN/Infinity. The wrapper imports `decode` from `greft-codec`, so
-// consumers of the wrapper need that (zero-dependency) package installed.
+// and NaN/Infinity. The wrapper imports `decode` from `zod-v4-mocks/greft`, so
+// consumers only need zod-v4-mocks installed — not greft-codec directly.
 generator.output(data, { path: './mocks/user.ts', binary: 'greft' })
 
 // Custom export name with header/footer
@@ -217,7 +217,7 @@ type OutputOptions = {
 |--------|------|-------------|
 | `.ts` / `.js` | `export const <exportName> = ...` | Accurately serializes Date, BigInt, Map, Set, Symbol, File, Blob |
 | `.ts` / `.js` + `binary: true` / `'v8'` | ESM wrapper + sibling `.bin` (v8 structured clone) | Preserves Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, circular refs. The wrapper exports the value as `unknown`; cast on the consumer side or use `deserialize<T>()` for typing. Node.js only, no extra runtime dependency. |
-| `.ts` / `.js` + `binary: 'greft'` | ESM wrapper + sibling `.bin` (greft-codec) | Same as above **+** Symbol, `NaN`/`Infinity`, shared refs. The `.bin` is cross-language (decodable in any JS runtime, or in Python / Rust / Go via a greft-codec port). The wrapper imports `decode` from `greft-codec`, so consumers of the wrapper need that package installed. |
+| `.ts` / `.js` + `binary: 'greft'` | ESM wrapper + sibling `.bin` (greft-codec) | Same as above **+** Symbol, `NaN`/`Infinity`, shared refs. The `.bin` is cross-language (decodable in any JS runtime, or in Python / Rust / Go via a greft-codec port). The wrapper imports `decode` from `zod-v4-mocks/greft`, so consumers only need `zod-v4-mocks` installed (not greft-codec directly). |
 | `.ts` / `.js` + `portable: true` (**`outputAsync`**) | inline `export const <name> = <seroval expr>` | Cross-runtime (Node↔browser), no sibling file and no consumer dependency. Preserves File/Blob/FormData **contents**, Date, Map, Set, BigInt, TypedArray, circular/shared refs. **No `Symbol`.** |
 | `.json` | JSON | Date as ISO string, BigInt as string, Map/Set/Symbol lose information (with warnings). `binary` is ignored. |
 
@@ -229,9 +229,9 @@ When outputting data containing types that cannot be represented in JSON (BigInt
 With `binary: true` (`'v8'`) or `binary: 'greft'`, `output()` writes two files:
 
 - `<name>.bin` — the binary payload. `true`/`'v8'` uses Node's `v8.serialize` (Node-only); `'greft'` uses a [greft-codec](https://github.com/Gityosan/greft) byte stream that is decodable in any JS runtime (or in Python / Rust / Go via a port). Both perfectly preserve every value Zod can generate, including circular references; `'greft'` additionally preserves `Symbol` and `NaN`/`Infinity`.
-- `<name>.ts` / `<name>.js` — a thin ESM wrapper that lazily reconstructs the sibling `.bin` at import time (`v8.deserialize` for `'v8'`, `decode` from `greft-codec` for `'greft'`), so consumers just do `import { mockData } from './user'` with no awareness of the binary representation.
+- `<name>.ts` / `<name>.js` — a thin ESM wrapper that lazily reconstructs the sibling `.bin` at import time (`v8.deserialize` for `'v8'`, `decode` from `zod-v4-mocks/greft` for `'greft'`), so consumers just do `import { mockData } from './user'` with no awareness of the binary representation.
 
-With `'greft'`, the wrapper imports `decode` from greft-codec (a zero-dependency package), so consumers of the generated module need it installed. The wrapper exports the value as `unknown`; cast on the consumer side, or call `deserialize<T>('./user.bin')` / `deserializeGreft<T>('./user.bin')` directly when you want a typed value without going through the wrapper. The `.bin` filename is always derived from the wrapper's basename and cannot be customized separately. The wrapper targets ESM (`import.meta.dirname`) and requires Node.js 20.11+.
+With `'greft'`, the wrapper imports `decode` from `zod-v4-mocks/greft` (a re-export of greft-codec), so consumers only need `zod-v4-mocks` installed — the same package they generated the file with — and never the transitive greft-codec dependency directly. The wrapper exports the value as `unknown`; cast on the consumer side, or call `deserialize<T>('./user.bin')` / `deserializeGreft<T>('./user.bin')` directly when you want a typed value without going through the wrapper. The `.bin` filename is always derived from the wrapper's basename and cannot be customized separately. The wrapper targets ESM (`import.meta.dirname`) and requires Node.js 20.11+.
 :::
 
 ## outputAsync

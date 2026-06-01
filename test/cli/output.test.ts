@@ -789,12 +789,18 @@ describe("output with binary: 'greft' (greft-codec wrapper + .bin)", () => {
     expect(existsSync(`${testOutputDir}/user.bin`)).toBe(true);
 
     const content = readFileSync(outputPath, 'utf-8');
-    expect(content).toContain("import { decode } from 'greft-codec';");
+    // Wrapper imports through zod-v4-mocks (which the consumer already has),
+    // not the transitive greft-codec dependency directly.
+    expect(content).toContain("import { decode } from 'zod-v4-mocks/greft';");
+    expect(content).not.toContain("from 'greft-codec'");
     expect(content).not.toContain("from 'node:v8'");
     expect(content).toContain('export const mockData: unknown = decode(');
   });
 
-  it('round-trips via the generated greft wrapper at runtime', async () => {
+  // The generated wrapper resolves `zod-v4-mocks/greft` via Node self-reference
+  // to dist/greft.js, so this needs the package built first.
+  const itIfBuilt = existsSync('./dist/greft.js') ? it : it.skip;
+  itIfBuilt('round-trips via the generated greft wrapper at runtime', async () => {
     const generator = initGenerator();
     const schema = z.object({
       id: z.string(),

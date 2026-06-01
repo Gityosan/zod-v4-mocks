@@ -58,8 +58,9 @@ export type OutputOptions = {
    *   language-agnostic format. The `.bin` round-trips across any JS runtime
    *   and can also be decoded in other languages (Python / Rust / Go / …),
    *   and additionally preserves `Symbol` and `NaN`/`Infinity`. The generated
-   *   wrapper imports `decode` from `greft-codec`, so consumers of the wrapper
-   *   need that (zero-dependency) package installed at runtime.
+   *   wrapper imports `decode` from `'zod-v4-mocks/greft'` (a re-export of
+   *   greft-codec), so consumers only need `zod-v4-mocks` installed — the same
+   *   package they generated the file with — not greft-codec directly.
    *
    * The wrapper exports the value as `unknown`. Cast on the consumer side or
    * use `deserialize<T>()` / `deserializeGreft<T>()` directly if you need
@@ -308,11 +309,13 @@ function buildBinWrapper(
   const footer = options.footer ?? '';
   const binRef = wrapperBinRelativeName(outputPath);
 
-  // v8 reconstructs via Node's built-in `deserialize`; greft via greft-codec's
-  // cross-runtime / cross-language `decode`.
+  // v8 reconstructs via Node's built-in `deserialize`; greft via the
+  // `decode` re-exported from 'zod-v4-mocks/greft'. We import through
+  // zod-v4-mocks (which the consumer already has) rather than 'greft-codec'
+  // directly, so the generated file never depends on our transitive dependency.
   const importLine =
     format === 'greft'
-      ? "import { decode } from 'greft-codec';"
+      ? "import { decode } from 'zod-v4-mocks/greft';"
       : "import { deserialize } from 'node:v8';";
   const reconstruct = format === 'greft' ? 'decode' : 'deserialize';
 

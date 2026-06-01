@@ -35,6 +35,10 @@
     "./config": {
       "types": "./dist/config.d.ts",
       "default": "./dist/config.js"
+    },
+    "./greft": {
+      "types": "./dist/greft.d.ts",
+      "default": "./dist/greft.js"
     }
   },
   "bin": {

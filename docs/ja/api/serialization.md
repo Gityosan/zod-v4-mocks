@@ -183,7 +183,8 @@ generator.output(data, { path: './mocks/user.js', binary: true })
 // `binary: 'greft'` — 同じラッパー＋同名 .bin ですが、greft-codec で符号化されます。
 // .bin はクロス言語の成果物（任意の JS ランタイム、さらに Python / Rust / Go などの
 // ポートでデコード可）で、Symbol と NaN/Infinity も追加で保持します。ラッパーは
-// `greft-codec` から `decode` を import するため、消費側にこの（依存ゼロの）パッケージが必要です。
+// `zod-v4-mocks/greft` から `decode` を import するため、消費側は（生成に使った）
+// zod-v4-mocks だけあればよく、greft-codec を直接入れる必要はありません。
 generator.output(data, { path: './mocks/user.ts', binary: 'greft' })
 
 // エクスポート名とヘッダー/フッターをカスタマイズ
@@ -215,7 +216,7 @@ type OutputOptions = {
 |--------|------|-------------|
 | `.ts` / `.js` | `export const <exportName> = ...` | Date, BigInt, Map, Set, Symbol, File, Blob を正確にシリアライズ |
 | `.ts` / `.js` + `binary: true` / `'v8'` | ESM ラッパー + 同名 `.bin`（v8 structured clone）| Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, 循環参照を保持。エクスポートは `unknown` 型なので、消費側でキャストするか `deserialize<T>()` を直接使用。Node.js 限定、追加の実行時依存なし |
-| `.ts` / `.js` + `binary: 'greft'` | ESM ラッパー + 同名 `.bin`（greft-codec）| 上記 **＋** Symbol, `NaN`/`Infinity`, 共有参照。`.bin` はクロス言語（任意の JS ランタイム、さらに Python / Rust / Go などのポートでデコード可）。ラッパーは `greft-codec` から `decode` を import するため、消費側にこのパッケージが必要 |
+| `.ts` / `.js` + `binary: 'greft'` | ESM ラッパー + 同名 `.bin`（greft-codec）| 上記 **＋** Symbol, `NaN`/`Infinity`, 共有参照。`.bin` はクロス言語（任意の JS ランタイム、さらに Python / Rust / Go などのポートでデコード可）。ラッパーは `zod-v4-mocks/greft` から `decode` を import するため、消費側は zod-v4-mocks だけあればよい（greft-codec を直接入れる必要なし） |
 | `.ts` / `.js` + `portable: true`（**`outputAsync`**）| `export const <name> = <seroval 式>` をインライン | クロスランタイム（Node↔ブラウザ）、sibling ファイル・consumer 依存なし。File/Blob/FormData の**中身**、Date, Map, Set, BigInt, TypedArray, 循環/共有参照を保持。**`Symbol` 不可。** |
 | `.json` | JSON | Date は ISO文字列、BigInt は文字列化、Map/Set/Symbol は情報損失（警告あり）。`binary` は無視 |
 
@@ -227,9 +228,9 @@ JSON では表現できない型（BigInt, Symbol, Map, Set, File, Blob）を含
 `binary: true`（`'v8'`）または `binary: 'greft'` を指定すると、`output()` は 2 つのファイルを書き出します:
 
 - `<name>.bin` — バイナリ本体。`true`/`'v8'` は Node の `v8.serialize`（Node 専用）、`'greft'` は任意の JS ランタイム（さらに Python / Rust / Go などのポート）でデコードできる [greft-codec](https://github.com/Gityosan/greft) のバイト列です。どちらも Zod が生成するあらゆる値（循環参照を含む）を完全に保持し、`'greft'` は加えて `Symbol` と `NaN`/`Infinity` も保持します
-- `<name>.ts` / `<name>.js` — import 時に同名の `.bin` を遅延復元する薄い ESM ラッパー（`'v8'` は `v8.deserialize`、`'greft'` は greft-codec の `decode`）。消費側は `import { mockData } from './user'` でそのまま使える
+- `<name>.ts` / `<name>.js` — import 時に同名の `.bin` を遅延復元する薄い ESM ラッパー（`'v8'` は `v8.deserialize`、`'greft'` は `zod-v4-mocks/greft` の `decode`）。消費側は `import { mockData } from './user'` でそのまま使える
 
-`'greft'` の場合、ラッパーは greft-codec（依存ゼロのパッケージ）から `decode` を import するため、生成モジュールの消費側にこのパッケージが必要です。エクスポート値は `unknown` 型なので、消費側でキャストするか、ラッパーを介さず `deserialize<T>('./user.bin')` / `deserializeGreft<T>('./user.bin')` を直接呼んで型付けしてください。`.bin` のファイル名は常にラッパーのベース名から自動導出され、個別には変更できません。ラッパーは ESM (`import.meta.dirname`) 前提で Node.js 20.11+ が必要です。
+`'greft'` の場合、ラッパーは `zod-v4-mocks/greft`（greft-codec の再export）から `decode` を import するため、生成モジュールの消費側は（生成に使った）zod-v4-mocks だけあればよく、推移的依存の greft-codec を直接入れる必要はありません。エクスポート値は `unknown` 型なので、消費側でキャストするか、ラッパーを介さず `deserialize<T>('./user.bin')` / `deserializeGreft<T>('./user.bin')` を直接呼んで型付けしてください。`.bin` のファイル名は常にラッパーのベース名から自動導出され、個別には変更できません。ラッパーは ESM (`import.meta.dirname`) 前提で Node.js 20.11+ が必要です。
 :::
 
 ## outputAsync

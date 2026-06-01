@@ -260,7 +260,7 @@ generator.output(data, {
 - Date objects are serialized as `new Date("...")` in JS/TS format
 - Directory is created automatically if it doesn't exist
 - `header`, `footer`, `exportName` are ignored for JSON. For ts/js + `binary`, they apply to the generated wrapper file
-- `binary: true`/`'v8'` perfectly round-trips Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, and circular references via `v8.serialize` (Node-only, no extra dependency). `binary: 'greft'` does the same via greft-codec and additionally preserves Symbol and `NaN`/`Infinity`; its `.bin` is decodable in any JS runtime or other languages (Python / Rust / Go), and the generated wrapper imports `decode` from `greft-codec` (so consumers of that wrapper need it). Both wrappers target ESM (`import.meta.dirname`) and are Node.js 20.11+ only
+- `binary: true`/`'v8'` perfectly round-trips Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, and circular references via `v8.serialize` (Node-only, no extra dependency). `binary: 'greft'` does the same via greft-codec and additionally preserves Symbol and `NaN`/`Infinity`; its `.bin` is decodable in any JS runtime or other languages (Python / Rust / Go), and the generated wrapper imports `decode` from `zod-v4-mocks/greft` (a re-export of greft-codec) so consumers only need zod-v4-mocks installed, not greft-codec directly. Both wrappers target ESM (`import.meta.dirname`) and are Node.js 20.11+ only
 - The sibling `.bin` basename is always derived from the wrapper path; it cannot be customized separately
 - `binary` is silently ignored for `ext: 'json'`
 

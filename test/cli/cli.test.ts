@@ -203,7 +203,7 @@ describe.runIf(HAS_BUILD)('CLI - additional options', () => {
     expect(existsSync(out)).toBe(true);
     expect(existsSync(join(tmp, 'users.bin'))).toBe(true);
     expect(require('node:fs').readFileSync(out, 'utf-8')).toContain(
-      "from 'greft-codec'",
+      "from 'zod-v4-mocks/greft'",
     );
   });
 
