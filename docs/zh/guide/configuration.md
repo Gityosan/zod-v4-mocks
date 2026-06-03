@@ -76,6 +76,8 @@ const results2 = Array.from({ length: 3 }, () => g2.generate(schema))
 
 ## locale（语言环境）
 
+[▶ 在 Playground 中试用](/zh/playground/?example=locale)
+
 指定 faker.js 的语言环境。可以指定单个字符串，也可以通过数组按优先级指定多个语言环境。
 
 ```ts
@@ -294,6 +296,8 @@ initGenerator({ customMockKey: 'zodMock' }).generate(Schema)
 完整用法见 [自定义生成器 — 处理 `z.custom()`](/zh/guide/custom-generator#处理-z-custom-和-z-instanceof)。
 
 ## keyMapping
+
+[▶ 在 Playground 中试用](/zh/playground/?example=key-mapping)
 
 属性名 → `faker` 函数的可选映射，仅对原始叶子 Schema（string / number / boolean / date）生效。默认 `'off'`。
 

@@ -56,6 +56,8 @@ console.log(mocks.post) // { id: 123, title: "..." }
 
 ## generateMany
 
+[▶ Try it in the Playground](/playground/?example=discriminated-union)
+
 ```ts
 generateMany<T extends z.ZodType>(schema: T, count: number): z.infer<T>[]
 ```

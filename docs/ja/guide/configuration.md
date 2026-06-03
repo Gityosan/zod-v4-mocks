@@ -76,6 +76,8 @@ const results2 = Array.from({ length: 3 }, () => g2.generate(schema))
 
 ## locale（ロケール）
 
+[▶ Playground で試す](/ja/playground/?example=locale)
+
 faker.js のロケールを指定します。文字列を1つ指定するか、配列で複数ロケールを優先順に指定できます。
 
 ```ts
@@ -294,6 +296,8 @@ initGenerator({ customMockKey: 'zodMock' }).generate(Schema)
 詳しい使い方は [カスタムジェネレータ — `z.custom()` / `z.instanceof()` の扱い](/ja/guide/custom-generator#z-custom-z-instanceof-の扱い) を参照。
 
 ## keyMapping
+
+[▶ Playground で試す](/ja/playground/?example=key-mapping)
 
 プロパティ名 → `faker` 関数のオプトインマッピング。プリミティブ葉スキーマ（string / number / boolean / date）にのみ作用します。既定 `'off'`。
 

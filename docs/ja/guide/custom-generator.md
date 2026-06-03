@@ -158,6 +158,8 @@ const mock = initGenerator().supplyPath([KEY], 7).generate(Schema)
 
 ## override - カスタムジェネレータ関数
 
+[▶ Playground で試す](/ja/playground/?example=override)
+
 `supply` よりも柔軟なカスタマイズが必要な場合に `override` を使用します。スキーマとオプションを引数に受け取り、カスタム値を返す関数を定義できます。
 
 ```ts

@@ -76,6 +76,8 @@ const results2 = Array.from({ length: 3 }, () => g2.generate(schema))
 
 ## locale (लोकेल)
 
+[▶ Playground में आज़माएँ](/hi/playground/?example=locale)
+
 faker.js का लोकेल निर्दिष्ट करता है। एक स्ट्रिंग निर्दिष्ट कर सकते हैं, या ऐरे से कई लोकेल प्राथमिकता क्रम में निर्दिष्ट कर सकते हैं।
 
 ```ts
@@ -294,6 +296,8 @@ initGenerator({ customMockKey: 'zodMock' }).generate(Schema)
 पूर्ण उपयोग के लिए देखें [कस्टम जेनरेटर — `z.custom()` और `z.instanceof()` का हैंडलिंग](/hi/guide/custom-generator#z-custom-और-z-instanceof-का-हैंडलिंग)।
 
 ## keyMapping
+
+[▶ Playground में आज़माएँ](/hi/playground/?example=key-mapping)
 
 प्रॉपर्टी नाम → `faker` फंक्शन की ऑप्ट-इन मैपिंग, केवल प्रिमिटिव लीफ़ स्कीमा (string / number / boolean / date) पर लागू होती है। डिफ़ॉल्ट `'off'`।
 

@@ -209,6 +209,85 @@ const result = {
 }
 `,
   },
+  {
+    id: 'key-mapping',
+    label: 'keyMapping',
+    code: `import { z } from 'zod'
+import { initGenerator } from 'zod-v4-mocks'
+
+// keyMapping: 'auto' picks a faker generator from the property name, so
+// common field names get realistic values without any extra setup.
+const schema = z.object({
+  firstName: z.string(),
+  lastName: z.string(),
+  email: z.string(),
+  avatar: z.string(),
+  phoneNumber: z.string(),
+  price: z.number(),
+})
+
+const generator = initGenerator({ seed: 1, keyMapping: 'auto' })
+const result = generator.generate(schema)
+`,
+  },
+  {
+    id: 'locale',
+    label: 'Locale (i18n)',
+    code: `import { z } from 'zod'
+import { initGenerator } from 'zod-v4-mocks'
+
+// Combine a locale with keyMapping to get realistic, localized data.
+// Try changing 'ja' to 'de', 'fr', 'es', 'ko', ...
+const schema = z.object({
+  firstName: z.string(),
+  lastName: z.string(),
+  city: z.string(),
+  phoneNumber: z.string(),
+})
+
+const generator = initGenerator({ seed: 1, locale: 'ja', keyMapping: 'auto' })
+const result = generator.generate(schema)
+`,
+  },
+  {
+    id: 'override',
+    label: 'override',
+    code: `import { z } from 'zod'
+import { initGenerator } from 'zod-v4-mocks'
+
+const schema = z.object({
+  username: z.string(),
+  bio: z.string(),
+  tags: z.array(z.string()),
+})
+
+// override registers a custom generator function. Return a value to take
+// over, or undefined to fall back to the default. faker is on the 2nd arg.
+const generator = initGenerator({ seed: 1 }).override((schema, { faker }) =>
+  schema instanceof z.ZodString ? faker.internet.username() : undefined,
+)
+
+const result = generator.generate(schema)
+`,
+  },
+  {
+    id: 'discriminated-union',
+    label: 'Discriminated Union',
+    code: `import { z } from 'zod'
+import { initGenerator } from 'zod-v4-mocks'
+
+// A discriminated union picks one variant per generation;
+// generateMany shows the spread across variants.
+const event = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('click'), x: z.number().int(), y: z.number().int() }),
+  z.object({ type: z.literal('key'), key: z.string() }),
+  z.object({ type: z.literal('scroll'), delta: z.number() }),
+])
+
+const generator = initGenerator({ seed: 7 })
+const result = generator.generateMany(event, 5)
+`,
+  },
 ];
 
 type PreflightDiagnostic = {
@@ -367,13 +446,15 @@ function wrapWithReturn(code: string): string {
   // parse failure.
   let schemaVar: string | null = null;
   let generatorVar: string | null = null;
+  let isSingleGenerate = false;
   if (resultLine) {
     const genMatch = resultLine.match(
-      /(\w+)\s*\.\s*(?:generate|generateMany)\(\s*(\w+)/,
+      /(\w+)\s*\.\s*(generateMany|generate)\(\s*(\w+)/,
     );
     if (genMatch) {
       if (varNames.includes(genMatch[1])) generatorVar = genMatch[1];
-      if (varNames.includes(genMatch[2])) schemaVar = genMatch[2];
+      if (varNames.includes(genMatch[3])) schemaVar = genMatch[3];
+      isSingleGenerate = genMatch[2] === 'generate';
     }
   }
 
@@ -391,7 +472,10 @@ function wrapWithReturn(code: string): string {
   }
 
   const fields = [`__result: ${resultVar}`];
-  if (schemaVar) fields.push(`__schema: ${schemaVar}`);
+  // Only validate the result against the schema for a single generate() — a
+  // generateMany() result is an array, so parsing it against the item schema
+  // would falsely fail.
+  if (schemaVar && isSingleGenerate) fields.push(`__schema: ${schemaVar}`);
   // Surface preflight diagnostics for the generated schema. Guarded so older
   // bundles without the preflight() method degrade gracefully.
   if (schemaVar && generatorVar) {
