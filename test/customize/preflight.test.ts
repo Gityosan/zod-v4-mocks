@@ -483,3 +483,39 @@ describe('preflight - additional coverage', () => {
     warn.mockRestore();
   });
 });
+
+describe('preflight() - public diagnostics API', () => {
+  it('returns warning diagnostics without throwing or logging', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const Schema = z.object({
+      name: z.string().refine((s) => s.length > 3),
+      score: z.number().min(100).max(10),
+    });
+    const diagnostics = initGenerator().preflight(Schema);
+    expect(diagnostics).toHaveLength(2);
+    expect(diagnostics.every((d) => d.level === 'warning')).toBe(true);
+    expect(diagnostics.map((d) => d.path)).toEqual(['name', 'score']);
+    // The read-only API must not emit the console warnings generate() does.
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('returns error-level diagnostics instead of throwing', () => {
+    const Schema = z.tuple([z.string(), FileCustom()]);
+    const diagnostics = initGenerator().preflight(Schema);
+    expect(diagnostics.some((d) => d.level === 'error')).toBe(true);
+    expect(diagnostics.some((d) => d.path === '[1]')).toBe(true);
+  });
+
+  it('returns an empty array for a clean schema', () => {
+    const Schema = z.object({ id: z.uuid(), name: z.string() });
+    expect(initGenerator().preflight(Schema)).toEqual([]);
+  });
+
+  it('returns an empty array when preflightCheck is disabled', () => {
+    const Schema = z.object({ score: z.number().min(100).max(10) });
+    expect(
+      initGenerator({ preflightCheck: false }).preflight(Schema),
+    ).toEqual([]);
+  });
+})

@@ -68,6 +68,29 @@ const users = generator.generateMany(UserSchema, 10)
 
 这正是 CLI 的 `--count` 标志背后所使用的方法。
 
+## preflight
+
+```ts
+preflight(schema: z.core.$ZodType): PreflightDiagnostic[]
+```
+
+运行[预检 schema 遍历](/zh/guide/configuration#preflightcheck)并将其诊断结果**以数据形式**返回，既不会抛出异常，也不会改变生成器状态。它是 `generate()` 内部所运行检查的只读版本——后者在 error 级别会抛出异常、在 warning 级别会打印日志，而 `preflight()` 会把每一条诊断都原样返回，便于你在生成前检查 schema（用于工具集成、Lint、[Playground](/zh/playground/) 等）。当 `preflightCheck` 被禁用时返回空数组。
+
+```ts
+const schema = z.object({
+  username: z.string().refine((s) => s.startsWith('@')),
+  score: z.number().min(100).max(10),
+})
+
+const diagnostics = generator.preflight(schema)
+// [
+//   { level: 'warning', path: 'username', message: 'A .refine() ... is ignored ...' },
+//   { level: 'warning', path: 'score',    message: 'Unsatisfiable number range ...' },
+// ]
+```
+
+每个 `PreflightDiagnostic` 都包含 `level`（`'error' | 'warning'`）、指向问题节点的 `path`，以及可读的 `message`。
+
 ## factory
 
 ```ts

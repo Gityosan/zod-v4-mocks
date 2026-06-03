@@ -112,12 +112,107 @@ const result = generator.multiGenerate({
 })
 `,
   },
+  {
+    label: 'Preflight',
+    code: `import { z } from 'zod'
+import { initGenerator } from 'zod-v4-mocks'
+
+// Before generating, zod-v4-mocks runs a "preflight" schema walk that
+// flags constructs it cannot faithfully mock. Here the .refine() is
+// dropped and the number range is impossible — both surface as warnings
+// below while generation still proceeds.
+const schema = z.object({
+  username: z.string().min(3).refine((s) => s.startsWith('@')),
+  score: z.number().min(100).max(10),
+  tags: z.array(z.string()),
+})
+
+const generator = initGenerator({ seed: 1 })
+const result = generator.generate(schema)
+`,
+  },
+  {
+    label: 'supplyRef & supplyPath',
+    code: `import { z } from 'zod'
+import { initGenerator } from 'zod-v4-mocks'
+
+const roleSchema = z.enum(['admin', 'user', 'guest'])
+
+const schema = z.object({
+  id: z.uuid(),
+  role: roleSchema,
+  profile: z.object({
+    name: z.string(),
+    country: z.string(),
+  }),
+})
+
+// supplyRef pins a value wherever this exact schema reference appears.
+// supplyPath pins a value at a specific path in the generated structure.
+const generator = initGenerator({ seed: 1 })
+  .supplyRef(roleSchema, 'admin')
+  .supplyPath(['profile', 'country'], 'JP')
+
+const result = generator.generate(schema)
+`,
+  },
+  {
+    label: 'Portable serialize',
+    code: `import { z } from 'zod'
+import { initGenerator } from 'zod-v4-mocks'
+
+// Portable serialization round-trips across any JS runtime and preserves
+// Date / Map / Set / BigInt — types JSON.stringify would lose.
+const User = z.object({
+  id: z.uuid(),
+  createdAt: z.date(),
+  tags: z.set(z.string()),
+  scores: z.map(z.string(), z.number().int()),
+})
+
+const generator = initGenerator({ seed: 1 })
+const mock = generator.generate(User)
+
+const portable = generator.serializePortable(mock)
+const restored = generator.deserializePortable(portable)
+
+const result = { portable, restored }
+`,
+  },
+  {
+    label: 'factory',
+    code: `import { z } from 'zod'
+import { initGenerator } from 'zod-v4-mocks'
+
+const User = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  active: z.boolean(),
+})
+
+// factory() binds a schema: next() makes one mock, take(n) makes an array.
+const generator = initGenerator({ seed: 1 })
+const userFactory = generator.factory(User)
+
+const result = {
+  first: userFactory.next(),
+  batch: userFactory.take(3),
+}
+`,
+  },
 ];
+
+type PreflightDiagnostic = {
+  level: 'error' | 'warning';
+  path: string;
+  message: string;
+};
 
 const code = ref(examples[0].code);
 const result = ref<string | null>(null);
 const error = ref<string | null>(null);
 const parseResult = ref<{ success: boolean; error?: string } | null>(null);
+const preflightResult = ref<PreflightDiagnostic[] | null>(null);
 const isRunning = ref(false);
 const editorReady = ref(false);
 const editorRef = shallowRef<InstanceType<typeof MonacoEditor> | null>(null);
@@ -171,6 +266,7 @@ function selectExample(index: number) {
   result.value = null;
   error.value = null;
   parseResult.value = null;
+  preflightResult.value = null;
 }
 
 // Parse import statements and extract imported names
@@ -232,42 +328,65 @@ function wrapWithReturn(code: string): string {
 
   if (!resultVar) return code;
 
-  // Try to detect schema from .generate(schemaVar) call in the result line
+  // Detect the generator + schema only from a direct single-schema
+  // `<gen>.generate(<schema>)` / `<gen>.generateMany(<schema>, n)` call on the
+  // result line. We deliberately do NOT guess a schema by name: when the
+  // result is a composite (e.g. a serialize round-trip or a factory batch),
+  // validating the whole object against one schema would falsely report a
+  // parse failure.
   let schemaVar: string | null = null;
+  let generatorVar: string | null = null;
   if (resultLine) {
-    const genMatch = resultLine.match(/\.generate\((\w+)\)/);
-    if (genMatch && varNames.includes(genMatch[1])) {
-      schemaVar = genMatch[1];
+    const genMatch = resultLine.match(
+      /(\w+)\s*\.\s*(?:generate|generateMany)\(\s*(\w+)/,
+    );
+    if (genMatch) {
+      if (varNames.includes(genMatch[1])) generatorVar = genMatch[1];
+      if (varNames.includes(genMatch[2])) schemaVar = genMatch[2];
     }
   }
 
-  // Fallback: find a variable named "schema" or ending with "Schema"
-  if (!schemaVar) {
-    const found = varNames.find(
-      (v) =>
-        v !== resultVar &&
-        (v === 'schema' || v.endsWith('Schema')),
-    );
-    // Only use fallback if there's exactly one schema-like variable
-    const allSchemaVars = varNames.filter(
-      (v) =>
-        v !== resultVar &&
-        (v === 'schema' || v.endsWith('Schema')),
-    );
-    if (allSchemaVars.length === 1) {
-      schemaVar = found ?? null;
+  // Fallback: find the generator instance created via initGenerator().
+  if (!generatorVar) {
+    for (const line of lines) {
+      const m = line.match(
+        /^\s*(?:const|let|var)\s+(\w+)\s*=\s*initGenerator\b/,
+      );
+      if (m) {
+        generatorVar = m[1];
+        break;
+      }
     }
   }
 
-  if (schemaVar) {
-    lines.push(
-      `return { __result: ${resultVar}, __schema: ${schemaVar} };`,
+  const fields = [`__result: ${resultVar}`];
+  if (schemaVar) fields.push(`__schema: ${schemaVar}`);
+  // Surface preflight diagnostics for the generated schema. Guarded so older
+  // bundles without the preflight() method degrade gracefully.
+  if (schemaVar && generatorVar) {
+    fields.push(
+      `__preflight: (typeof ${generatorVar}?.preflight === 'function' ` +
+        `? ${generatorVar}.preflight(${schemaVar}) : undefined)`,
     );
-  } else {
-    lines.push(`return { __result: ${resultVar} };`);
   }
+  lines.push(`return { ${fields.join(', ')} };`);
 
   return lines.join('\n');
+}
+
+// Parse the error thrown by generate() when preflight finds error-level
+// issues so they can be shown in the preflight panel instead of as a raw
+// error string. Returns null for any other error.
+function parsePreflightError(message: string): PreflightDiagnostic[] | null {
+  if (!message.startsWith('Preflight check found')) return null;
+  const diagnostics: PreflightDiagnostic[] = [];
+  for (const line of message.split('\n')) {
+    const m = line.match(/^\s*-\s*(.+?):\s+(.+)$/);
+    if (m) {
+      diagnostics.push({ level: 'error', path: m[1], message: m[2] });
+    }
+  }
+  return diagnostics.length > 0 ? diagnostics : null;
 }
 
 // Custom JSON serializer that handles special types
@@ -301,6 +420,7 @@ async function run() {
   error.value = null;
   result.value = null;
   parseResult.value = null;
+  preflightResult.value = null;
 
   try {
     // 1. Load browser bundles
@@ -346,13 +466,21 @@ async function run() {
       ),
     ]);
 
-    // 7. Extract result and schema, then serialize
+    // 7. Extract result, schema, and preflight diagnostics, then serialize
     const wrapped = resultValue as
-      | { __result: unknown; __schema?: { safeParse: (v: unknown) => { success: boolean; error?: { message: string } } } }
+      | {
+          __result: unknown;
+          __schema?: { safeParse: (v: unknown) => { success: boolean; error?: { message: string } } };
+          __preflight?: PreflightDiagnostic[];
+        }
       | undefined;
 
     const actualResult = wrapped?.__result ?? resultValue;
     const schemaObj = wrapped?.__schema;
+
+    if (Array.isArray(wrapped?.__preflight)) {
+      preflightResult.value = wrapped.__preflight;
+    }
 
     if (actualResult !== undefined) {
       result.value = serializeResult(actualResult);
@@ -381,7 +509,15 @@ async function run() {
       }
     }
   } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e);
+    const message = e instanceof Error ? e.message : String(e);
+    // A preflight error-level failure is reported in the preflight panel
+    // rather than as a generic error.
+    const preflightErrors = parsePreflightError(message);
+    if (preflightErrors) {
+      preflightResult.value = preflightErrors;
+    } else {
+      error.value = message;
+    }
   } finally {
     isRunning.value = false;
   }
@@ -437,7 +573,19 @@ async function run() {
       </div>
       <div class="panel output-panel-wrapper">
         <div class="panel-header">Output</div>
-        <OutputPanel :result="result" :error="error" :is-running="isRunning" :parse-result="parseResult" :running-text="t.running" :placeholder-text="t.placeholder" />
+        <OutputPanel
+          :result="result"
+          :error="error"
+          :is-running="isRunning"
+          :parse-result="parseResult"
+          :preflight-result="preflightResult"
+          :running-text="t.running"
+          :placeholder-text="t.placeholder"
+          :preflight-text="t.preflight"
+          :no-issues-text="t.noIssues"
+          :warning-text="t.warning"
+          :error-text="t.error"
+        />
       </div>
     </div>
   </div>
