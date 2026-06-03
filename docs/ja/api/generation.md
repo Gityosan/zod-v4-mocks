@@ -69,6 +69,29 @@ const users = generator.generateMany(UserSchema, 10)
 
 CLI の `--count` フラグはこのメソッドを使っています。
 
+## preflight
+
+```ts
+preflight(schema: z.core.$ZodType): PreflightDiagnostic[]
+```
+
+[プリフライトのスキーマウォーク](/ja/guide/configuration#preflightcheck)を実行し、その診断結果を**データとして**返します。例外を投げたりジェネレーターの状態を変更したりはしません。`generate()` 内部で動くチェック（error レベルでは例外を投げ、warning レベルではログ出力する）の読み取り専用版にあたり、すべての診断をそのまま返すので、生成前にスキーマを検査できます（ツール連携、Lint、[Playground](/ja/playground/) など）。`preflightCheck` を無効にしている場合は空配列を返します。
+
+```ts
+const schema = z.object({
+  username: z.string().refine((s) => s.startsWith('@')),
+  score: z.number().min(100).max(10),
+})
+
+const diagnostics = generator.preflight(schema)
+// [
+//   { level: 'warning', path: 'username', message: 'A .refine() ... is ignored ...' },
+//   { level: 'warning', path: 'score',    message: 'Unsatisfiable number range ...' },
+// ]
+```
+
+各 `PreflightDiagnostic` は `level`（`'error' | 'warning'`）、問題のあるノードへの `path`、人間が読める `message` を持ちます。
+
 ## factory
 
 ```ts

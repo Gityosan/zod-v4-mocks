@@ -112,12 +112,38 @@ const result = generator.multiGenerate({
 })
 `,
   },
+  {
+    label: 'Preflight',
+    code: `import { z } from 'zod'
+import { initGenerator } from 'zod-v4-mocks'
+
+// Before generating, zod-v4-mocks runs a "preflight" schema walk that
+// flags constructs it cannot faithfully mock. Here the .refine() is
+// dropped and the number range is impossible — both surface as warnings
+// below while generation still proceeds.
+const schema = z.object({
+  username: z.string().min(3).refine((s) => s.startsWith('@')),
+  score: z.number().min(100).max(10),
+  tags: z.array(z.string()),
+})
+
+const generator = initGenerator({ seed: 1 })
+const result = generator.generate(schema)
+`,
+  },
 ];
+
+type PreflightDiagnostic = {
+  level: 'error' | 'warning';
+  path: string;
+  message: string;
+};
 
 const code = ref(examples[0].code);
 const result = ref<string | null>(null);
 const error = ref<string | null>(null);
 const parseResult = ref<{ success: boolean; error?: string } | null>(null);
+const preflightResult = ref<PreflightDiagnostic[] | null>(null);
 const isRunning = ref(false);
 const editorReady = ref(false);
 const editorRef = shallowRef<InstanceType<typeof MonacoEditor> | null>(null);
@@ -171,6 +197,7 @@ function selectExample(index: number) {
   result.value = null;
   error.value = null;
   parseResult.value = null;
+  preflightResult.value = null;
 }
 
 // Parse import statements and extract imported names
@@ -232,12 +259,17 @@ function wrapWithReturn(code: string): string {
 
   if (!resultVar) return code;
 
-  // Try to detect schema from .generate(schemaVar) call in the result line
+  // Try to detect the generator + schema from a single-schema
+  // `<gen>.generate(<schema>)` / `<gen>.generateMany(<schema>, n)` call.
   let schemaVar: string | null = null;
+  let generatorVar: string | null = null;
   if (resultLine) {
-    const genMatch = resultLine.match(/\.generate\((\w+)\)/);
-    if (genMatch && varNames.includes(genMatch[1])) {
-      schemaVar = genMatch[1];
+    const genMatch = resultLine.match(
+      /(\w+)\s*\.\s*(?:generate|generateMany)\(\s*(\w+)/,
+    );
+    if (genMatch) {
+      if (varNames.includes(genMatch[1])) generatorVar = genMatch[1];
+      if (varNames.includes(genMatch[2])) schemaVar = genMatch[2];
     }
   }
 
@@ -259,15 +291,47 @@ function wrapWithReturn(code: string): string {
     }
   }
 
-  if (schemaVar) {
-    lines.push(
-      `return { __result: ${resultVar}, __schema: ${schemaVar} };`,
-    );
-  } else {
-    lines.push(`return { __result: ${resultVar} };`);
+  // Fallback: find the generator instance created via initGenerator().
+  if (!generatorVar) {
+    for (const line of lines) {
+      const m = line.match(
+        /^\s*(?:const|let|var)\s+(\w+)\s*=\s*initGenerator\b/,
+      );
+      if (m) {
+        generatorVar = m[1];
+        break;
+      }
+    }
   }
 
+  const fields = [`__result: ${resultVar}`];
+  if (schemaVar) fields.push(`__schema: ${schemaVar}`);
+  // Surface preflight diagnostics for the generated schema. Guarded so older
+  // bundles without the preflight() method degrade gracefully.
+  if (schemaVar && generatorVar) {
+    fields.push(
+      `__preflight: (typeof ${generatorVar}?.preflight === 'function' ` +
+        `? ${generatorVar}.preflight(${schemaVar}) : undefined)`,
+    );
+  }
+  lines.push(`return { ${fields.join(', ')} };`);
+
   return lines.join('\n');
+}
+
+// Parse the error thrown by generate() when preflight finds error-level
+// issues so they can be shown in the preflight panel instead of as a raw
+// error string. Returns null for any other error.
+function parsePreflightError(message: string): PreflightDiagnostic[] | null {
+  if (!message.startsWith('Preflight check found')) return null;
+  const diagnostics: PreflightDiagnostic[] = [];
+  for (const line of message.split('\n')) {
+    const m = line.match(/^\s*-\s*(.+?):\s+(.+)$/);
+    if (m) {
+      diagnostics.push({ level: 'error', path: m[1], message: m[2] });
+    }
+  }
+  return diagnostics.length > 0 ? diagnostics : null;
 }
 
 // Custom JSON serializer that handles special types
@@ -301,6 +365,7 @@ async function run() {
   error.value = null;
   result.value = null;
   parseResult.value = null;
+  preflightResult.value = null;
 
   try {
     // 1. Load browser bundles
@@ -346,13 +411,21 @@ async function run() {
       ),
     ]);
 
-    // 7. Extract result and schema, then serialize
+    // 7. Extract result, schema, and preflight diagnostics, then serialize
     const wrapped = resultValue as
-      | { __result: unknown; __schema?: { safeParse: (v: unknown) => { success: boolean; error?: { message: string } } } }
+      | {
+          __result: unknown;
+          __schema?: { safeParse: (v: unknown) => { success: boolean; error?: { message: string } } };
+          __preflight?: PreflightDiagnostic[];
+        }
       | undefined;
 
     const actualResult = wrapped?.__result ?? resultValue;
     const schemaObj = wrapped?.__schema;
+
+    if (Array.isArray(wrapped?.__preflight)) {
+      preflightResult.value = wrapped.__preflight;
+    }
 
     if (actualResult !== undefined) {
       result.value = serializeResult(actualResult);
@@ -381,7 +454,15 @@ async function run() {
       }
     }
   } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e);
+    const message = e instanceof Error ? e.message : String(e);
+    // A preflight error-level failure is reported in the preflight panel
+    // rather than as a generic error.
+    const preflightErrors = parsePreflightError(message);
+    if (preflightErrors) {
+      preflightResult.value = preflightErrors;
+    } else {
+      error.value = message;
+    }
   } finally {
     isRunning.value = false;
   }
@@ -437,7 +518,19 @@ async function run() {
       </div>
       <div class="panel output-panel-wrapper">
         <div class="panel-header">Output</div>
-        <OutputPanel :result="result" :error="error" :is-running="isRunning" :parse-result="parseResult" :running-text="t.running" :placeholder-text="t.placeholder" />
+        <OutputPanel
+          :result="result"
+          :error="error"
+          :is-running="isRunning"
+          :parse-result="parseResult"
+          :preflight-result="preflightResult"
+          :running-text="t.running"
+          :placeholder-text="t.placeholder"
+          :preflight-text="t.preflight"
+          :no-issues-text="t.noIssues"
+          :warning-text="t.warning"
+          :error-text="t.error"
+        />
       </div>
     </div>
   </div>

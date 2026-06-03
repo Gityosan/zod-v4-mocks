@@ -124,11 +124,18 @@ const mocksWrapped = `declare module "zod-v4-mocks" {
     lazyDepthLimit: number;
     recursiveDepthLimit?: number;
     consistentKey?: string;
+    preflightCheck?: boolean;
   }
 
   export type OutputOptions = {
     path?: string;
     ext?: "json" | "js" | "ts";
+  };
+
+  export type PreflightDiagnostic = {
+    level: "error" | "warning";
+    path: string;
+    message: string;
   };
 
   export declare class MockGenerator {
@@ -137,7 +144,9 @@ const mocksWrapped = `declare module "zod-v4-mocks" {
     supply(constructor: z.core.$constructor<any>, value: any): MockGenerator;
     override(customGenerator: CustomGeneratorType): MockGenerator;
     register(schemas: z.ZodType[]): this;
+    preflight(schema: z.core.$ZodType): PreflightDiagnostic[];
     generate<T extends z.ZodType>(schema: T): z.infer<T>;
+    generateMany<T extends z.ZodType>(schema: T, count: number): z.infer<T>[];
     multiGenerate<T extends Record<string, z.ZodType>>(schemas: T): {
       [K in keyof T]: z.infer<T[K]>;
     };
