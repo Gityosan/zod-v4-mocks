@@ -32,6 +32,8 @@ yarn add zod-v4-mocks
 
 ## Basic Usage
 
+[▶ Try it in the Playground](/playground/?example=basic-object)
+
 ```ts
 import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -120,6 +122,8 @@ When defining custom generators with `override`, use `options.faker` instead of 
 :::
 
 ## Complex Schemas
+
+[▶ Try it in the Playground](/playground/?example=nested-object)
 
 Complex schemas including nested objects, arrays, records, unions, and more are supported.
 

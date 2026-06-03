@@ -32,6 +32,8 @@ yarn add zod-v4-mocks
 
 ## बुनियादी उपयोग
 
+[▶ Playground में आज़माएँ](/hi/playground/?example=basic-object)
+
 ```ts
 import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -120,6 +122,8 @@ gen1.generate(schema) === gen2.generate(schema) // true
 :::
 
 ## जटिल स्कीमा
+
+[▶ Playground में आज़माएँ](/hi/playground/?example=nested-object)
 
 नेस्टेड ऑब्जेक्ट, ऐरे, रिकॉर्ड, यूनियन आदि जटिल स्कीमा को भी सपोर्ट करता है।
 

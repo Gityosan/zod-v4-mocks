@@ -70,6 +70,8 @@ const restored = generator.deserialize<User>(generator.serializeBinary(data))
 
 ## serializePortable / serializePortableAsync
 
+[▶ Try it in the Playground](/playground/?example=portable)
+
 ```ts
 serializePortable(data: unknown, options?: PortableOptions): string
 serializePortableAsync(data: unknown, options?: PortableOptions): Promise<string>

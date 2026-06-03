@@ -60,6 +60,8 @@ const mock = initGenerator()
 
 ## supplyRef - स्कीमा रेफरेंस से मिलान
 
+[▶ Playground में आज़माएँ](/hi/playground/?example=supply)
+
 `supply` एक ही Zod क्लास के सभी स्कीमा पर लागू होता है। यदि सिर्फ **एक खास जगह** को फिक्स करना हो, तो `supplyRef` का उपयोग करें - यह रेफरेंस की समानता (`===`) से मिलान करता है।
 
 ```ts

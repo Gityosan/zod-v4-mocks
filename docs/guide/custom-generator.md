@@ -60,6 +60,8 @@ const mock = initGenerator()
 
 ## supplyRef - Match by Schema Reference
 
+[▶ Try it in the Playground](/playground/?example=supply)
+
 `supply` targets every schema of a given Zod class. When you need to pin only **one specific occurrence**, use `supplyRef` to compare by reference (`===`).
 
 ```ts

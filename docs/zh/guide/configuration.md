@@ -349,6 +349,8 @@ initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 
 ## preflightCheck
 
+[▶ 在 Playground 中试用](/zh/playground/?example=preflight)
+
 在生成之前，库会对 Schema 进行预检遍历。默认 `true`。它检测生成器无法安全 mock 的结构，指出具体路径并尽早失败，或在存在最小修正方案时自动修复。可通过 `initGenerator({ preflightCheck: false })` 关闭。
 
 ### error 级检查（生成前抛错）

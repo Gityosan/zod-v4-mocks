@@ -60,6 +60,8 @@ const mock = initGenerator()
 
 ## supplyRef - 按 Schema 引用匹配
 
+[▶ 在 Playground 中试用](/zh/playground/?example=supply)
+
 `supply` 会匹配同一 Zod 类的所有 Schema。如果只想固定**某一个具体的位置**，使用 `supplyRef` 按引用相等（`===`）匹配。
 
 ```ts

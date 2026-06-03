@@ -60,6 +60,8 @@ const mock = initGenerator()
 
 ## supplyRef - スキーマ参照で一致
 
+[▶ Playground で試す](/ja/playground/?example=supply)
+
 `supply` は同じ Zod クラスのスキーマすべてに当たります。**特定の1箇所だけ**固定したい場合は、参照（`===`）で一致する `supplyRef` を使います。
 
 ```ts

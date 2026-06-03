@@ -349,6 +349,8 @@ initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 
 ## preflightCheck
 
+[▶ Playground में आज़माएँ](/hi/playground/?example=preflight)
+
 जेनरेशन से पहले, लाइब्रेरी स्कीमा पर एक प्री-फ़्लाइट वॉक चलाती है। डिफ़ॉल्ट `true`। यह उन संरचनाओं का पता लगाती है जिन्हें जेनरेटर सुरक्षित रूप से mock नहीं कर सकता — संबंधित पाथ बताकर जल्दी फ़ेल करती है, या जहाँ न्यूनतम सुधार संभव है वहाँ ऑटो-फ़िक्स करती है। `initGenerator({ preflightCheck: false })` से बंद करें।
 
 ### error-स्तर की जाँचें (जेनरेशन से पहले throw)

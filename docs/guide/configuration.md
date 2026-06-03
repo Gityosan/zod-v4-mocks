@@ -349,6 +349,8 @@ initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 
 ## preflightCheck
 
+[▶ Try it in the Playground](/playground/?example=preflight)
+
 Before generation, the library runs a pre-flight walk over the schema.
 Default `true`. It catches constructs the generator cannot safely mock —
 failing fast with the offending path, or auto-fixing where a minimal

@@ -32,6 +32,8 @@ yarn add zod-v4-mocks
 
 ## 基本的な使い方
 
+[▶ Playground で試す](/ja/playground/?example=basic-object)
+
 ```ts
 import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -120,6 +122,8 @@ gen1.generate(schema) === gen2.generate(schema) // true
 :::
 
 ## 複雑なスキーマ
+
+[▶ Playground で試す](/ja/playground/?example=nested-object)
 
 ネストしたオブジェクト、配列、レコード、ユニオンなど、複雑なスキーマにも対応しています。
 

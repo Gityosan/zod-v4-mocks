@@ -349,6 +349,8 @@ initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 
 ## preflightCheck
 
+[▶ Playground で試す](/ja/playground/?example=preflight)
+
 生成前に、ライブラリはスキーマをプリフライト走査します。既定は `true`。ジェネレータが安全にモックできない構造を検出し、該当パスを示して即座に失敗させるか、最小限の修正が可能なものは自動修正します。`initGenerator({ preflightCheck: false })` で無効化できます。
 
 ### error レベルのチェック（生成前に throw）

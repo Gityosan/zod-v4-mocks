@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, shallowRef } from 'vue';
+import { onMounted, ref, shallowRef } from 'vue';
 import MonacoEditor from './MonacoEditor.vue';
 import OutputPanel from './OutputPanel.vue';
 import { usePlaygroundI18n } from '../composables/usePlaygroundI18n';
@@ -8,6 +8,7 @@ const { t } = usePlaygroundI18n();
 
 const examples = [
   {
+    id: 'basic-object',
     label: 'Basic Object',
     code: `import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -25,6 +26,7 @@ const result = generator.generate(schema)
 `,
   },
   {
+    id: 'nested-object',
     label: 'Nested Object',
     code: `import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -48,6 +50,7 @@ const result = generator.generate(userSchema)
 `,
   },
   {
+    id: 'union-enum',
     label: 'Union & Enum',
     code: `import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -66,6 +69,7 @@ const result = generator.generate(schema)
 `,
   },
   {
+    id: 'array-tuple',
     label: 'Array & Tuple',
     code: `import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -88,6 +92,7 @@ const result = generator.generate(schema)
 `,
   },
   {
+    id: 'multi-generate',
     label: 'multiGenerate',
     code: `import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -113,6 +118,7 @@ const result = generator.multiGenerate({
 `,
   },
   {
+    id: 'preflight',
     label: 'Preflight',
     code: `import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -132,6 +138,7 @@ const result = generator.generate(schema)
 `,
   },
   {
+    id: 'supply',
     label: 'supplyRef & supplyPath',
     code: `import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -157,6 +164,7 @@ const result = generator.generate(schema)
 `,
   },
   {
+    id: 'portable',
     label: 'Portable serialize',
     code: `import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -180,6 +188,7 @@ const result = { portable, restored }
 `,
   },
   {
+    id: 'factory',
     label: 'factory',
     code: `import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -261,13 +270,35 @@ async function loadBundles() {
   mocksModule = await importFromBlobUrl(rewritten);
 }
 
-function selectExample(index: number) {
+// Query parameter that pre-selects an example, e.g. ?example=preflight.
+// Each example has a stable `id` so doc pages can deep-link to a pattern.
+const EXAMPLE_PARAM = 'example';
+
+function applyExample(index: number, updateUrl: boolean) {
   code.value = examples[index].code;
   result.value = null;
   error.value = null;
   parseResult.value = null;
   preflightResult.value = null;
+  if (updateUrl && typeof window !== 'undefined') {
+    const url = new URL(window.location.href);
+    url.searchParams.set(EXAMPLE_PARAM, examples[index].id);
+    window.history.replaceState(window.history.state, '', url);
+  }
 }
+
+function selectExample(index: number) {
+  applyExample(index, true);
+}
+
+// On load, honor ?example=<id> (also accepts ?pattern=<id>) from the URL.
+onMounted(() => {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get(EXAMPLE_PARAM) ?? params.get('pattern');
+  if (!id) return;
+  const index = examples.findIndex((ex) => ex.id === id);
+  if (index >= 0) applyExample(index, false);
+});
 
 // Parse import statements and extract imported names
 function parseImports(jsCode: string): {
