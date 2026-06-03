@@ -131,6 +131,75 @@ const generator = initGenerator({ seed: 1 })
 const result = generator.generate(schema)
 `,
   },
+  {
+    label: 'supplyRef & supplyPath',
+    code: `import { z } from 'zod'
+import { initGenerator } from 'zod-v4-mocks'
+
+const roleSchema = z.enum(['admin', 'user', 'guest'])
+
+const schema = z.object({
+  id: z.uuid(),
+  role: roleSchema,
+  profile: z.object({
+    name: z.string(),
+    country: z.string(),
+  }),
+})
+
+// supplyRef pins a value wherever this exact schema reference appears.
+// supplyPath pins a value at a specific path in the generated structure.
+const generator = initGenerator({ seed: 1 })
+  .supplyRef(roleSchema, 'admin')
+  .supplyPath(['profile', 'country'], 'JP')
+
+const result = generator.generate(schema)
+`,
+  },
+  {
+    label: 'Portable serialize',
+    code: `import { z } from 'zod'
+import { initGenerator } from 'zod-v4-mocks'
+
+// Portable serialization round-trips across any JS runtime and preserves
+// Date / Map / Set / BigInt — types JSON.stringify would lose.
+const User = z.object({
+  id: z.uuid(),
+  createdAt: z.date(),
+  tags: z.set(z.string()),
+  scores: z.map(z.string(), z.number().int()),
+})
+
+const generator = initGenerator({ seed: 1 })
+const mock = generator.generate(User)
+
+const portable = generator.serializePortable(mock)
+const restored = generator.deserializePortable(portable)
+
+const result = { portable, restored }
+`,
+  },
+  {
+    label: 'factory',
+    code: `import { z } from 'zod'
+import { initGenerator } from 'zod-v4-mocks'
+
+const User = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  active: z.boolean(),
+})
+
+// factory() binds a schema: next() makes one mock, take(n) makes an array.
+const generator = initGenerator({ seed: 1 })
+const userFactory = generator.factory(User)
+
+const result = {
+  first: userFactory.next(),
+  batch: userFactory.take(3),
+}
+`,
+  },
 ];
 
 type PreflightDiagnostic = {
@@ -259,8 +328,12 @@ function wrapWithReturn(code: string): string {
 
   if (!resultVar) return code;
 
-  // Try to detect the generator + schema from a single-schema
-  // `<gen>.generate(<schema>)` / `<gen>.generateMany(<schema>, n)` call.
+  // Detect the generator + schema only from a direct single-schema
+  // `<gen>.generate(<schema>)` / `<gen>.generateMany(<schema>, n)` call on the
+  // result line. We deliberately do NOT guess a schema by name: when the
+  // result is a composite (e.g. a serialize round-trip or a factory batch),
+  // validating the whole object against one schema would falsely report a
+  // parse failure.
   let schemaVar: string | null = null;
   let generatorVar: string | null = null;
   if (resultLine) {
@@ -270,24 +343,6 @@ function wrapWithReturn(code: string): string {
     if (genMatch) {
       if (varNames.includes(genMatch[1])) generatorVar = genMatch[1];
       if (varNames.includes(genMatch[2])) schemaVar = genMatch[2];
-    }
-  }
-
-  // Fallback: find a variable named "schema" or ending with "Schema"
-  if (!schemaVar) {
-    const found = varNames.find(
-      (v) =>
-        v !== resultVar &&
-        (v === 'schema' || v.endsWith('Schema')),
-    );
-    // Only use fallback if there's exactly one schema-like variable
-    const allSchemaVars = varNames.filter(
-      (v) =>
-        v !== resultVar &&
-        (v === 'schema' || v.endsWith('Schema')),
-    );
-    if (allSchemaVars.length === 1) {
-      schemaVar = found ?? null;
     }
   }
 

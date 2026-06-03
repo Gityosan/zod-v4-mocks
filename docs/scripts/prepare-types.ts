@@ -110,6 +110,15 @@ const mocksWrapped = `declare module "zod-v4-mocks" {
     options: GeneraterOptions,
   ) => unknown;
 
+  export type PathSegment = string | number | symbol;
+
+  export type KeyMapper = (
+    key: string,
+    schema: z.core.$ZodType,
+    faker: Faker,
+    options: GeneraterOptions,
+  ) => unknown;
+
   export interface MockConfig {
     locale?: LocaleType | LocaleType[];
     randomizer?: Randomizer;
@@ -124,12 +133,23 @@ const mocksWrapped = `declare module "zod-v4-mocks" {
     lazyDepthLimit: number;
     recursiveDepthLimit?: number;
     consistentKey?: string;
+    customMockKey?: string;
+    keyMapping?: "off" | "auto" | KeyMapper;
     preflightCheck?: boolean;
   }
 
   export type OutputOptions = {
     path?: string;
     ext?: "json" | "js" | "ts";
+    exportName?: string;
+    header?: string;
+    footer?: string;
+    binary?: boolean;
+    portable?: boolean;
+  };
+
+  export type PortableOptions = {
+    base64?: boolean;
   };
 
   export type PreflightDiagnostic = {
@@ -138,11 +158,16 @@ const mocksWrapped = `declare module "zod-v4-mocks" {
     message: string;
   };
 
+  export const ITEM_MARKER: "$item";
+  export const VALUE_MARKER: "$value";
+
   export declare class MockGenerator {
     constructor(config?: Partial<MockConfig>);
     updateConfig(newConfig?: Partial<MockConfig>): MockGenerator;
     supply(constructor: z.core.$constructor<any>, value: any): MockGenerator;
     override(customGenerator: CustomGeneratorType): MockGenerator;
+    supplyRef(subSchema: z.core.$ZodType, value: unknown): MockGenerator;
+    supplyPath(path: PathSegment[], value: unknown): MockGenerator;
     register(schemas: z.ZodType[]): this;
     preflight(schema: z.core.$ZodType): PreflightDiagnostic[];
     generate<T extends z.ZodType>(schema: T): z.infer<T>;
@@ -150,7 +175,18 @@ const mocksWrapped = `declare module "zod-v4-mocks" {
     multiGenerate<T extends Record<string, z.ZodType>>(schemas: T): {
       [K in keyof T]: z.infer<T[K]>;
     };
+    factory<T extends z.ZodType>(schema: T): {
+      next: () => z.infer<T>;
+      take: (n: number) => z.infer<T>[];
+    };
+    serialize(data: unknown, options?: OutputOptions): string;
+    serializeBinary(data: unknown): Uint8Array;
+    deserialize<T = unknown>(input: Uint8Array | string): T;
+    serializePortable(data: unknown, options?: PortableOptions): string;
+    serializePortableAsync(data: unknown, options?: PortableOptions): Promise<string>;
+    deserializePortable<T = unknown>(input: string, options?: PortableOptions): T;
     output(data: unknown, options?: OutputOptions): string;
+    outputAsync(data: unknown, options?: OutputOptions): Promise<string>;
   }
 
   export declare function initGenerator(config?: Partial<MockConfig>): MockGenerator;
