@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, shallowRef } from 'vue';
+import { onMounted, ref, shallowRef } from 'vue';
 import MonacoEditor from './MonacoEditor.vue';
 import OutputPanel from './OutputPanel.vue';
 import { usePlaygroundI18n } from '../composables/usePlaygroundI18n';
@@ -8,6 +8,7 @@ const { t } = usePlaygroundI18n();
 
 const examples = [
   {
+    id: 'basic-object',
     label: 'Basic Object',
     code: `import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -25,6 +26,7 @@ const result = generator.generate(schema)
 `,
   },
   {
+    id: 'nested-object',
     label: 'Nested Object',
     code: `import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -48,6 +50,7 @@ const result = generator.generate(userSchema)
 `,
   },
   {
+    id: 'union-enum',
     label: 'Union & Enum',
     code: `import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -66,6 +69,7 @@ const result = generator.generate(schema)
 `,
   },
   {
+    id: 'array-tuple',
     label: 'Array & Tuple',
     code: `import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -88,6 +92,7 @@ const result = generator.generate(schema)
 `,
   },
   {
+    id: 'multi-generate',
     label: 'multiGenerate',
     code: `import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -113,6 +118,7 @@ const result = generator.multiGenerate({
 `,
   },
   {
+    id: 'preflight',
     label: 'Preflight',
     code: `import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -132,6 +138,7 @@ const result = generator.generate(schema)
 `,
   },
   {
+    id: 'supply',
     label: 'supplyRef & supplyPath',
     code: `import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -157,6 +164,7 @@ const result = generator.generate(schema)
 `,
   },
   {
+    id: 'portable',
     label: 'Portable serialize',
     code: `import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -180,6 +188,7 @@ const result = { portable, restored }
 `,
   },
   {
+    id: 'factory',
     label: 'factory',
     code: `import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -198,6 +207,85 @@ const result = {
   first: userFactory.next(),
   batch: userFactory.take(3),
 }
+`,
+  },
+  {
+    id: 'key-mapping',
+    label: 'keyMapping',
+    code: `import { z } from 'zod'
+import { initGenerator } from 'zod-v4-mocks'
+
+// keyMapping: 'auto' picks a faker generator from the property name, so
+// common field names get realistic values without any extra setup.
+const schema = z.object({
+  firstName: z.string(),
+  lastName: z.string(),
+  email: z.string(),
+  avatar: z.string(),
+  phoneNumber: z.string(),
+  price: z.number(),
+})
+
+const generator = initGenerator({ seed: 1, keyMapping: 'auto' })
+const result = generator.generate(schema)
+`,
+  },
+  {
+    id: 'locale',
+    label: 'Locale (i18n)',
+    code: `import { z } from 'zod'
+import { initGenerator } from 'zod-v4-mocks'
+
+// Combine a locale with keyMapping to get realistic, localized data.
+// Try changing 'ja' to 'de', 'fr', 'es', 'ko', ...
+const schema = z.object({
+  firstName: z.string(),
+  lastName: z.string(),
+  city: z.string(),
+  phoneNumber: z.string(),
+})
+
+const generator = initGenerator({ seed: 1, locale: 'ja', keyMapping: 'auto' })
+const result = generator.generate(schema)
+`,
+  },
+  {
+    id: 'override',
+    label: 'override',
+    code: `import { z } from 'zod'
+import { initGenerator } from 'zod-v4-mocks'
+
+const schema = z.object({
+  username: z.string(),
+  bio: z.string(),
+  tags: z.array(z.string()),
+})
+
+// override registers a custom generator function. Return a value to take
+// over, or undefined to fall back to the default. faker is on the 2nd arg.
+const generator = initGenerator({ seed: 1 }).override((schema, { faker }) =>
+  schema instanceof z.ZodString ? faker.internet.username() : undefined,
+)
+
+const result = generator.generate(schema)
+`,
+  },
+  {
+    id: 'discriminated-union',
+    label: 'Discriminated Union',
+    code: `import { z } from 'zod'
+import { initGenerator } from 'zod-v4-mocks'
+
+// A discriminated union picks one variant per generation;
+// generateMany shows the spread across variants.
+const event = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('click'), x: z.number().int(), y: z.number().int() }),
+  z.object({ type: z.literal('key'), key: z.string() }),
+  z.object({ type: z.literal('scroll'), delta: z.number() }),
+])
+
+const generator = initGenerator({ seed: 7 })
+const result = generator.generateMany(event, 5)
 `,
   },
 ];
@@ -261,13 +349,35 @@ async function loadBundles() {
   mocksModule = await importFromBlobUrl(rewritten);
 }
 
-function selectExample(index: number) {
+// Query parameter that pre-selects an example, e.g. ?example=preflight.
+// Each example has a stable `id` so doc pages can deep-link to a pattern.
+const EXAMPLE_PARAM = 'example';
+
+function applyExample(index: number, updateUrl: boolean) {
   code.value = examples[index].code;
   result.value = null;
   error.value = null;
   parseResult.value = null;
   preflightResult.value = null;
+  if (updateUrl && typeof window !== 'undefined') {
+    const url = new URL(window.location.href);
+    url.searchParams.set(EXAMPLE_PARAM, examples[index].id);
+    window.history.replaceState(window.history.state, '', url);
+  }
 }
+
+function selectExample(index: number) {
+  applyExample(index, true);
+}
+
+// On load, honor ?example=<id> (also accepts ?pattern=<id>) from the URL.
+onMounted(() => {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get(EXAMPLE_PARAM) ?? params.get('pattern');
+  if (!id) return;
+  const index = examples.findIndex((ex) => ex.id === id);
+  if (index >= 0) applyExample(index, false);
+});
 
 // Parse import statements and extract imported names
 function parseImports(jsCode: string): {
@@ -336,13 +446,15 @@ function wrapWithReturn(code: string): string {
   // parse failure.
   let schemaVar: string | null = null;
   let generatorVar: string | null = null;
+  let isSingleGenerate = false;
   if (resultLine) {
     const genMatch = resultLine.match(
-      /(\w+)\s*\.\s*(?:generate|generateMany)\(\s*(\w+)/,
+      /(\w+)\s*\.\s*(generateMany|generate)\(\s*(\w+)/,
     );
     if (genMatch) {
       if (varNames.includes(genMatch[1])) generatorVar = genMatch[1];
-      if (varNames.includes(genMatch[2])) schemaVar = genMatch[2];
+      if (varNames.includes(genMatch[3])) schemaVar = genMatch[3];
+      isSingleGenerate = genMatch[2] === 'generate';
     }
   }
 
@@ -360,7 +472,10 @@ function wrapWithReturn(code: string): string {
   }
 
   const fields = [`__result: ${resultVar}`];
-  if (schemaVar) fields.push(`__schema: ${schemaVar}`);
+  // Only validate the result against the schema for a single generate() — a
+  // generateMany() result is an array, so parsing it against the item schema
+  // would falsely fail.
+  if (schemaVar && isSingleGenerate) fields.push(`__schema: ${schemaVar}`);
   // Surface preflight diagnostics for the generated schema. Guarded so older
   // bundles without the preflight() method degrade gracefully.
   if (schemaVar && generatorVar) {

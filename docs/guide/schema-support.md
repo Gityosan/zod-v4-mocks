@@ -22,6 +22,8 @@ A list of Zod schemas supported by zod-v4-mocks.
 
 ## Collection Types
 
+[▶ Try it in the Playground](/playground/?example=array-tuple)
+
 | Method            | Status              | Notes                              |
 | ----------------- | ------------------- | ---------------------------------- |
 | `object()`        | Fully supported     | Nesting supported                  |
@@ -49,6 +51,8 @@ schema.parse(mock); // OK - all keys are optional
 This allows `partialRecord()` to naturally generate objects with only a subset of keys, unlike `record()`. The `record` `min`/`max` settings affect the number of entry generation attempts, but the actual number of keys may be fewer due to `ZodNever` skipping.
 
 ## Union and Intersection Types
+
+[▶ Try it in the Playground](/playground/?example=union-enum)
 
 | Method                 | Status              | Notes                                   |
 | ---------------------- | ------------------- | --------------------------------------- |

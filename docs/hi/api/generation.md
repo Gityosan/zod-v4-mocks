@@ -34,6 +34,8 @@ const val = generator.generate(BrandedUserId)
 
 ## multiGenerate
 
+[▶ Playground में आज़माएँ](/hi/playground/?example=multi-generate)
+
 ```ts
 multiGenerate<T extends Record<string, z.ZodType>>(
   schemas: T
@@ -53,6 +55,8 @@ console.log(mocks.post) // { id: 123, title: "..." }
 ```
 
 ## generateMany
+
+[▶ Playground में आज़माएँ](/hi/playground/?example=discriminated-union)
 
 ```ts
 generateMany<T extends z.ZodType>(schema: T, count: number): z.infer<T>[]
@@ -93,6 +97,8 @@ const diagnostics = generator.preflight(schema)
 प्रत्येक `PreflightDiagnostic` में `level` (`'error' | 'warning'`), समस्या वाले नोड का `path`, और एक पठनीय `message` होता है।
 
 ## factory
+
+[▶ Playground में आज़माएँ](/hi/playground/?example=factory)
 
 ```ts
 factory<T extends z.ZodType>(

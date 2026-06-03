@@ -34,6 +34,8 @@ const val = generator.generate(BrandedUserId)
 
 ## multiGenerate
 
+[▶ Playground で試す](/ja/playground/?example=multi-generate)
+
 ```ts
 multiGenerate<T extends Record<string, z.ZodType>>(
   schemas: T
@@ -53,6 +55,8 @@ console.log(mocks.post) // { id: 123, title: "..." }
 ```
 
 ## generateMany
+
+[▶ Playground で試す](/ja/playground/?example=discriminated-union)
 
 ```ts
 generateMany<T extends z.ZodType>(schema: T, count: number): z.infer<T>[]
@@ -93,6 +97,8 @@ const diagnostics = generator.preflight(schema)
 各 `PreflightDiagnostic` は `level`（`'error' | 'warning'`）、問題のあるノードへの `path`、人間が読める `message` を持ちます。
 
 ## factory
+
+[▶ Playground で試す](/ja/playground/?example=factory)
 
 ```ts
 factory<T extends z.ZodType>(

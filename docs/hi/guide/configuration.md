@@ -76,6 +76,8 @@ const results2 = Array.from({ length: 3 }, () => g2.generate(schema))
 
 ## locale (लोकेल)
 
+[▶ Playground में आज़माएँ](/hi/playground/?example=locale)
+
 faker.js का लोकेल निर्दिष्ट करता है। एक स्ट्रिंग निर्दिष्ट कर सकते हैं, या ऐरे से कई लोकेल प्राथमिकता क्रम में निर्दिष्ट कर सकते हैं।
 
 ```ts
@@ -295,6 +297,8 @@ initGenerator({ customMockKey: 'zodMock' }).generate(Schema)
 
 ## keyMapping
 
+[▶ Playground में आज़माएँ](/hi/playground/?example=key-mapping)
+
 प्रॉपर्टी नाम → `faker` फंक्शन की ऑप्ट-इन मैपिंग, केवल प्रिमिटिव लीफ़ स्कीमा (string / number / boolean / date) पर लागू होती है। डिफ़ॉल्ट `'off'`।
 
 - `'off'` — कोई मैपिंग नहीं (डिफ़ॉल्ट)
@@ -348,6 +352,8 @@ initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 ```
 
 ## preflightCheck
+
+[▶ Playground में आज़माएँ](/hi/playground/?example=preflight)
 
 जेनरेशन से पहले, लाइब्रेरी स्कीमा पर एक प्री-फ़्लाइट वॉक चलाती है। डिफ़ॉल्ट `true`। यह उन संरचनाओं का पता लगाती है जिन्हें जेनरेटर सुरक्षित रूप से mock नहीं कर सकता — संबंधित पाथ बताकर जल्दी फ़ेल करती है, या जहाँ न्यूनतम सुधार संभव है वहाँ ऑटो-फ़िक्स करती है। `initGenerator({ preflightCheck: false })` से बंद करें।
 

@@ -34,6 +34,8 @@ const val = generator.generate(BrandedUserId)
 
 ## multiGenerate
 
+[▶ Try it in the Playground](/playground/?example=multi-generate)
+
 ```ts
 multiGenerate<T extends Record<string, z.ZodType>>(
   schemas: T
@@ -53,6 +55,8 @@ console.log(mocks.post) // { id: 123, title: "..." }
 ```
 
 ## generateMany
+
+[▶ Try it in the Playground](/playground/?example=discriminated-union)
 
 ```ts
 generateMany<T extends z.ZodType>(schema: T, count: number): z.infer<T>[]
@@ -101,6 +105,8 @@ Each `PreflightDiagnostic` has a `level` (`'error' | 'warning'`), the `path`
 to the offending node, and a human-readable `message`.
 
 ## factory
+
+[▶ Try it in the Playground](/playground/?example=factory)
 
 ```ts
 factory<T extends z.ZodType>(
