@@ -34,6 +34,8 @@ const val = generator.generate(BrandedUserId)
 
 ## multiGenerate
 
+[▶ Playground में आज़माएँ](/hi/playground/?example=multi-generate)
+
 ```ts
 multiGenerate<T extends Record<string, z.ZodType>>(
   schemas: T
@@ -54,6 +56,8 @@ console.log(mocks.post) // { id: 123, title: "..." }
 
 ## generateMany
 
+[▶ Playground में आज़माएँ](/hi/playground/?example=discriminated-union)
+
 ```ts
 generateMany<T extends z.ZodType>(schema: T, count: number): z.infer<T>[]
 ```
@@ -69,7 +73,32 @@ const users = generator.generateMany(UserSchema, 10)
 
 यह वही मेथड है जो CLI के `--count` फ़्लैग के पीछे है।
 
+## preflight
+
+```ts
+preflight(schema: z.core.$ZodType): PreflightDiagnostic[]
+```
+
+[प्रीफ़्लाइट schema walk](/hi/guide/configuration#preflightcheck) को चलाता है और उसके डायग्नॉस्टिक्स को **डेटा के रूप में** लौटाता है — न तो कोई एक्सेप्शन फेंकता है और न ही जनरेटर की स्थिति बदलता है। यह `generate()` के अंदर चलने वाली जाँच का read-only रूप है — वह error स्तर पर एक्सेप्शन फेंकती है और warning स्तर पर लॉग करती है, जबकि `preflight()` हर डायग्नॉस्टिक को वैसे ही लौटा देता है, ताकि आप जनरेट करने से पहले schema की जाँच कर सकें (टूलिंग, लिंटिंग, [Playground](/hi/playground/) आदि के लिए)। जब `preflightCheck` अक्षम हो तो यह एक खाली array लौटाता है।
+
+```ts
+const schema = z.object({
+  username: z.string().refine((s) => s.startsWith('@')),
+  score: z.number().min(100).max(10),
+})
+
+const diagnostics = generator.preflight(schema)
+// [
+//   { level: 'warning', path: 'username', message: 'A .refine() ... is ignored ...' },
+//   { level: 'warning', path: 'score',    message: 'Unsatisfiable number range ...' },
+// ]
+```
+
+प्रत्येक `PreflightDiagnostic` में `level` (`'error' | 'warning'`), समस्या वाले नोड का `path`, और एक पठनीय `message` होता है।
+
 ## factory
+
+[▶ Playground में आज़माएँ](/hi/playground/?example=factory)
 
 ```ts
 factory<T extends z.ZodType>(

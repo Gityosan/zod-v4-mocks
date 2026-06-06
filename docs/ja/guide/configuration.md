@@ -76,6 +76,8 @@ const results2 = Array.from({ length: 3 }, () => g2.generate(schema))
 
 ## locale（ロケール）
 
+[▶ Playground で試す](/ja/playground/?example=locale)
+
 faker.js のロケールを指定します。文字列を1つ指定するか、配列で複数ロケールを優先順に指定できます。
 
 ```ts
@@ -295,6 +297,8 @@ initGenerator({ customMockKey: 'zodMock' }).generate(Schema)
 
 ## keyMapping
 
+[▶ Playground で試す](/ja/playground/?example=key-mapping)
+
 プロパティ名 → `faker` 関数のオプトインマッピング。プリミティブ葉スキーマ（string / number / boolean / date）にのみ作用します。既定 `'off'`。
 
 - `'off'` — マッピング無し（既定動作）
@@ -348,6 +352,8 @@ initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 ```
 
 ## preflightCheck
+
+[▶ Playground で試す](/ja/playground/?example=preflight)
 
 生成前に、ライブラリはスキーマをプリフライト走査します。既定は `true`。ジェネレータが安全にモックできない構造を検出し、該当パスを示して即座に失敗させるか、最小限の修正が可能なものは自動修正します。`initGenerator({ preflightCheck: false })` で無効化できます。
 

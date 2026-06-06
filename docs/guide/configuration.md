@@ -76,6 +76,8 @@ When using custom generators (`override`), use `options.faker` instead of `Math.
 
 ## locale
 
+[▶ Try it in the Playground](/playground/?example=locale)
+
 Specifies the faker.js locale. You can specify a single string or an array of multiple locales in priority order.
 
 ```ts
@@ -295,6 +297,8 @@ See [Custom Generator — Handling `z.custom()`](/guide/custom-generator#handlin
 
 ## keyMapping
 
+[▶ Try it in the Playground](/playground/?example=key-mapping)
+
 Opt-in mapping from a property name to a `faker` function for primitive leaf schemas (string / number / boolean / date). Default `'off'`.
 
 - `'off'` — no mapping (default behaviour).
@@ -348,6 +352,8 @@ initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 ```
 
 ## preflightCheck
+
+[▶ Try it in the Playground](/playground/?example=preflight)
 
 Before generation, the library runs a pre-flight walk over the schema.
 Default `true`. It catches constructs the generator cannot safely mock —

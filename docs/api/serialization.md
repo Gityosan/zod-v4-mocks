@@ -114,6 +114,8 @@ const restored = generator.deserializeGreft<User>($greft, { base64: true })
 
 ## serializePortable / serializePortableAsync
 
+[▶ Try it in the Playground](/playground/?example=portable)
+
 ```ts
 serializePortable(data: unknown, options?: PortableOptions): string
 serializePortableAsync(data: unknown, options?: PortableOptions): Promise<string>

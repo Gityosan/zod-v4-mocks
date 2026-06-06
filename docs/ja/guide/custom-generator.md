@@ -60,6 +60,8 @@ const mock = initGenerator()
 
 ## supplyRef - スキーマ参照で一致
 
+[▶ Playground で試す](/ja/playground/?example=supply)
+
 `supply` は同じ Zod クラスのスキーマすべてに当たります。**特定の1箇所だけ**固定したい場合は、参照（`===`）で一致する `supplyRef` を使います。
 
 ```ts
@@ -155,6 +157,8 @@ const mock = initGenerator().supplyPath([KEY], 7).generate(Schema)
 :::
 
 ## override - カスタムジェネレータ関数
+
+[▶ Playground で試す](/ja/playground/?example=override)
 
 `supply` よりも柔軟なカスタマイズが必要な場合に `override` を使用します。スキーマとオプションを引数に受け取り、カスタム値を返す関数を定義できます。
 

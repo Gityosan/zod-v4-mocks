@@ -60,6 +60,8 @@ const mock = initGenerator()
 
 ## supplyRef - 按 Schema 引用匹配
 
+[▶ 在 Playground 中试用](/zh/playground/?example=supply)
+
 `supply` 会匹配同一 Zod 类的所有 Schema。如果只想固定**某一个具体的位置**，使用 `supplyRef` 按引用相等（`===`）匹配。
 
 ```ts
@@ -154,6 +156,8 @@ const mock = initGenerator().supplyPath([KEY], 7).generate(Schema)
 :::
 
 ## override - 自定义生成器函数
+
+[▶ 在 Playground 中试用](/zh/playground/?example=override)
 
 当需要比 `supply` 更灵活的自定义时，使用 `override`。可以定义一个接收 Schema 和选项作为参数并返回自定义值的函数。
 

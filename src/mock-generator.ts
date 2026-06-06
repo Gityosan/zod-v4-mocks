@@ -14,6 +14,7 @@ import {
   type OutputOptions,
   type PathSegment,
   type PortableOptions,
+  type PreflightDiagnostic,
   regenerateIfOmitted,
   runPreflight,
   serializeBinary,
@@ -173,6 +174,25 @@ class MockGenerator {
       this.options.preflightFixes.set(from, to);
     }
     this.#preflighted.add(schema);
+  }
+
+  /**
+   * Run the pre-flight schema walk and return its diagnostics without
+   * throwing or mutating generator state. Unlike the internal check that
+   * runs inside `generate()` — which throws on error-level diagnostics and
+   * emits warning-level ones to the console — this surfaces every diagnostic
+   * (error and warning) as data, so callers can inspect a schema up front
+   * (e.g. tooling, linting, the docs playground). Returns an empty array
+   * when `preflightCheck` is disabled.
+   */
+  preflight(schema: z.core.$ZodType): PreflightDiagnostic[] {
+    if (this.options.config.preflightCheck === false) return [];
+    const { diagnostics } = runPreflight(schema, {
+      customMockKey: this.options.config.customMockKey ?? 'mock',
+      supplyRefTargets: this.options.supplyRefTargets,
+      hasOpaqueCustomizer: this.options.hasOpaqueCustomizer,
+    });
+    return diagnostics;
   }
 
   // Overloads: ZodFunction is not supported -> unknown, others -> z.infer<T>

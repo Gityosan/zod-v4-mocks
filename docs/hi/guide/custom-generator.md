@@ -60,6 +60,8 @@ const mock = initGenerator()
 
 ## supplyRef - स्कीमा रेफरेंस से मिलान
 
+[▶ Playground में आज़माएँ](/hi/playground/?example=supply)
+
 `supply` एक ही Zod क्लास के सभी स्कीमा पर लागू होता है। यदि सिर्फ **एक खास जगह** को फिक्स करना हो, तो `supplyRef` का उपयोग करें - यह रेफरेंस की समानता (`===`) से मिलान करता है।
 
 ```ts
@@ -155,6 +157,8 @@ const mock = initGenerator().supplyPath([KEY], 7).generate(Schema)
 :::
 
 ## override - कस्टम जेनरेटर फंक्शन
+
+[▶ Playground में आज़माएँ](/hi/playground/?example=override)
 
 `supply` से अधिक लचीले कस्टमाइज़ेशन की आवश्यकता होने पर `override` का उपयोग करें। स्कीमा और ऑप्शन को आर्गुमेंट के रूप में प्राप्त करके, कस्टम वैल्यू लौटाने वाला फंक्शन परिभाषित कर सकते हैं।
 

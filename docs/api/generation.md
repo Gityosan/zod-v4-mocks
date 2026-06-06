@@ -34,6 +34,8 @@ const val = generator.generate(BrandedUserId)
 
 ## multiGenerate
 
+[▶ Try it in the Playground](/playground/?example=multi-generate)
+
 ```ts
 multiGenerate<T extends Record<string, z.ZodType>>(
   schemas: T
@@ -54,6 +56,8 @@ console.log(mocks.post) // { id: 123, title: "..." }
 
 ## generateMany
 
+[▶ Try it in the Playground](/playground/?example=discriminated-union)
+
 ```ts
 generateMany<T extends z.ZodType>(schema: T, count: number): z.infer<T>[]
 ```
@@ -69,7 +73,40 @@ const users = generator.generateMany(UserSchema, 10)
 
 This is the method behind the CLI's `--count` flag.
 
+## preflight
+
+```ts
+preflight(schema: z.core.$ZodType): PreflightDiagnostic[]
+```
+
+Runs the [pre-flight schema walk](/guide/configuration#preflightcheck) and
+returns its diagnostics **as data**, without throwing or mutating the
+generator. This is the read-only counterpart to the check that runs inside
+`generate()` — that one throws on error-level diagnostics and logs
+warning-level ones, whereas `preflight()` hands every diagnostic back so you
+can inspect a schema up front (tooling, linting, the
+[playground](/playground/)). Returns an empty array when `preflightCheck` is
+disabled.
+
+```ts
+const schema = z.object({
+  username: z.string().refine((s) => s.startsWith('@')),
+  score: z.number().min(100).max(10),
+})
+
+const diagnostics = generator.preflight(schema)
+// [
+//   { level: 'warning', path: 'username', message: 'A .refine() ... is ignored ...' },
+//   { level: 'warning', path: 'score',    message: 'Unsatisfiable number range ...' },
+// ]
+```
+
+Each `PreflightDiagnostic` has a `level` (`'error' | 'warning'`), the `path`
+to the offending node, and a human-readable `message`.
+
 ## factory
+
+[▶ Try it in the Playground](/playground/?example=factory)
 
 ```ts
 factory<T extends z.ZodType>(

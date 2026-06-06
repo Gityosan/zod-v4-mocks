@@ -60,6 +60,8 @@ const mock = initGenerator()
 
 ## supplyRef - Match by Schema Reference
 
+[▶ Try it in the Playground](/playground/?example=supply)
+
 `supply` targets every schema of a given Zod class. When you need to pin only **one specific occurrence**, use `supplyRef` to compare by reference (`===`).
 
 ```ts
@@ -155,6 +157,8 @@ value explicitly: `supplyPath(['name'], undefined)`.
 :::
 
 ## override - Custom Generator Functions
+
+[▶ Try it in the Playground](/playground/?example=override)
 
 Use `override` when you need more flexible customization than `supply`. You can define a function that takes a schema and options as arguments and returns a custom value.
 

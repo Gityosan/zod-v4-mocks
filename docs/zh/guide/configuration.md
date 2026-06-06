@@ -76,6 +76,8 @@ const results2 = Array.from({ length: 3 }, () => g2.generate(schema))
 
 ## locale（语言环境）
 
+[▶ 在 Playground 中试用](/zh/playground/?example=locale)
+
 指定 faker.js 的语言环境。可以指定单个字符串，也可以通过数组按优先级指定多个语言环境。
 
 ```ts
@@ -295,6 +297,8 @@ initGenerator({ customMockKey: 'zodMock' }).generate(Schema)
 
 ## keyMapping
 
+[▶ 在 Playground 中试用](/zh/playground/?example=key-mapping)
+
 属性名 → `faker` 函数的可选映射，仅对原始叶子 Schema（string / number / boolean / date）生效。默认 `'off'`。
 
 - `'off'` —— 不映射（默认行为）
@@ -348,6 +352,8 @@ initGenerator({ keyMapping: myMap }).generate(z.object({ sku: z.string() }))
 ```
 
 ## preflightCheck
+
+[▶ 在 Playground 中试用](/zh/playground/?example=preflight)
 
 在生成之前，库会对 Schema 进行预检遍历。默认 `true`。它检测生成器无法安全 mock 的结构，指出具体路径并尽早失败，或在存在最小修正方案时自动修复。可通过 `initGenerator({ preflightCheck: false })` 关闭。
 

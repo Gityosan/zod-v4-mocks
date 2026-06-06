@@ -32,6 +32,8 @@ yarn add zod-v4-mocks
 
 ## 基本用法
 
+[▶ 在 Playground 中试用](/zh/playground/?example=basic-object)
+
 ```ts
 import { z } from 'zod'
 import { initGenerator } from 'zod-v4-mocks'
@@ -120,6 +122,8 @@ gen1.generate(schema) === gen2.generate(schema) // true
 :::
 
 ## 复杂 Schema
+
+[▶ 在 Playground 中试用](/zh/playground/?example=nested-object)
 
 支持嵌套对象、数组、Record、Union 等复杂 Schema。
 

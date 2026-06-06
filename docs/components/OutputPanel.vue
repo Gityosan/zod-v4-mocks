@@ -1,11 +1,22 @@
 <script setup lang="ts">
+type PreflightDiagnostic = {
+  level: 'error' | 'warning'
+  path: string
+  message: string
+}
+
 defineProps<{
   result: string | null
   error: string | null
   isRunning: boolean
   parseResult: { success: boolean; error?: string } | null
+  preflightResult: PreflightDiagnostic[] | null
   runningText: string
   placeholderText: string
+  preflightText: string
+  noIssuesText: string
+  warningText: string
+  errorText: string
 }>()
 </script>
 
@@ -15,27 +26,56 @@ defineProps<{
       <span class="spinner" />
       {{ runningText }}
     </div>
-    <div v-else-if="error" class="output-error">
-      <div class="output-error-title">Error</div>
-      <pre class="output-error-message">{{ error }}</pre>
-    </div>
-    <div v-else-if="result" class="output-success">
-      <div v-if="parseResult" class="parse-result">
-        <span v-if="parseResult.success" class="parse-badge parse-badge-success">
-          schema.parse ✓
-        </span>
-        <details v-else class="parse-details">
-          <summary class="parse-badge parse-badge-fail">
-            schema.parse ✗
-          </summary>
-          <pre class="parse-error-detail">{{ parseResult.error }}</pre>
-        </details>
+    <template v-else>
+      <div v-if="preflightResult" class="preflight">
+        <div class="preflight-header">
+          <span class="preflight-label">{{ preflightText }}</span>
+          <span
+            v-if="preflightResult.length === 0"
+            class="preflight-badge preflight-badge-clean"
+          >
+            ✓ {{ noIssuesText }}
+          </span>
+        </div>
+        <ul v-if="preflightResult.length > 0" class="preflight-list">
+          <li
+            v-for="(d, i) in preflightResult"
+            :key="i"
+            class="preflight-item"
+            :class="`preflight-item-${d.level}`"
+          >
+            <span class="preflight-item-badge">
+              {{ d.level === 'error' ? errorText : warningText }}
+            </span>
+            <span class="preflight-item-body">
+              <code class="preflight-item-path">{{ d.path }}</code>
+              <span class="preflight-item-message">{{ d.message }}</span>
+            </span>
+          </li>
+        </ul>
       </div>
-      <pre class="output-json">{{ result }}</pre>
-    </div>
-    <div v-else class="output-placeholder">
-      {{ placeholderText }}
-    </div>
+      <div v-if="error" class="output-error">
+        <div class="output-error-title">Error</div>
+        <pre class="output-error-message">{{ error }}</pre>
+      </div>
+      <div v-else-if="result" class="output-success">
+        <div v-if="parseResult" class="parse-result">
+          <span v-if="parseResult.success" class="parse-badge parse-badge-success">
+            schema.parse ✓
+          </span>
+          <details v-else class="parse-details">
+            <summary class="parse-badge parse-badge-fail">
+              schema.parse ✗
+            </summary>
+            <pre class="parse-error-detail">{{ parseResult.error }}</pre>
+          </details>
+        </div>
+        <pre class="output-json">{{ result }}</pre>
+      </div>
+      <div v-else-if="!preflightResult" class="output-placeholder">
+        {{ placeholderText }}
+      </div>
+    </template>
   </div>
 </template>
 
@@ -138,6 +178,108 @@ defineProps<{
   word-break: break-word;
   max-height: 120px;
   overflow: auto;
+}
+
+.preflight {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--vp-c-divider);
+}
+
+.preflight-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.preflight-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--vp-c-text-3);
+}
+
+.preflight-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.preflight-badge-clean {
+  background: var(--vp-c-green-soft, rgba(16, 185, 129, 0.14));
+  color: var(--vp-c-green-1, #10b981);
+}
+
+.preflight-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.preflight-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: 4px;
+}
+
+.preflight-item-warning {
+  background: var(--vp-c-yellow-soft, rgba(234, 179, 8, 0.14));
+}
+
+.preflight-item-error {
+  background: var(--vp-c-red-soft, rgba(244, 63, 94, 0.14));
+}
+
+.preflight-item-badge {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.preflight-item-warning .preflight-item-badge {
+  background: var(--vp-c-yellow-1, #eab308);
+  color: var(--vp-c-bg, #fff);
+}
+
+.preflight-item-error .preflight-item-badge {
+  background: var(--vp-c-red-1, #f43f5e);
+  color: var(--vp-c-bg, #fff);
+}
+
+.preflight-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.preflight-item-path {
+  font-family: var(--vp-font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--vp-c-text-1);
+  background: none;
+  padding: 0;
+}
+
+.preflight-item-message {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--vp-c-text-2);
+  white-space: normal;
+  word-break: break-word;
 }
 
 .output-placeholder {
