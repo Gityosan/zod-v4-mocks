@@ -485,6 +485,38 @@ beforeEach(() => {
 
 `loadConfig()` is built on [`c12`](https://github.com/unjs/c12), so TS configs work out of the box and the resolved config is cached.
 
+### 13. MCP server (`npx zod-v4-mocks mcp`)
+
+Expose the generator over the [Model Context Protocol](https://modelcontextprotocol.io) so AI agents can generate mocks from your Zod schemas. The server speaks MCP over **stdio**:
+
+```bash
+npx zod-v4-mocks mcp
+```
+
+Register it with an MCP client (e.g. Claude Desktop, Cursor) by pointing the command at this package:
+
+```json
+{
+  "mcpServers": {
+    "zod-v4-mocks": {
+      "command": "npx",
+      "args": ["-y", "zod-v4-mocks", "mcp"]
+    }
+  }
+}
+```
+
+Four tools are exposed:
+
+- **`usage`** — no input. Explains the server, the file-path contract, and the typical workflow. Call this first if an agent is unsure how to proceed.
+- **`list_schemas`** — input `{ module }`. Lists the names of every Zod schema exported by a JS/ESM module. Use these as the `export` argument below.
+- **`preflight`** — input `{ module, export?, config?, profile? }`. Runs the pre-flight schema walk *without generating data* and reports constructs that cannot be safely mocked (`error`) or that may not satisfy `.parse()` / are auto-fixed (`warning`). Returns "no issues" for a clean schema. Handy to validate a schema before generating.
+- **`generate_mock`** — input `{ module, export?, count?, seed?, locale?, format?, pretty?, config?, profile? }`. Generates mock data and returns it serialised as `json` (default), `ts`, or `js`. `count > 1` yields an array.
+
+Schemas are referenced by **file path** (the same contract as the `generate` CLI command), because a Zod schema cannot be faithfully reconstructed from JSON. As with the CLI, point at a compiled `.js`/`.mjs` module — TypeScript files are not loaded directly. The server reuses the auto-discovered `zod-v4-mocks.config.{ts,js,mjs}` file when present.
+
+`@modelcontextprotocol/sdk` is an **optional dependency**. `npx` installs it automatically; if it is ever missing, the `mcp` command prints install instructions (`npm install @modelcontextprotocol/sdk`).
+
 ## Unsupported Schemas
 
 - `.catchall()` is ignored

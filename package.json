@@ -59,6 +59,9 @@
   "peerDependencies": {
     "zod": "^4.0.0"
   },
+  "optionalDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
   "dependencies": {
     "@faker-js/faker": "10.3.0",
     "c12": "4.0.0-beta.4",
