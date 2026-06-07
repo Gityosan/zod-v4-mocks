@@ -1,107 +1,21 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { dirname, extname, isAbsolute, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { existsSync, mkdirSync } from 'node:fs';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import { defineCommand, runMain } from 'citty';
 import { consola } from 'consola';
 import logUpdate from 'log-update';
-import type { z } from 'zod';
+import type { ConfigProfile } from './config';
+import type { MockGenerator } from './mock-generator';
 import {
-  type ConfigProfile,
-  getProfileFactory,
-  loadConfig,
-  type LoadedMockConfig,
-} from './config';
-import { initGenerator, type MockGenerator } from './mock-generator';
-import type { LocaleType, MockConfig } from './type';
-
-const FORMATS = ['json', 'ts', 'js', 'bin', 'greft'] as const;
-type Format = (typeof FORMATS)[number];
-
-const PROFILES = ['base', 'cli', 'test'] as const;
-
-function isFormat(value: string): value is Format {
-  return (FORMATS as readonly string[]).includes(value);
-}
-
-function readPkgVersion(): string {
-  try {
-    const url = new URL('../package.json', import.meta.url);
-    const pkg = JSON.parse(readFileSync(url, 'utf8')) as { version?: string };
-    return pkg.version ?? '0.0.0';
-  } catch {
-    return '0.0.0';
-  }
-}
-
-function isZodSchema(value: unknown): value is z.ZodType {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    '_zod' in value &&
-    'parse' in value &&
-    typeof (value as { parse: unknown }).parse === 'function'
-  );
-}
-
-async function loadSchema(
-  modulePath: string,
-  exportName: string | undefined,
-): Promise<z.ZodType> {
-  const abs = isAbsolute(modulePath)
-    ? modulePath
-    : resolve(process.cwd(), modulePath);
-  if (!existsSync(abs)) {
-    throw new Error(`Module not found: ${abs}`);
-  }
-  const ext = extname(abs);
-  if (ext === '.ts' || ext === '.tsx' || ext === '.mts' || ext === '.cts') {
-    throw new Error(
-      'TypeScript files are not loaded directly. Run via tsx, e.g.:\n' +
-        '  npx tsx node_modules/zod-v4-mocks/dist/cli.js generate ./schemas.ts User',
-    );
-  }
-  const url = pathToFileURL(abs).href;
-  const mod = (await import(url)) as Record<string, unknown>;
-  const value = exportName ? mod[exportName] : (mod.default ?? mod);
-  if (!value) {
-    throw new Error(
-      `Export "${exportName ?? 'default'}" not found in ${modulePath}`,
-    );
-  }
-  if (!isZodSchema(value)) {
-    throw new Error(
-      `Export "${exportName ?? 'default'}" is not a Zod schema (missing _zod / .parse).`,
-    );
-  }
-  return value;
-}
-
-function inferFormat(
-  format: string | undefined,
-  output: string | undefined,
-): Format {
-  if (format) {
-    if (isFormat(format)) return format;
-    throw new Error(
-      `Unknown format: ${format} (expected: ${FORMATS.join('|')})`,
-    );
-  }
-  if (output) {
-    const ext = extname(output).slice(1).toLowerCase();
-    if (isFormat(ext)) return ext;
-  }
-  return 'json';
-}
-
-function jsonReplacer(_key: string, value: unknown): unknown {
-  if (typeof value === 'bigint') return value.toString();
-  if (typeof value === 'symbol') return value.toString();
-  if (typeof value === 'undefined') return null;
-  if (value instanceof Map) return Object.fromEntries(value);
-  if (value instanceof Set) return Array.from(value);
-  return value;
-}
+  inferFormat,
+  isProfile,
+  jsonReplacer,
+  loadSchema,
+  PROFILES,
+  readPkgVersion,
+  resolveGenerator,
+  validateCount,
+} from './runner';
 
 const PROGRESS_THRESHOLD = 10;
 
@@ -197,49 +111,29 @@ async function runGenerate(args: {
   profile?: string;
 }): Promise<void> {
   const count = Number(args.count);
-  if (!Number.isFinite(count) || count < 0 || !Number.isInteger(count)) {
-    throw new Error(`--count must be a non-negative integer (got: ${args.count})`);
-  }
+  validateCount(count, args.count);
 
   const profile = (args.profile ?? 'cli') as ConfigProfile;
-  if (!(PROFILES as readonly string[]).includes(profile)) {
+  if (!isProfile(profile)) {
     throw new Error(
       `--profile must be one of ${PROFILES.join('|')} (got: ${args.profile})`,
     );
   }
 
-  const flagConfig: Partial<MockConfig> = {};
-  if (args.seed !== undefined) {
-    const n = Number(args.seed);
-    if (!Number.isFinite(n)) {
-      throw new Error(`--seed must be a number (got: ${args.seed})`);
-    }
-    flagConfig.seed = n;
+  const seed = args.seed !== undefined ? Number(args.seed) : undefined;
+  if (seed !== undefined && !Number.isFinite(seed)) {
+    throw new Error(`--seed must be a number (got: ${args.seed})`);
   }
-  if (args.locale) flagConfig.locale = args.locale as LocaleType;
 
   const schema = await loadSchema(args.module, args.export);
 
-  const loaded: LoadedMockConfig | null = await loadConfig({
-    configFile: args.config,
+  const gen: MockGenerator = await resolveGenerator({
+    seed,
+    locale: args.locale,
+    config: args.config,
+    profile,
+    onConfigInfo: args.silent ? undefined : (msg) => consola.info(msg),
   });
-
-  let gen: MockGenerator;
-  if (loaded) {
-    if (!args.silent) {
-      consola.info(
-        `Using config: ${loaded.configFile ?? '(unknown)'} (profile: ${profile})`,
-      );
-    }
-    gen = getProfileFactory(loaded, profile)();
-    if (Object.keys(flagConfig).length > 0) {
-      // CLI flags override config-file values for the well-known knobs
-      // they cover (seed, locale).
-      gen.updateConfig(flagConfig);
-    }
-  } else {
-    gen = initGenerator(flagConfig);
-  }
 
   let data: unknown;
   if (count > 1) {
@@ -302,6 +196,39 @@ async function runGenerate(args: {
   consola.success(`Wrote ${absOut}`);
 }
 
+const mcpCmd = defineCommand({
+  meta: {
+    name: 'mcp',
+    description:
+      'Start a Model Context Protocol (MCP) server over stdio so agents ' +
+      'can generate mocks from your Zod schemas.',
+  },
+  async run() {
+    // The MCP SDK is an optional dependency (it pulls a large tree that core
+    // library users don't need), and it is heavy to load, so it is imported
+    // lazily only when this command runs.
+    try {
+      const { startMcpServer } = await import('./mcp');
+      await startMcpServer();
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        /Cannot find (module|package)|ERR_MODULE_NOT_FOUND/.test(err.message) &&
+        err.message.includes('modelcontextprotocol')
+      ) {
+        consola.error(
+          'The MCP server requires "@modelcontextprotocol/sdk".\n' +
+            'Install it alongside zod-v4-mocks:\n' +
+            '  npm install @modelcontextprotocol/sdk',
+        );
+        process.exit(1);
+      }
+      consola.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+  },
+});
+
 const main = defineCommand({
   meta: {
     name: 'zod-v4-mocks',
@@ -310,6 +237,7 @@ const main = defineCommand({
   },
   subCommands: {
     generate: generateCmd,
+    mcp: mcpCmd,
   },
 });
 

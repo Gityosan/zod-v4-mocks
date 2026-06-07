@@ -28,7 +28,10 @@ export default defineConfig([
   },
   {
     ...shared,
-    entry: { cli: 'src/cli.ts' },
+    // `cli.ts` lazily `import()`s `./mcp`, so both share this build. The MCP
+    // SDK is externalised (optional dependency) and resolved from node_modules
+    // at runtime; only consumers that run `mcp` need it installed.
+    entry: { cli: 'src/cli.ts', mcp: 'src/mcp.ts' },
     dts: false,
   },
 ]);

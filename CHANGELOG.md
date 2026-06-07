@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.3.0] - 2026-05-31
+## [Unreleased]
 
 ### Added
 - Added `serializeGreft(data)` / `deserializeGreft<T>(input)` methods on `MockGenerator` — lossless binary serialization backed by [`greft-codec`](https://github.com/Gityosan/greft). Unlike the Node-only `serializeBinary` (v8), the `Uint8Array` output round-trips across any JS runtime and can also be decoded in other languages (Python / Rust / Go / …) via a greft-codec port — handy for reusing generated mocks as cross-language test fixtures. Preserves `Date` / `Map` / `Set` / `RegExp` / `BigInt` / `TypedArray` / `undefined` / circular references like `serializeBinary`, plus `Symbol` and `NaN` / `Infinity`
@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - `OutputOptions.binary` is now `boolean | 'v8' | 'greft'` (was `boolean`). Fully backward compatible: `true` continues to mean the Node-only `v8.serialize` backend
+
+## [3.3.0] - 2026-06-07
+
+### Added
+- Added an **MCP (Model Context Protocol) server** exposed via `npx zod-v4-mocks mcp` (stdio transport). Lets agents discover and generate mocks from your Zod schemas with four tools: `usage` (explains the server and workflow), `list_schemas` (lists the Zod schema exports in a module), `preflight` (reports constructs that cannot be safely mocked, without generating), and `generate_mock` (module path + export + `count`/`seed`/`locale`/`format`/`pretty`/`config`/`profile`). Schemas are referenced by file path — the same contract as the `generate` CLI command. `@modelcontextprotocol/sdk` is an `optionalDependency` (installed automatically by `npx`); if it is absent, the `mcp` command prints install instructions
 
 ## [3.2.0] - 2026-05-28
 
