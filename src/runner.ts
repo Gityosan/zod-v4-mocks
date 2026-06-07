@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { extname, isAbsolute, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { z } from 'zod';
@@ -18,6 +18,17 @@ import type { LocaleType, MockConfig } from './type';
  * which calls `runMain` on import) lets `mcp.ts` reuse them without triggering
  * the CLI entrypoint.
  */
+
+/** Read this package's version from its package.json (sibling of dist/). */
+export function readPkgVersion(): string {
+  try {
+    const url = new URL('../package.json', import.meta.url);
+    const pkg = JSON.parse(readFileSync(url, 'utf8')) as { version?: string };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
 
 export const FORMATS = ['json', 'ts', 'js', 'bin'] as const;
 export type Format = (typeof FORMATS)[number];

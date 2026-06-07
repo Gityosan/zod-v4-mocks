@@ -26,6 +26,8 @@ beforeAll(() => {
     `import { z } from '${ZOD}';
 export const User = z.object({ id: z.uuid(), name: z.string(), email: z.email() });
 export const Post = z.object({ title: z.string() });
+// Intersection of structurally incompatible types -> preflight error.
+export const Bad = z.intersection(z.string(), z.number());
 export const notASchema = 42;
 export default User;
 `,
@@ -115,13 +117,17 @@ function driveServer(
 const text = (res?: JsonRpcResponse) => res?.result?.content?.[0]?.text ?? '';
 
 describe.runIf(CAN_RUN)('MCP server', () => {
-  it('lists the generate_mock and list_schemas tools', async () => {
+  it('lists all four tools', async () => {
     const res = await driveServer([{ id: 1, method: 'tools/list' }]);
     const names = (
       res.get(1)?.result as unknown as { tools: { name: string }[] }
     ).tools.map((t) => t.name);
-    expect(names).toContain('generate_mock');
-    expect(names).toContain('list_schemas');
+    expect(names.sort()).toEqual([
+      'generate_mock',
+      'list_schemas',
+      'preflight',
+      'usage',
+    ]);
   });
 
   it('list_schemas returns only Zod schema exports', async () => {
@@ -134,7 +140,52 @@ describe.runIf(CAN_RUN)('MCP server', () => {
     ]);
     const lines = text(res.get(1)).split('\n').sort();
     // `default` is the default export (also a schema); `notASchema` is excluded.
-    expect(lines).toEqual(['Post', 'User', 'default']);
+    expect(lines).toEqual(['Bad', 'Post', 'User', 'default']);
+  });
+
+  it('usage explains the workflow and tools', async () => {
+    const res = await driveServer([
+      {
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'usage', arguments: {} },
+      },
+    ]);
+    const guide = text(res.get(1));
+    expect(guide).toMatch(/list_schemas/);
+    expect(guide).toMatch(/generate_mock/);
+    expect(guide).toMatch(/preflight/);
+  });
+
+  it('preflight reports no issues for a clean schema', async () => {
+    const res = await driveServer([
+      {
+        id: 1,
+        method: 'tools/call',
+        params: {
+          name: 'preflight',
+          arguments: { module: schemasPath, export: 'User' },
+        },
+      },
+    ]);
+    expect(res.get(1)?.result?.isError).toBeFalsy();
+    expect(text(res.get(1))).toMatch(/no preflight issues/i);
+  });
+
+  it('preflight flags an incompatible intersection as an error', async () => {
+    const res = await driveServer([
+      {
+        id: 1,
+        method: 'tools/call',
+        params: {
+          name: 'preflight',
+          arguments: { module: schemasPath, export: 'Bad' },
+        },
+      },
+    ]);
+    const report = text(res.get(1));
+    expect(report).toMatch(/\[error\]/);
+    expect(report).toMatch(/incompatible/i);
   });
 
   it('generate_mock produces a deterministic array for a given seed', async () => {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { defineCommand, runMain } from 'citty';
 import { consola } from 'consola';
@@ -12,19 +12,10 @@ import {
   jsonReplacer,
   loadSchema,
   PROFILES,
+  readPkgVersion,
   resolveGenerator,
   validateCount,
 } from './runner';
-
-function readPkgVersion(): string {
-  try {
-    const url = new URL('../package.json', import.meta.url);
-    const pkg = JSON.parse(readFileSync(url, 'utf8')) as { version?: string };
-    return pkg.version ?? '0.0.0';
-  } catch {
-    return '0.0.0';
-  }
-}
 
 const PROGRESS_THRESHOLD = 10;
 
