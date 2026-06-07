@@ -413,6 +413,9 @@ export const generateUtils = {
     options: GeneraterOptions,
     generator: CustomGeneratorType,
   ) => {
+    // An empty union (constructible since Zod 4.4.0) matches nothing — it is
+    // `never` in disguise, so there is no value to produce. Mirror z.never().
+    if (schema.options.length === 0) return OMIT_SYMBOL;
     const { faker } = options;
     const randomOption = faker.helpers.arrayElement(schema.options);
     const result = generator(randomOption, options);
@@ -423,6 +426,8 @@ export const generateUtils = {
     options: GeneraterOptions,
     generator: CustomGeneratorType,
   ) => {
+    // Empty discriminated union — nothing to discriminate on. See `union`.
+    if (schema.options.length === 0) return OMIT_SYMBOL;
     const { faker } = options;
     const randomOption = faker.helpers.arrayElement(schema.options);
     const result = generator(randomOption, options);
@@ -433,6 +438,8 @@ export const generateUtils = {
     options: GeneraterOptions,
     generator: CustomGeneratorType,
   ) => {
+    // Empty XOR matches nothing — `never` in disguise. See `union`.
+    if (schema.options.length === 0) return OMIT_SYMBOL;
     for (const selectedOption of schema.options) {
       let value = generator(selectedOption, options);
       value = regenerateIfOmitted(value, selectedOption, options, generator);
