@@ -485,6 +485,36 @@ beforeEach(() => {
 
 `loadConfig()` is built on [`c12`](https://github.com/unjs/c12), so TS configs work out of the box and the resolved config is cached.
 
+### 13. MCP server (`npx zod-v4-mocks mcp`)
+
+Expose the generator over the [Model Context Protocol](https://modelcontextprotocol.io) so AI agents can generate mocks from your Zod schemas. The server speaks MCP over **stdio**:
+
+```bash
+npx zod-v4-mocks mcp
+```
+
+Register it with an MCP client (e.g. Claude Desktop, Cursor) by pointing the command at this package:
+
+```json
+{
+  "mcpServers": {
+    "zod-v4-mocks": {
+      "command": "npx",
+      "args": ["-y", "zod-v4-mocks", "mcp"]
+    }
+  }
+}
+```
+
+Two tools are exposed:
+
+- **`list_schemas`** — input `{ module }`. Lists the names of every Zod schema exported by a JS/ESM module. Use these as the `export` argument below.
+- **`generate_mock`** — input `{ module, export?, count?, seed?, locale?, format?, pretty?, config?, profile? }`. Generates mock data and returns it serialised as `json` (default), `ts`, or `js`. `count > 1` yields an array.
+
+Schemas are referenced by **file path** (the same contract as the `generate` CLI command), because a Zod schema cannot be faithfully reconstructed from JSON. As with the CLI, point at a compiled `.js`/`.mjs` module — TypeScript files are not loaded directly. The server reuses the auto-discovered `zod-v4-mocks.config.{ts,js,mjs}` file when present.
+
+`@modelcontextprotocol/sdk` is an **optional dependency**. `npx` installs it automatically; if it is ever missing, the `mcp` command prints install instructions (`npm install @modelcontextprotocol/sdk`).
+
 ## Unsupported Schemas
 
 - `.catchall()` is ignored

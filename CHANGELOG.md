@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Added an **MCP (Model Context Protocol) server** exposed via `npx zod-v4-mocks mcp` (stdio transport). Lets agents discover and generate mocks from your Zod schemas with two tools: `generate_mock` (module path + export + `count`/`seed`/`locale`/`format`/`pretty`/`config`/`profile`) and `list_schemas` (lists the Zod schema exports in a module). Schemas are referenced by file path — the same contract as the `generate` CLI command. `@modelcontextprotocol/sdk` is an `optionalDependency` (installed automatically by `npx`); if it is absent, the `mcp` command prints install instructions
+
 ## [3.2.0] - 2026-05-28
 
 ### Added
