@@ -249,6 +249,46 @@ describe('preflight - invalid z.record key type', () => {
       initGenerator().generate(z.record(z.enum(['a', 'b']), z.number())),
     ).not.toThrow();
   });
+
+  it('accepts a transformed key whose concrete side is keyable', () => {
+    // Since Zod 4.4.0 record keys run their transforms. A key built from a
+    // keyable schema then transformed is generated and re-validated, so it
+    // must not be rejected by preflight.
+    const upper = z.record(
+      z.string().transform((s) => s.toUpperCase()),
+      z.number(),
+    );
+    const gen = initGenerator({ seed: 3 });
+    const result = gen.generate(upper);
+    expect(() => upper.parse(result)).not.toThrow();
+    for (const key of Object.keys(result)) {
+      expect(key).toBe(key.toUpperCase());
+    }
+
+    // string -> number transform: still keyable.
+    const lengths = z.record(
+      z.string().transform((s) => s.length),
+      z.boolean(),
+    );
+    expect(() => initGenerator({ seed: 1 }).generate(lengths)).not.toThrow();
+
+    // z.preprocess(..., z.string()) keeps the concrete side on the output.
+    const pre = z.record(
+      z.preprocess((v) => v, z.string()),
+      z.number(),
+    );
+    expect(() => initGenerator({ seed: 1 }).generate(pre)).not.toThrow();
+  });
+
+  it('throws a clear error when a key transform returns a non-keyable value', () => {
+    const Schema = z.record(
+      z.string().transform(() => ({})),
+      z.number(),
+    );
+    expect(() => initGenerator({ seed: 1 }).generate(Schema)).toThrow(
+      /cannot be an object key/,
+    );
+  });
 });
 
 describe('preflight - incompatible z.intersection', () => {
