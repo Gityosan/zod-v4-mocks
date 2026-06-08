@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.1] - 2026-06-08
+
 ### Fixed
 - Generating a mock for an empty union — `z.union([])`, `z.xor([])`, or `z.discriminatedUnion(key, [])`, all constructible since Zod 4.4.0 — no longer throws the internal `Cannot get value from empty dataset` error. An empty union matches nothing (it is `never` in disguise), so it is now handled like `z.never()`: the key is omitted inside an object, and a top-level empty union yields `undefined`
 
