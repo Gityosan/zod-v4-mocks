@@ -180,6 +180,17 @@ function isKeyableKeyType(keyType: z.core.$ZodType): boolean {
   if (safeInstanceof(core, z.ZodUnion)) {
     return core.options.every((o) => isKeyableKeyType(o));
   }
+  // A pipe key — e.g. z.string().transform(...) or z.preprocess(..., z.string())
+  // — produces its key from the concrete (non-transform) side and then runs the
+  // transform (record keys run their transforms since Zod 4.4.0). If that
+  // concrete side is keyable, generation can produce a key; whether the
+  // transform output is still string/number/symbol is verified at generation
+  // time by the record handler.
+  if (safeInstanceof(core, z.ZodPipe)) {
+    const { in: pipeIn, out: pipeOut } = core;
+    const concrete = safeInstanceof(pipeIn, z.ZodTransform) ? pipeOut : pipeIn;
+    return isKeyableKeyType(concrete);
+  }
   return KEYABLE_TYPES.has(core._zod.def.type);
 }
 
