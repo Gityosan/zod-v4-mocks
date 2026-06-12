@@ -5,16 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Added
-- Added `serializeGreft(data)` / `deserializeGreft<T>(input)` methods on `MockGenerator` — lossless binary serialization backed by [`greft-codec`](https://github.com/Gityosan/greft). Unlike the Node-only `serializeBinary` (v8), the `Uint8Array` output round-trips across any JS runtime and can also be decoded in other languages (Python / Rust / Go / …) via a greft-codec port — handy for reusing generated mocks as cross-language test fixtures. Preserves `Date` / `Map` / `Set` / `RegExp` / `BigInt` / `TypedArray` / `undefined` / circular references like `serializeBinary`, plus `Symbol` and `NaN` / `Infinity`
-- Added `binary: 'greft'` to `OutputOptions` (and a `greft` CLI format) — writes a sibling `.bin` encoded with greft-codec and an ESM wrapper that reconstructs it via `decode`. The `.bin` is a portable, cross-language artifact. The wrapper imports `decode` from the new `zod-v4-mocks/greft` subpath (a re-export of greft-codec), so consumers of the generated file only need `zod-v4-mocks` installed — not the transitive greft-codec dependency directly. The existing `binary: true` is unchanged and now also accepts the explicit alias `binary: 'v8'`
-- Added a `zod-v4-mocks/greft` export subpath that re-exports greft-codec's `decode` / `encode`. Used by `binary: 'greft'` wrappers, and available for hand-decoding `.bin` files without taking a direct greft-codec dependency
-- Added a `{ base64: true }` option to `serializeGreft` / `deserializeGreft` (new `GreftOptions` type). `serializeGreft(data, { base64: true })` returns a text-safe `string` instead of `Uint8Array` — pure data with no `node:fs` dependency that embeds directly in JSON / env vars while staying cross-language (any greft port can base64-decode then `decode`). `deserializeGreft(str, { base64: true })` reverses it (the string is treated as data, not a file path)
+## [4.0.0] - 2026-06-08
 
 ### Changed
-- `OutputOptions.binary` is now `boolean | 'v8' | 'greft'` (was `boolean`). Fully backward compatible: `true` continues to mean the Node-only `v8.serialize` backend
+- **BREAKING:** `serializeBinary(data)` now returns a `Uint8Array` encoded with [`greft-codec`](https://github.com/Gityosan/greft) instead of a Node `Buffer` from `v8.serialize`. The single binary backend is now greft-codec: the language-agnostic format round-trips across **any JS runtime** (no longer Node-only) and can be decoded in other languages (Python / Rust / Go / …) via a greft-codec port — ideal for reusing generated mocks as cross-language test fixtures. It also now preserves `Symbol` and `NaN` / `Infinity`, on top of the previous `Date` / `Map` / `Set` / `RegExp` / `BigInt` / `TypedArray` / `undefined` / circular references. The Node-only `v8.serialize` backend has been removed
+- **BREAKING:** `deserialize<T>(input)` now decodes the greft-codec format (`input` narrowed from `Buffer | Uint8Array | string` to `Uint8Array | string`; `Buffer` is still accepted as a `Uint8Array`). `.bin` files written by 3.x (`v8.serialize`) are **not** readable by 4.x and must be regenerated
+- **BREAKING:** `output({ binary: true })` (and the CLI `-f bin`) now write a greft-codec `.bin` and an ESM wrapper that `decode`s it. The wrapper imports `decode` from the new `zod-v4-mocks/greft` subpath (a re-export of greft-codec), so consumers of the generated file need `zod-v4-mocks` installed at runtime (the same package they generated it with) — never the transitive greft-codec dependency directly. In exchange the sibling `.bin` is a portable, cross-language artifact
+
+### Added
+- Added a `{ base64: true }` option to `serializeBinary` / `deserialize` (new `BinaryOptions` type). `serializeBinary(data, { base64: true })` returns a text-safe `string` instead of `Uint8Array` — pure data with no `node:fs` dependency that embeds directly in JSON / env vars while staying cross-language (any greft-codec port can base64-decode then `decode`). `deserialize(str, { base64: true })` reverses it (the string is treated as data, not a file path)
+- Added a `zod-v4-mocks/greft` export subpath that re-exports greft-codec's `decode` / `encode`. Used by `binary: true` wrappers, and available for hand-decoding `.bin` files without taking a direct greft-codec dependency
 
 ## [3.3.1] - 2026-06-08
 

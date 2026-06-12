@@ -196,21 +196,21 @@ describe.runIf(HAS_BUILD)('CLI - additional options', () => {
     expect(require('node:fs').statSync(out).size).toBeGreaterThan(0);
   });
 
-  itIfBuild('-f greft -o writes a wrapper + a greft-codec .bin', () => {
-    const out = join(tmp, 'users.ts');
-    const r = run(['generate', schemasPath, 'User', '-f', 'greft', '-o', out]);
+  itIfBuild('-f bin -o <name>.ts writes a wrapper importing zod-v4-mocks/greft + .bin', () => {
+    const out = join(tmp, 'users-wrapper.ts');
+    const r = run(['generate', schemasPath, 'User', '-f', 'bin', '-o', out]);
     expect(r.status).toBe(0);
     expect(existsSync(out)).toBe(true);
-    expect(existsSync(join(tmp, 'users.bin'))).toBe(true);
+    expect(existsSync(join(tmp, 'users-wrapper.bin'))).toBe(true);
     expect(require('node:fs').readFileSync(out, 'utf-8')).toContain(
       "from 'zod-v4-mocks/greft'",
     );
   });
 
-  itIfBuild('-f greft (stdout) writes a greft byte stream', () => {
+  itIfBuild('-f bin (stdout) writes a greft byte stream', () => {
     // The shared `run` helper decodes stdout as utf8, which would corrupt
     // binary; spawn directly with buffer encoding to inspect raw bytes.
-    const r = spawnSync('node', [CLI, 'generate', schemasPath, 'User', '-f', 'greft'], {
+    const r = spawnSync('node', [CLI, 'generate', schemasPath, 'User', '-f', 'bin'], {
       cwd: tmp,
       env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
     });

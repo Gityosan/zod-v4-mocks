@@ -8,8 +8,8 @@
 
 - **[生成](/ja/api/generation)** — `generate`, `multiGenerate`, `generateMany`, `factory`
 - **[カスタマイズ](/ja/api/customization)** — `supply`, `supplyRef`, `supplyPath`, `override`, `register`, `updateConfig`
-- **[シリアライズと出力](/ja/api/serialization)** — `serialize`, `serializeBinary`, `deserialize`, `serializeGreft`, `deserializeGreft`, `serializePortable`, `deserializePortable`, `output`
-- **[型定義](/ja/api/types)** — `MockConfig`, `CustomGeneratorType`, `GeneraterOptions`, `OutputOptions`, `GreftOptions`, `PortableOptions`, `PathSegment`、および re-export
+- **[シリアライズと出力](/ja/api/serialization)** — `serialize`, `serializeBinary`, `deserialize`, `serializePortable`, `deserializePortable`, `output`
+- **[型定義](/ja/api/types)** — `MockConfig`, `CustomGeneratorType`, `GeneraterOptions`, `OutputOptions`, `BinaryOptions`, `PortableOptions`, `PathSegment`、および re-export
 
 ## initGenerator
 
@@ -53,8 +53,8 @@ const generator = initGenerator({
 | `updateConfig` | `MockGenerator` | ✅ |
 | `generate` / `multiGenerate` / `generateMany` | データ | ❌ |
 | `factory` | `{ next, take }` | ❌ |
-| `serialize` / `serializeBinary` / `serializeGreft` / `serializePortable*` | `string` / `Buffer` / `Uint8Array` | ❌ |
-| `deserialize` / `deserializeGreft` / `deserializePortable` | データ | ❌ |
+| `serialize` / `serializeBinary` / `serializePortable*` | `string` / `Uint8Array` | ❌ |
+| `deserialize` / `deserializePortable` | データ | ❌ |
 | `output` | 出力パス `string` | ❌ |
 
 ```ts

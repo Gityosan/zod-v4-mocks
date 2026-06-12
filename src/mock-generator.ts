@@ -2,11 +2,10 @@ import { z } from 'zod';
 import { generateMocks } from './generate-from-schema';
 import type { CustomGeneratorType, GeneraterOptions, MockConfig } from './type';
 import {
+  type BinaryOptions,
   createGeneraterOptions,
   deserializeBinary,
-  deserializeGreft,
   deserializePortable,
-  type GreftOptions,
   makePathSupply,
   OMIT_SYMBOL,
   outputToFile,
@@ -18,7 +17,6 @@ import {
   regenerateIfOmitted,
   runPreflight,
   serializeBinary,
-  serializeGreft,
   serializeOutput,
   serializePortable,
   serializePortableAsync,
@@ -265,70 +263,48 @@ class MockGenerator {
   }
 
   /**
-   * Serialize data to a binary Buffer using Node.js's structured clone
-   * algorithm (`v8.serialize`). Preserves Date, Map, Set, RegExp, BigInt,
-   * TypedArray, `undefined`, and circular references with no information loss.
-   * The result is only readable in a Node.js environment. For a cross-runtime /
-   * cross-language binary, use `serializeGreft` instead.
-   */
-  serializeBinary(data: unknown): Buffer {
-    return serializeBinary(data);
-  }
-
-  /**
-   * Deserialize a Buffer (or `.bin` file path) produced by `serializeBinary`
-   * or `output({ binary: true })` back into the original JavaScript value.
-   *
-   * Pass a generic type parameter to cast the result, e.g.
-   * `generator.deserialize<User>('./user.bin')`.
-   */
-  deserialize<T = unknown>(input: Buffer | Uint8Array | string): T {
-    return deserializeBinary<T>(input);
-  }
-
-  /**
    * Serialize data to a binary `Uint8Array` using
    * [`greft-codec`](https://github.com/Gityosan/greft)'s language-agnostic
    * lossless format. Preserves Date, Map, Set, RegExp, BigInt, TypedArray,
    * Symbol, `undefined`, `NaN`/`Infinity`, and circular/shared references with
    * no information loss.
    *
-   * Unlike `serializeBinary` (Node-only `v8.serialize`), the result round-trips
-   * across any JS runtime and can also be decoded in other languages (Python /
-   * Rust / Go / …) via a greft-codec port — handy for reusing mock data as a
-   * cross-language test fixture. Decode it back with `deserializeGreft`.
+   * The result round-trips across any JS runtime and can also be decoded in
+   * other languages (Python / Rust / Go / …) via a greft-codec port — handy for
+   * reusing mock data as a cross-language test fixture. Decode it back with
+   * `deserialize`.
    *
    * Pass `{ base64: true }` to get a text-safe `string` instead — pure data
    * with no `node:fs` dependency, embeddable in JSON / env vars, still
    * cross-language.
    */
-  serializeGreft(data: unknown, options?: { base64?: false }): Uint8Array;
-  serializeGreft(data: unknown, options: { base64: true }): string;
-  serializeGreft(data: unknown, options?: GreftOptions): Uint8Array | string {
+  serializeBinary(data: unknown, options?: { base64?: false }): Uint8Array;
+  serializeBinary(data: unknown, options: { base64: true }): string;
+  serializeBinary(data: unknown, options?: BinaryOptions): Uint8Array | string {
     return options?.base64
-      ? serializeGreft(data, { base64: true })
-      : serializeGreft(data);
+      ? serializeBinary(data, { base64: true })
+      : serializeBinary(data);
   }
 
   /**
    * Deserialize bytes (`Uint8Array`/`Buffer`, or a `.bin` file path) produced
-   * by `serializeGreft` or `output({ binary: 'greft' })` back into the
-   * original JavaScript value. Pass `{ base64: true }` to decode a base64
-   * string from `serializeGreft(data, { base64: true })` (treated as data, not
-   * a file path).
+   * by `serializeBinary` or `output({ binary: true })` back into the original
+   * JavaScript value. Pass `{ base64: true }` to decode a base64 string from
+   * `serializeBinary(data, { base64: true })` (treated as data, not a file
+   * path).
    *
    * Pass a generic type parameter to cast the result, e.g.
-   * `generator.deserializeGreft<User>('./user.bin')`.
+   * `generator.deserialize<User>('./user.bin')`.
    */
-  deserializeGreft<T = unknown>(input: Uint8Array | string): T;
-  deserializeGreft<T = unknown>(input: string, options: { base64: true }): T;
-  deserializeGreft<T = unknown>(
+  deserialize<T = unknown>(input: Uint8Array | string): T;
+  deserialize<T = unknown>(input: string, options: { base64: true }): T;
+  deserialize<T = unknown>(
     input: Uint8Array | string,
-    options?: GreftOptions,
+    options?: BinaryOptions,
   ): T {
     return options?.base64
-      ? deserializeGreft<T>(input as string, { base64: true })
-      : deserializeGreft<T>(input);
+      ? deserializeBinary<T>(input as string, { base64: true })
+      : deserializeBinary<T>(input);
   }
 
   /**

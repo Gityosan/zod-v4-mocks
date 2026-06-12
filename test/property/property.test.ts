@@ -187,8 +187,8 @@ describe('portable round-trip: deserializePortable(serializePortable(x)) deep-eq
 });
 
 /**
- * The v8 binary path (Node-only) must round-trip the same value space —
- * hardening `serializeBinary` / `deserialize`, previously only example-tested.
+ * The greft-codec binary path (cross-runtime / cross-language) must round-trip
+ * the same value space — hardening `serializeBinary` / `deserialize`.
  */
 describe('binary round-trip: deserialize(serializeBinary(x)) deep-equals x', () => {
   it('round-trips arbitrary generated mocks', () => {
@@ -197,23 +197,6 @@ describe('binary round-trip: deserialize(serializeBinary(x)) deep-equals x', () 
         const g = initGenerator(config);
         const value = g.generate(schema);
         expect(g.deserialize(g.serializeBinary(value))).toStrictEqual(value);
-      }),
-      { numRuns: 200 },
-    );
-  });
-});
-
-/**
- * The greft-codec path (cross-runtime / cross-language) must round-trip the
- * same value space — hardening `serializeGreft` / `deserializeGreft`.
- */
-describe('greft round-trip: deserializeGreft(serializeGreft(x)) deep-equals x', () => {
-  it('round-trips arbitrary generated mocks', () => {
-    fc.assert(
-      fc.property(zodSchema, safeConfig, (schema, config) => {
-        const g = initGenerator(config);
-        const value = g.generate(schema);
-        expect(g.deserializeGreft(g.serializeGreft(value))).toStrictEqual(value);
       }),
       { numRuns: 200 },
     );

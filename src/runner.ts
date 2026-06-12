@@ -30,7 +30,7 @@ export function readPkgVersion(): string {
   }
 }
 
-export const FORMATS = ['json', 'ts', 'js', 'bin', 'greft'] as const;
+export const FORMATS = ['json', 'ts', 'js', 'bin'] as const;
 export type Format = (typeof FORMATS)[number];
 
 export const PROFILES = ['base', 'cli', 'test'] as const;
@@ -185,14 +185,14 @@ export function validateCount(count: number, raw?: string): void {
 }
 
 /**
- * Serialise generated data to a string in one of the textual formats. The
- * binary formats (`bin`, `greft`) are intentionally excluded — they are
- * handled separately by callers that can write bytes.
+ * Serialise generated data to a string in one of the textual formats. `bin` is
+ * intentionally excluded — binary output is handled separately by callers that
+ * can write bytes.
  */
 export function serializeData(
   gen: MockGenerator,
   data: unknown,
-  format: Exclude<Format, 'bin' | 'greft'>,
+  format: Exclude<Format, 'bin'>,
   pretty: boolean,
 ): string {
   if (format === 'json') {

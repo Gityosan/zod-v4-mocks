@@ -8,13 +8,15 @@
 | मेथड | आउटपुट | रनटाइम | सुरक्षित रखता है | बिना हानि राउंड-ट्रिप |
 |--------|--------|---------|-----------|---------------------|
 | `serialize` | `.ts` / `.js` / `.json` सोर्स स्ट्रिंग | कोई भी (केवल स्ट्रिंग) | ts/js में Date, BigInt, Map, Set, Symbol, File, Blob | ❌ (सोर्स टेक्स्ट, JSON टाइप खो देता है) |
-| `serializeBinary` | `Buffer` (`v8.serialize`) | **केवल Node** | Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, सर्कुलर रेफ़रेंस | ✅ |
-| `serializePortable` | पोर्टेबल स्ट्रिंग (seroval) | **कोई भी** (Node ↔ ब्राउज़र) | उपरोक्त **+** `NaN`/`Infinity`, साझा रेफ़रेंस, `Symbol`, URL/URLSearchParams/Headers | ✅ |
+| `serializeBinary` | `Uint8Array` (`greft-codec`) | **कोई भी** (Node ↔ ब्राउज़र ↔ अन्य भाषाएँ) | Date, Map, Set, RegExp, BigInt, TypedArray, Symbol, `undefined`, `NaN`/`Infinity`, सर्कुलर/साझा रेफ़रेंस | ✅ |
+| `serializePortable` | पोर्टेबल स्ट्रिंग (seroval) | **कोई भी** (Node ↔ ब्राउज़र) | उपरोक्त **+** URL/URLSearchParams/Headers | ✅ |
 | `output` | डिस्क पर फ़ाइल | **केवल Node** | एक्सटेंशन पर निर्भर (नीचे देखें) | ✅ `binary: true` के साथ |
 
-अंगूठे का नियम: मानव-पठनीय fixtures के लिए **`serialize`**, बिना हानि केवल-Node ब्लॉब के लिए
-**`serializeBinary`**, और जब डेटा को रनटाइम के बीच पार करना हो (जैसे Node में जनरेट किया गया,
-ब्राउज़र में hydrate किया गया) तब **`serializePortable`**।
+अंगूठे का नियम: मानव-पठनीय fixtures के लिए **`serialize`**, किसी भी JS रनटाइम में (या
+[greft-codec](https://github.com/Gityosan/greft) पोर्ट के ज़रिए Python / Rust / Go में भी)
+डिकोड होने वाले कॉम्पैक्ट बिना-हानि ब्लॉब के लिए **`serializeBinary`** (टेक्स्ट-सुरक्षित
+स्ट्रिंग के लिए `{ base64: true }`), और `URL`/`Headers` सहित JS↔JS राउंड-ट्रिप करने वाले
+प्लेन-टेक्स्ट के लिए **`serializePortable`**।
 
 ## serialize
 
@@ -42,30 +44,41 @@ const content = generator.serialize(data, {
 ## serializeBinary
 
 ```ts
-serializeBinary(data: unknown): Buffer
+serializeBinary(data: unknown): Uint8Array
+serializeBinary(data: unknown, options: { base64: true }): string
 ```
 
-Node.js के स्ट्रक्चर्ड क्लोन एल्गोरिथ्म (`v8.serialize`) का उपयोग करके डेटा को बाइनरी `Buffer` में सीरियलाइज़ करता है। `Date`, `Map`, `Set`, `RegExp`, `BigInt`, `TypedArray`, `undefined` और सर्कुलर रेफ़रेंस को बिना किसी जानकारी हानि के सुरक्षित रखता है। परिणाम केवल Node.js एनवायरनमेंट में `deserialize` (या `v8.deserialize`) के ज़रिए पढ़ा जा सकता है।
+[greft-codec](https://github.com/Gityosan/greft) के भाषा-अज्ञेय बिना-हानि फ़ॉर्मैट का उपयोग करके डेटा को बाइनरी `Uint8Array` में सीरियलाइज़ करता है। `Date`, `Map`, `Set`, `RegExp`, `BigInt`, `TypedArray`, `Symbol`, `undefined`, `NaN`/`Infinity` और सर्कुलर/साझा रेफ़रेंस को बिना किसी जानकारी हानि के सुरक्षित रखता है। परिणाम **किसी भी JS रनटाइम** में राउंड-ट्रिप करता है और greft-codec पोर्ट के ज़रिए अन्य भाषाओं (Python / Rust / Go आदि) में भी डिकोड किया जा सकता है — मॉक डेटा को क्रॉस-लैंग्वेज टेस्ट fixture के रूप में पुनः उपयोग करने के लिए आदर्श।
+
+`{ base64: true }` पास करने पर कच्चे बाइट्स के बजाय एक टेक्स्ट-सुरक्षित **स्ट्रिंग** लौटती है। यह स्ट्रिंग शुद्ध डेटा है (कोई `node:fs` निर्भरता नहीं), इसलिए इसे सीधे JSON, env var, या बाइनरी न स्वीकारने वाले किसी भी ट्रांसपोर्ट में एम्बेड किया जा सकता है, और यह क्रॉस-लैंग्वेज बनी रहती है (कोई भी greft पोर्ट base64 डिकोड करके `decode` कर सकता है)।
 
 ```ts
 const data = generator.generate(schema)
-const buf = generator.serializeBinary(data) // Buffer
+const bytes = generator.serializeBinary(data) // Uint8Array
+
+// क्रॉस-लैंग्वेज + node-मुक्त: base64 स्ट्रिंग को कहीं भी एम्बेड करें (जैसे JSON)
+const fixture = JSON.stringify({ $mock: generator.serializeBinary(data, { base64: true }) })
 ```
 
 ## deserialize
 
 ```ts
-deserialize<T = unknown>(input: Buffer | Uint8Array | string): T
+deserialize<T = unknown>(input: Uint8Array | string): T
+deserialize<T = unknown>(input: string, options: { base64: true }): T
 ```
 
-`serializeBinary` या `output({ binary: true })` से पहले सीरियलाइज़ किए गए मान को पुनर्स्थापित करता है। `Buffer`/`Uint8Array` या `.bin` फ़ाइल का पथ पास करें। परिणाम को टाइप करने के लिए एक जेनेरिक टाइप पैरामीटर पास करें।
+`serializeBinary` या `output({ binary: true })` से पहले सीरियलाइज़ किए गए मान को पुनर्स्थापित करता है। `Uint8Array`/`Buffer` या `.bin` फ़ाइल का पथ पास करें। `{ base64: true }` पास करने पर `serializeBinary(data, { base64: true })` से मिली base64 स्ट्रिंग को डिकोड करता है (तब स्ट्रिंग को फ़ाइल पथ नहीं, डेटा माना जाता है)। परिणाम को टाइप करने के लिए एक जेनेरिक टाइप पैरामीटर पास करें।
 
 ```ts
 // जेनेरिक पैरामीटर के ज़रिए परिणाम को टाइप करें
 const restored = generator.deserialize<User>('./mocks/user.bin')
 
-// Buffer से
+// बाइट्स से
 const restored = generator.deserialize<User>(generator.serializeBinary(data))
+
+// JSON से निकाली गई base64 स्ट्रिंग से (किसी भी JS रनटाइम में)
+const { $mock } = JSON.parse(fixture)
+const restored = generator.deserialize<User>($mock, { base64: true })
 ```
 
 ## serializePortable / serializePortableAsync
@@ -77,7 +90,7 @@ serializePortable(data: unknown, options?: PortableOptions): string
 serializePortableAsync(data: unknown, options?: PortableOptions): Promise<string>
 ```
 
-[seroval](https://github.com/lxsmnsyc/seroval) के ज़रिए डेटा को एक **पोर्टेबल स्ट्रिंग** में सीरियलाइज़ करता है। `serializeBinary` (केवल Node का `v8`) के विपरीत, परिणाम **किसी भी JS रनटाइम** के बीच राउंड-ट्रिप करता है — Node↔ब्राउज़र और ब्राउज़र↔ब्राउज़र। यह `Date`, `RegExp`, `Map`, `Set`, `BigInt`, `TypedArray`, `undefined`, `NaN`/`Infinity`, सर्कुलर/साझा रेफ़रेंस, और (बंडल किए गए प्लगइन्स के ज़रिए) `URL`, `URLSearchParams`, `Headers` को सुरक्षित रखता है।
+[seroval](https://github.com/lxsmnsyc/seroval) के ज़रिए डेटा को एक **पोर्टेबल स्ट्रिंग** में सीरियलाइज़ करता है। `serializeBinary` की तरह परिणाम **किसी भी JS रनटाइम** के बीच राउंड-ट्रिप करता है — Node↔ब्राउज़र और ब्राउज़र↔ब्राउज़र, पर यह बाइनरी नहीं बल्कि (केवल JS वाला) प्लेन टेक्स्ट है, इसलिए तब उपयोगी है जब payload को `URL`/`URLSearchParams`/`Headers` सहित JSON, env var या HTTP हेडर में रखना हो। यह `Date`, `RegExp`, `Map`, `Set`, `BigInt`, `TypedArray`, `undefined`, `NaN`/`Infinity`, सर्कुलर/साझा रेफ़रेंस, और (बंडल किए गए प्लगइन्स के ज़रिए) `URL`, `URLSearchParams`, `Headers` को सुरक्षित रखता है। (क्रॉस-**लैंग्वेज** या JS eval के बिना टेक्स्ट-सुरक्षित payload के लिए `serializeBinary` को प्राथमिकता दें — ज़रूरत हो तो `{ base64: true }` के साथ।)
 
 `File`, `Blob`, और `FormData` अपने बाइट्स को एसिंक्रोनस रूप से पढ़ते हैं, इसलिए वे केवल `serializePortableAsync` के ज़रिए राउंड-ट्रिप करते हैं (सिंक्रोनस संस्करण इनसे मिलने पर एक स्पष्ट एरर फेंकता है जो एसिंक्रोनस संस्करण की ओर इशारा करता है)।
 
@@ -142,11 +155,13 @@ generator.output(data, { path: './mocks/user.ts' })
 generator.output(data, { path: './mocks/user.js' })
 
 // `binary: true` — ts/js आउटपुट के लिए, एक हल्का ESM रैपर और साथ में एक
-// <name>.bin (v8.serialize द्वारा बनाई गई) लिखता है। रैपर इम्पोर्ट के समय उस .bin को
-// आलस्यपूर्वक डिसीरियलाइज़ करता है, इसलिए मॉड्यूल सामान्य `import { mockData }` जैसा ही
-// व्यवहार करता है, पर Date / Map / Set / RegExp / BigInt / TypedArray / undefined /
-// सर्कुलर रेफ़रेंस को बिना हानि के सुरक्षित रखता है। एक्सपोर्ट किया गया मान `unknown` टाइप का होता है;
-// उपभोक्ता पक्ष पर कास्ट करें या टाइपिंग ज़रूरी होने पर सीधे `deserialize<T>()` का उपयोग करें।
+// <name>.bin (greft-codec से एनकोडेड) लिखता है। रैपर इम्पोर्ट के समय उस .bin को
+// आलस्यपूर्वक `decode` करता है, इसलिए मॉड्यूल सामान्य `import { mockData }` जैसा ही व्यवहार
+// करता है, पर Date / Map / Set / RegExp / BigInt / TypedArray / Symbol / undefined /
+// NaN/Infinity / सर्कुलर रेफ़रेंस को बिना हानि के सुरक्षित रखता है। यह .bin क्रॉस-लैंग्वेज
+// आर्टिफ़ैक्ट है (किसी भी JS रनटाइम, या greft-codec पोर्ट के ज़रिए Python / Rust / Go में डिकोड)।
+// रैपर `zod-v4-mocks/greft` से `decode` इम्पोर्ट करता है, इसलिए उपभोक्ता को केवल zod-v4-mocks
+// चाहिए, सीधे greft-codec नहीं। एक्सपोर्ट मान `unknown` टाइप का है; कास्ट करें या `deserialize<T>()` लें।
 generator.output(data, { path: './mocks/user.ts', binary: true })
 generator.output(data, { path: './mocks/user.js', binary: true })
 
@@ -178,7 +193,7 @@ type OutputOptions = {
 | एक्सटेंशन | फॉर्मेट | विशेष टाइप का हैंडलिंग |
 |--------|------|-------------|
 | `.ts` / `.js` | `export const <exportName> = ...` | Date, BigInt, Map, Set, Symbol, File, Blob को सटीक रूप से सीरियलाइज़ करता है |
-| `.ts` / `.js` + `binary: true` | ESM रैपर + साथ में `.bin` (v8 स्ट्रक्चर्ड क्लोन) | Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, सर्कुलर रेफ़रेंस को सुरक्षित रखता है। रैपर मान को `unknown` के रूप में एक्सपोर्ट करता है; उपभोक्ता पक्ष पर कास्ट करें या टाइपिंग के लिए `deserialize<T>()` का उपयोग करें। केवल Node.js। |
+| `.ts` / `.js` + `binary: true` | ESM रैपर + साथ में `.bin` (greft-codec) | Date, Map, Set, RegExp, BigInt, TypedArray, Symbol, `undefined`, `NaN`/`Infinity`, सर्कुलर/साझा रेफ़रेंस को सुरक्षित रखता है। यह `.bin` क्रॉस-लैंग्वेज है (किसी भी JS रनटाइम, या greft-codec पोर्ट के ज़रिए Python / Rust / Go में डिकोड)। रैपर `zod-v4-mocks/greft` से `decode` इम्पोर्ट करता है, इसलिए उपभोक्ता को केवल `zod-v4-mocks` चाहिए (सीधे greft-codec नहीं)। मान `unknown` के रूप में एक्सपोर्ट; कास्ट करें या `deserialize<T>()` लें। |
 | `.ts` / `.js` + `portable: true` (**`outputAsync`**) | इनलाइन `export const <name> = <seroval एक्सप्रेशन>` | क्रॉस-रनटाइम (Node↔ब्राउज़र), कोई sibling फ़ाइल नहीं और consumer पर कोई निर्भरता नहीं। File/Blob/FormData की **सामग्री**, Date, Map, Set, BigInt, TypedArray, सर्कुलर/साझा रेफ़रेंस सुरक्षित। **`Symbol` नहीं।** |
 | `.json` | JSON | Date ISO स्ट्रिंग के रूप में, BigInt स्ट्रिंग में, Map/Set/Symbol में जानकारी का नुकसान (चेतावनी सहित)। `binary` अनदेखा किया जाता है। |
 
@@ -189,10 +204,10 @@ JSON में प्रस्तुत न किए जा सकने वा
 ::: info `binary: true` (बिना हानि राउंड-ट्रिप)
 `binary: true` के साथ, `output()` दो फ़ाइलें लिखता है:
 
-- `<name>.bin` — कच्चा `v8.serialize` Buffer। Zod जो भी मान बना सकता है उन सभी को, सर्कुलर रेफ़रेंस सहित, पूर्ण रूप से सुरक्षित रखता है।
-- `<name>.ts` / `<name>.js` — एक हल्का ESM रैपर जो इम्पोर्ट के समय साथ वाली `.bin` को आलस्यपूर्वक `v8.deserialize` करता है, इसलिए उपभोक्ता केवल `import { mockData } from './user'` करते हैं और बाइनरी प्रतिनिधित्व से अनजान रहते हैं।
+- `<name>.bin` — एक [greft-codec](https://github.com/Gityosan/greft) बाइट स्ट्रीम, जिसे किसी भी JS रनटाइम (या पोर्ट के ज़रिए Python / Rust / Go) में डिकोड किया जा सकता है। Zod जो भी मान बना सकता है उन सभी को — `Symbol`, `NaN`/`Infinity` और सर्कुलर रेफ़रेंस सहित — पूर्ण रूप से सुरक्षित रखता है।
+- `<name>.ts` / `<name>.js` — एक हल्का ESM रैपर जो इम्पोर्ट के समय साथ वाली `.bin` को आलस्यपूर्वक `decode` करता है, इसलिए उपभोक्ता केवल `import { mockData } from './user'` करते हैं और बाइनरी प्रतिनिधित्व से अनजान रहते हैं।
 
-रैपर मान को `unknown` के रूप में एक्सपोर्ट करता है; उपभोक्ता पक्ष पर कास्ट करें, या रैपर के बिना टाइप किया हुआ मान चाहने पर सीधे `deserialize<T>('./user.bin')` कॉल करें। `.bin` फ़ाइल का नाम हमेशा रैपर के बेसनेम से प्राप्त होता है और अलग से कस्टमाइज़ नहीं किया जा सकता। रैपर ESM (`import.meta.dirname`) को लक्षित करता है और Node.js 20.11+ की आवश्यकता है।
+रैपर `zod-v4-mocks/greft` (greft-codec का री-एक्सपोर्ट) से `decode` इम्पोर्ट करता है, इसलिए उपभोक्ता को केवल `zod-v4-mocks` चाहिए (वही पैकेज जिससे फ़ाइल जनरेट की गई), ट्रांज़िटिव greft-codec निर्भरता सीधे नहीं। रैपर मान को `unknown` के रूप में एक्सपोर्ट करता है; उपभोक्ता पक्ष पर कास्ट करें, या रैपर के बिना टाइप किया हुआ मान चाहने पर सीधे `deserialize<T>('./user.bin')` कॉल करें। `.bin` फ़ाइल का नाम हमेशा रैपर के बेसनेम से प्राप्त होता है और अलग से कस्टमाइज़ नहीं किया जा सकता। रैपर ESM (`import.meta.dirname`) को लक्षित करता है और Node.js 20.11+ की आवश्यकता है।
 :::
 
 ## outputAsync
@@ -203,7 +218,7 @@ outputAsync(data: unknown, options?: OutputOptions): Promise<string>
 
 `output` का एसिंक्रोनस समकक्ष। `{ portable: true }` के लिए आवश्यक है, क्योंकि `File`/`Blob`/`FormData` के बाइट्स एसिंक्रोनस रूप से पढ़े जाते हैं। non-portable मोड (`json` / `ts` / `js` / `binary`) `output` जैसा ही व्यवहार करते हैं, बस एसिंक्रोनस fs से लिखते हैं। आउटपुट पथ लौटाता है।
 
-`portable: true` (ts/js) के साथ यह एक स्व-निहित, क्रॉस-रनटाइम एक्सप्रेशन इनलाइन करता है — `export const <name> = <seroval एक्सप्रेशन>` — जिसे किसी भी JS रनटाइम (Node↔ब्राउज़र) में सामान्य `import` से पुनर्स्थापित किया जा सकता है। `binary: true` (केवल Node का v8 + sibling `.bin`) के विपरीत, **कोई sibling फ़ाइल नहीं और उपभोक्ता के लिए कोई रनटाइम निर्भरता नहीं**, और `File`/`Blob`/`FormData` अपनी **सामग्री सहित** राउंड-ट्रिप करते हैं, साथ ही Date, Map, Set, BigInt, TypedArray और सर्कुलर/साझा रेफ़रेंस भी।
+`portable: true` (ts/js) के साथ यह एक स्व-निहित, क्रॉस-रनटाइम एक्सप्रेशन इनलाइन करता है — `export const <name> = <seroval एक्सप्रेशन>` — जिसे किसी भी JS रनटाइम (Node↔ब्राउज़र) में सामान्य `import` से पुनर्स्थापित किया जा सकता है। `binary` (जो एक sibling `.bin` लिखता है) के विपरीत, **कोई sibling फ़ाइल नहीं**, और `File`/`Blob`/`FormData` अपनी **सामग्री सहित** राउंड-ट्रिप करते हैं, साथ ही Date, Map, Set, BigInt, TypedArray और सर्कुलर/साझा रेफ़रेंस भी।
 
 ```ts
 const data = generator.generate(schema)

@@ -8,8 +8,8 @@ This reference is split into focused pages:
 
 - **[Generation](/api/generation)** — `generate`, `multiGenerate`, `generateMany`, `factory`
 - **[Customization](/api/customization)** — `supply`, `supplyRef`, `supplyPath`, `override`, `register`, `updateConfig`
-- **[Serialization & Output](/api/serialization)** — `serialize`, `serializeBinary`, `deserialize`, `serializeGreft`, `deserializeGreft`, `serializePortable`, `deserializePortable`, `output`
-- **[Types](/api/types)** — `MockConfig`, `CustomGeneratorType`, `GeneraterOptions`, `OutputOptions`, `GreftOptions`, `PortableOptions`, `PathSegment`, and re-exports
+- **[Serialization & Output](/api/serialization)** — `serialize`, `serializeBinary`, `deserialize`, `serializePortable`, `deserializePortable`, `output`
+- **[Types](/api/types)** — `MockConfig`, `CustomGeneratorType`, `GeneraterOptions`, `OutputOptions`, `BinaryOptions`, `PortableOptions`, `PathSegment`, and re-exports
 
 ## initGenerator
 
@@ -54,8 +54,8 @@ be chained. The terminal methods — those that produce data or strings — do n
 | `updateConfig` | `MockGenerator` | ✅ |
 | `generate` / `multiGenerate` / `generateMany` | data | ❌ |
 | `factory` | `{ next, take }` | ❌ |
-| `serialize` / `serializeBinary` / `serializeGreft` / `serializePortable*` | `string` / `Buffer` / `Uint8Array` | ❌ |
-| `deserialize` / `deserializeGreft` / `deserializePortable` | data | ❌ |
+| `serialize` / `serializeBinary` / `serializePortable*` | `string` / `Uint8Array` | ❌ |
+| `deserialize` / `deserializePortable` | data | ❌ |
 | `output` | output path `string` | ❌ |
 
 ```ts

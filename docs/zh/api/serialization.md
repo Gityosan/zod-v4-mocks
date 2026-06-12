@@ -7,11 +7,11 @@
 | 方法 | 输出 | 运行时 | 保留 | 无损往返 |
 |--------|--------|---------|-----------|---------------------|
 | `serialize` | `.ts` / `.js` / `.json` 源码字符串 | 任意（仅字符串） | 在 ts/js 中保留 Date、BigInt、Map、Set、Symbol、File、Blob | ❌（源码文本，JSON 会丢失类型） |
-| `serializeBinary` | `Buffer`（`v8.serialize`） | **仅限 Node** | Date、Map、Set、RegExp、BigInt、TypedArray、`undefined`、循环引用 | ✅ |
-| `serializePortable` | 可移植字符串（seroval） | **任意**（Node ↔ 浏览器） | 以上所有 **+** `NaN`/`Infinity`、共享引用、`Symbol`、URL/URLSearchParams/Headers | ✅ |
+| `serializeBinary` | `Uint8Array`（`greft-codec`） | **任意**（Node ↔ 浏览器 ↔ 其他语言） | Date、Map、Set、RegExp、BigInt、TypedArray、Symbol、`undefined`、`NaN`/`Infinity`、循环/共享引用 | ✅ |
+| `serializePortable` | 可移植字符串（seroval） | **任意**（Node ↔ 浏览器） | 以上所有 **+** URL/URLSearchParams/Headers | ✅ |
 | `output` | 磁盘上的文件 | **仅限 Node** | 取决于扩展名（见下文） | 配合 `binary: true` 时为 ✅ |
 
-经验法则：人类可读的测试数据用 **`serialize`**，仅限 Node 的无损 blob 用 **`serializeBinary`**，当数据必须跨运行时（例如在 Node 中生成、在浏览器中还原）时用 **`serializePortable`**。
+经验法则：人类可读的测试数据用 **`serialize`**，可在任意 JS 运行时（甚至通过 [greft-codec](https://github.com/Gityosan/greft) 移植在 Python / Rust / Go 中）还原的紧凑无损 blob 用 **`serializeBinary`**（需要文本安全的字符串时传 `{ base64: true }`），需要可嵌入 JSON/环境变量且带 `URL`/`Headers` 的 JS↔JS 纯文本时用 **`serializePortable`**。
 
 ## serialize
 
@@ -39,30 +39,41 @@ const content = generator.serialize(data, {
 ## serializeBinary
 
 ```ts
-serializeBinary(data: unknown): Buffer
+serializeBinary(data: unknown): Uint8Array
+serializeBinary(data: unknown, options: { base64: true }): string
 ```
 
-使用 Node.js 的结构化克隆算法（`v8.serialize`）将数据序列化为二进制 `Buffer`。可无损保留 `Date`、`Map`、`Set`、`RegExp`、`BigInt`、`TypedArray`、`undefined` 以及循环引用。结果仅可在 Node.js 环境中通过 `deserialize`（或 `v8.deserialize`）读取。
+使用 [greft-codec](https://github.com/Gityosan/greft) 的语言无关无损格式将数据序列化为二进制 `Uint8Array`。可无损保留 `Date`、`Map`、`Set`、`RegExp`、`BigInt`、`TypedArray`、`Symbol`、`undefined`、`NaN`/`Infinity` 以及循环/共享引用。结果可在**任意 JS 运行时**往返，也能通过 greft-codec 移植在其他语言（Python / Rust / Go 等）中解码——非常适合把 Mock 数据作为跨语言测试夹具复用。
+
+传入 `{ base64: true }` 会返回文本安全的**字符串**而非原始字节。该字符串是纯数据（无 `node:fs` 依赖），可直接嵌入 JSON、环境变量或任何拒绝二进制的传输中，并保持跨语言（任意 greft 移植均可 base64 解码后 `decode`）。
 
 ```ts
 const data = generator.generate(schema)
-const buf = generator.serializeBinary(data) // Buffer
+const bytes = generator.serializeBinary(data) // Uint8Array
+
+// 跨语言 + 无 node 依赖：将 base64 字符串嵌入任意位置（例如 JSON）
+const fixture = JSON.stringify({ $mock: generator.serializeBinary(data, { base64: true }) })
 ```
 
 ## deserialize
 
 ```ts
-deserialize<T = unknown>(input: Buffer | Uint8Array | string): T
+deserialize<T = unknown>(input: Uint8Array | string): T
+deserialize<T = unknown>(input: string, options: { base64: true }): T
 ```
 
-还原此前通过 `serializeBinary` 或 `output({ binary: true })` 序列化的值。可传入 `Buffer`/`Uint8Array` 或 `.bin` 文件路径。传入泛型参数可为结果指定类型。
+还原此前通过 `serializeBinary` 或 `output({ binary: true })` 序列化的值。可传入 `Uint8Array`/`Buffer` 或 `.bin` 文件路径。传入 `{ base64: true }` 可解码 `serializeBinary(data, { base64: true })` 返回的 base64 字符串（此时该字符串按数据而非文件路径处理）。传入泛型参数可为结果指定类型。
 
 ```ts
 // 通过泛型参数为结果指定类型
 const restored = generator.deserialize<User>('./mocks/user.bin')
 
-// 从 Buffer
+// 从字节
 const restored = generator.deserialize<User>(generator.serializeBinary(data))
+
+// 从 JSON 中取出的 base64 字符串（在任意 JS 运行时均可）
+const { $mock } = JSON.parse(fixture)
+const restored = generator.deserialize<User>($mock, { base64: true })
 ```
 
 ## serializePortable / serializePortableAsync
@@ -74,7 +85,7 @@ serializePortable(data: unknown, options?: PortableOptions): string
 serializePortableAsync(data: unknown, options?: PortableOptions): Promise<string>
 ```
 
-使用 [seroval](https://github.com/lxsmnsyc/seroval) 将数据序列化为**可移植的字符串**。与 `serializeBinary`（仅限 Node 的 `v8`）不同，其结果可在**任意 JS 运行时**之间往返——Node↔浏览器、浏览器↔浏览器。可保留 `Date`、`RegExp`、`Map`、`Set`、`BigInt`、`TypedArray`、`undefined`、`NaN`/`Infinity`、循环/共享引用，以及（通过内置插件）`URL`、`URLSearchParams`、`Headers`。
+使用 [seroval](https://github.com/lxsmnsyc/seroval) 将数据序列化为**可移植的字符串**。与 `serializeBinary` 一样可在**任意 JS 运行时**之间往返——Node↔浏览器、浏览器↔浏览器，但它是（仅限 JS 的）纯文本而非二进制，适合需要同时携带 `URL`/`URLSearchParams`/`Headers` 并嵌入 JSON、环境变量或 HTTP 头时使用。可保留 `Date`、`RegExp`、`Map`、`Set`、`BigInt`、`TypedArray`、`undefined`、`NaN`/`Infinity`、循环/共享引用，以及（通过内置插件）`URL`、`URLSearchParams`、`Headers`。（跨**语言**或不想经过 JS eval 的文本安全负载请优先用 `serializeBinary`——必要时配合 `{ base64: true }`。）
 
 `File`、`Blob` 和 `FormData` 需异步读取字节，因此只能通过 `serializePortableAsync` 往返（同步版本遇到它们时会抛出明确错误，提示改用异步版本）。
 
@@ -139,10 +150,12 @@ generator.output(data, { path: './mocks/user.ts' })
 generator.output(data, { path: './mocks/user.js' })
 
 // `binary: true` —— 对于 ts/js 输出，会写出一个轻量 ESM 包装器以及同名的
-// <name>.bin（由 v8.serialize 生成）。包装器在导入时惰性反序列化该 .bin，
-// 因此模块的用法与普通的 `import { mockData }` 一致，但可无损保留
-// Date / Map / Set / RegExp / BigInt / TypedArray / undefined / 循环引用。
-// 导出值的类型为 `unknown`；请在消费端进行类型断言，或在需要类型时直接使用 `deserialize<T>()`。
+// <name>.bin（由 greft-codec 编码）。包装器在导入时惰性 `decode` 该 .bin，
+// 因此模块的用法与普通的 `import { mockData }` 一致，但可无损保留 Date / Map /
+// Set / RegExp / BigInt / TypedArray / Symbol / undefined / NaN/Infinity / 循环引用。
+// 该 .bin 是跨语言产物（任意 JS 运行时，或通过 greft-codec 移植在 Python / Rust / Go 中解码）。
+// 包装器从 `zod-v4-mocks/greft` 导入 `decode`，因此消费端只需安装 zod-v4-mocks，
+// 无需直接依赖 greft-codec。导出值类型为 `unknown`；请在消费端断言或使用 `deserialize<T>()`。
 generator.output(data, { path: './mocks/user.ts', binary: true })
 generator.output(data, { path: './mocks/user.js', binary: true })
 
@@ -174,7 +187,7 @@ type OutputOptions = {
 | 扩展名 | 格式 | 特殊类型处理 |
 |--------|------|-------------|
 | `.ts` / `.js` | `export const <exportName> = ...` | 准确序列化 Date, BigInt, Map, Set, Symbol, File, Blob |
-| `.ts` / `.js` + `binary: true` | ESM 包装器 + 同名 `.bin`（v8 结构化克隆）| 保留 Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, 循环引用。导出值类型为 `unknown`；请在消费端断言或使用 `deserialize<T>()` 指定类型。仅限 Node.js。 |
+| `.ts` / `.js` + `binary: true` | ESM 包装器 + 同名 `.bin`（greft-codec）| 保留 Date, Map, Set, RegExp, BigInt, TypedArray, Symbol, `undefined`, `NaN`/`Infinity`, 循环/共享引用。该 `.bin` 跨语言（任意 JS 运行时，或通过 greft-codec 移植在 Python / Rust / Go 中解码）。包装器从 `zod-v4-mocks/greft` 导入 `decode`，因此消费端只需安装 `zod-v4-mocks`（无需直接依赖 greft-codec）。导出值类型为 `unknown`；请在消费端断言或使用 `deserialize<T>()`。 |
 | `.ts` / `.js` + `portable: true`（**`outputAsync`**）| 内联 `export const <name> = <seroval 表达式>` | 跨运行时（Node↔浏览器），无 sibling 文件、无 consumer 依赖。保留 File/Blob/FormData 的**内容**、Date、Map、Set、BigInt、TypedArray、循环/共享引用。**不支持 `Symbol`。** |
 | `.json` | JSON | Date 转为 ISO 字符串，BigInt 转为字符串，Map/Set/Symbol 会丢失信息（有警告）。`binary` 会被忽略。 |
 
@@ -185,10 +198,10 @@ type OutputOptions = {
 ::: info `binary: true`（无损往返）
 当设置 `binary: true` 时，`output()` 会写出两个文件：
 
-- `<name>.bin` —— 原始的 `v8.serialize` Buffer。完美保留 Zod 能生成的所有值，包括循环引用。
-- `<name>.ts` / `<name>.js` —— 一个轻量 ESM 包装器，在导入时惰性 `v8.deserialize` 同名 `.bin`，因此消费者只需 `import { mockData } from './user'`，无需关心二进制表示。
+- `<name>.bin` —— 一段 [greft-codec](https://github.com/Gityosan/greft) 字节流，可在任意 JS 运行时（或通过移植在 Python / Rust / Go 中）解码。完美保留 Zod 能生成的所有值——包括 `Symbol`、`NaN`/`Infinity` 和循环引用。
+- `<name>.ts` / `<name>.js` —— 一个轻量 ESM 包装器，在导入时惰性 `decode` 同名 `.bin`，因此消费者只需 `import { mockData } from './user'`，无需关心二进制表示。
 
-导出值的类型为 `unknown`；请在消费端断言，或在需要类型化的值时直接调用 `deserialize<T>('./user.bin')`（无需经过包装器）。`.bin` 文件名始终从包装器的基础名派生，无法单独自定义。包装器面向 ESM（`import.meta.dirname`），需要 Node.js 20.11+。
+包装器从 `zod-v4-mocks/greft`（greft-codec 的再导出）导入 `decode`，因此消费端只需安装 `zod-v4-mocks`（生成该文件所用的同一个包），无需直接依赖传递依赖 greft-codec。导出值的类型为 `unknown`；请在消费端断言，或在需要类型化的值时直接调用 `deserialize<T>('./user.bin')`（无需经过包装器）。`.bin` 文件名始终从包装器的基础名派生，无法单独自定义。包装器面向 ESM（`import.meta.dirname`），需要 Node.js 20.11+。
 :::
 
 ## outputAsync
@@ -199,7 +212,7 @@ outputAsync(data: unknown, options?: OutputOptions): Promise<string>
 
 `output` 的异步版本。`{ portable: true }` 需要它，因为要异步读取 `File`/`Blob`/`FormData` 的字节。非 portable 模式（`json` / `ts` / `js` / `binary`）的行为与 `output` 相同，只是用异步 fs 写入。返回输出路径。
 
-在 `portable: true`（ts/js）下，它内联一个自包含、跨运行时的表达式——`export const <name> = <seroval 表达式>`——可在**任意 JS 运行时**（Node↔浏览器）通过普通 `import` 还原。与 `binary: true`（仅限 Node 的 v8 + sibling `.bin`）不同，**没有 sibling 文件，consumer 也无需任何依赖**，并且 `File`/`Blob`/`FormData` 会**连同内容**一起往返，同时保留 Date、Map、Set、BigInt、TypedArray、循环/共享引用。
+在 `portable: true`（ts/js）下，它内联一个自包含、跨运行时的表达式——`export const <name> = <seroval 表达式>`——可在**任意 JS 运行时**（Node↔浏览器）通过普通 `import` 还原。与 `binary`（会写出同名 `.bin`）不同，**没有 sibling 文件**，并且 `File`/`Blob`/`FormData` 会**连同内容**一起往返，同时保留 Date、Map、Set、BigInt、TypedArray、循环/共享引用。
 
 ```ts
 const data = generator.generate(schema)

@@ -51,7 +51,7 @@ const generator = initGenerator({
 | `updateConfig` | `MockGenerator` | ✅ |
 | `generate` / `multiGenerate` / `generateMany` | 数据 | ❌ |
 | `factory` | `{ next, take }` | ❌ |
-| `serialize` / `serializeBinary` / `serializePortable*` | `string` / `Buffer` | ❌ |
+| `serialize` / `serializeBinary` / `serializePortable*` | `string` / `Uint8Array` | ❌ |
 | `deserialize` / `deserializePortable` | 数据 | ❌ |
 | `output` | 输出路径 `string` | ❌ |
 

@@ -8,16 +8,15 @@
 | メソッド | 出力 | ランタイム | 保持される型 | 完全な round-trip |
 |--------|--------|---------|-----------|---------------------|
 | `serialize` | `.ts` / `.js` / `.json` のソース文字列 | 任意（文字列のみ） | ts/js では Date, BigInt, Map, Set, Symbol, File, Blob | ❌（ソーステキスト、JSON は型が失われる） |
-| `serializeBinary` | `Buffer`（`v8.serialize`） | **Node 専用** | Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, 循環参照 | ✅ |
-| `serializeGreft` | `Uint8Array`（`greft-codec`） | **任意**（Node ↔ ブラウザ ↔ 他言語） | 上記 **＋** Symbol, `NaN`/`Infinity`, 共有参照 | ✅ |
+| `serializeBinary` | `Uint8Array`（`greft-codec`） | **任意**（Node ↔ ブラウザ ↔ 他言語） | Date, Map, Set, RegExp, BigInt, TypedArray, Symbol, `undefined`, `NaN`/`Infinity`, 循環/共有参照 | ✅ |
 | `serializePortable` | 可搬な文字列（seroval） | **任意**（Node ↔ ブラウザ） | 上記 **＋** URL/URLSearchParams/Headers | ✅ |
 | `output` | ディスク上のファイル | **Node 専用** | 拡張子による（下記参照） | `binary` で ✅ |
 
-目安: 人間が読むフィクスチャには **`serialize`**、Node 専用の完全バイナリ（追加依存なし）
-には **`serializeBinary`**、任意の JS ランタイム（さらに
+目安: 人間が読むフィクスチャには **`serialize`**、任意の JS ランタイム（さらに
 [greft-codec](https://github.com/Gityosan/greft) のポート経由で Python / Rust / Go
-など他言語）で復元できるコンパクトな完全バイナリには **`serializeGreft`**、JSON や
-環境変数に埋め込むプレーンテキストのペイロードが必要な場合には **`serializePortable`**。
+など他言語）で復元できるコンパクトな完全バイナリには **`serializeBinary`**（テキスト安全な
+文字列が欲しい場合は `{ base64: true }`）、`URL`/`Headers` 等を含めて JS↔JS で往復する
+プレーンテキストには **`serializePortable`**。
 
 ## serialize
 
@@ -45,70 +44,41 @@ const content = generator.serialize(data, {
 ## serializeBinary
 
 ```ts
-serializeBinary(data: unknown): Buffer
+serializeBinary(data: unknown): Uint8Array
+serializeBinary(data: unknown, options: { base64: true }): string
 ```
 
-Node.js の structured clone アルゴリズム (`v8.serialize`) を使ってデータをバイナリ `Buffer` にシリアライズします。`Date` / `Map` / `Set` / `RegExp` / `BigInt` / `TypedArray` / `undefined` / 循環参照を情報損失なく保持できます。復元は Node.js 環境上で `deserialize`（または `v8.deserialize`）でのみ可能です。クロスランタイム／クロス言語のバイナリが必要な場合は [`serializeGreft`](#serializegreft) を使ってください。
-
-```ts
-const data = generator.generate(schema)
-const buf = generator.serializeBinary(data) // Buffer
-```
-
-## deserialize
-
-```ts
-deserialize<T = unknown>(input: Buffer | Uint8Array | string): T
-```
-
-`serializeBinary` または `output({ binary: true })` で書き出した値を復元します。`Buffer`/`Uint8Array` または `.bin` ファイルのパスを受け取れます。型引数を渡すと結果をその型としてキャストします。
-
-```ts
-// 型引数で結果に型を付ける
-const restored = generator.deserialize<User>('./mocks/user.bin')
-
-// Buffer から
-const restored = generator.deserialize<User>(generator.serializeBinary(data))
-```
-
-## serializeGreft
-
-```ts
-serializeGreft(data: unknown): Uint8Array
-serializeGreft(data: unknown, options: { base64: true }): string
-```
-
-[greft-codec](https://github.com/Gityosan/greft) の言語非依存なロスレス形式を使ってデータをバイナリ `Uint8Array` にシリアライズします。`Date` / `Map` / `Set` / `RegExp` / `BigInt` / `TypedArray` / `Symbol` / `undefined` / `NaN`/`Infinity` / 循環・共有参照を情報損失なく保持できます。`serializeBinary`（Node 専用の `v8.serialize`）と異なり、出力は **任意の JS ランタイム** で round-trip でき、greft-codec のポート経由で他言語（Python / Rust / Go など）でもデコードできます。モックデータを他言語のテストフィクスチャとして再利用するのに最適です。
+[greft-codec](https://github.com/Gityosan/greft) の言語非依存なロスレス形式を使ってデータをバイナリ `Uint8Array` にシリアライズします。`Date` / `Map` / `Set` / `RegExp` / `BigInt` / `TypedArray` / `Symbol` / `undefined` / `NaN`/`Infinity` / 循環・共有参照を情報損失なく保持できます。出力は **任意の JS ランタイム** で round-trip でき、greft-codec のポート経由で他言語（Python / Rust / Go など）でもデコードできます。モックデータを他言語のテストフィクスチャとして再利用するのに最適です。
 
 `{ base64: true }` を渡すと、生バイトの代わりにテキスト安全な **文字列** を返します。これは純粋なデータ（`node:fs` 依存なし）なので、JSON・環境変数・バイナリ非対応の経路にそのまま埋め込めます。言語非依存性も保たれます（各言語の greft ポートで base64 デコード → `decode`）。
 
 ```ts
 const data = generator.generate(schema)
-const bytes = generator.serializeGreft(data) // Uint8Array
+const bytes = generator.serializeBinary(data) // Uint8Array
 
 // クロス言語 + node 非依存: base64 文字列をどこにでも埋め込める（例: JSON）
-const fixture = JSON.stringify({ $greft: generator.serializeGreft(data, { base64: true }) })
+const fixture = JSON.stringify({ $mock: generator.serializeBinary(data, { base64: true }) })
 ```
 
-## deserializeGreft
+## deserialize
 
 ```ts
-deserializeGreft<T = unknown>(input: Uint8Array | string): T
-deserializeGreft<T = unknown>(input: string, options: { base64: true }): T
+deserialize<T = unknown>(input: Uint8Array | string): T
+deserialize<T = unknown>(input: string, options: { base64: true }): T
 ```
 
-`serializeGreft` または `output({ binary: 'greft' })` で書き出した値を復元します。`Uint8Array`/`Buffer` または `.bin` ファイルのパスを受け取れます。`{ base64: true }` を渡すと `serializeGreft(data, { base64: true })` が返した base64 文字列をデコードします（その場合、文字列はファイルパスではなくデータとして扱われます）。型引数を渡すと結果をその型としてキャストします。
+`serializeBinary` または `output({ binary: true })` で書き出した値を復元します。`Uint8Array`/`Buffer` または `.bin` ファイルのパスを受け取れます。`{ base64: true }` を渡すと `serializeBinary(data, { base64: true })` が返した base64 文字列をデコードします（その場合、文字列はファイルパスではなくデータとして扱われます）。型引数を渡すと結果をその型としてキャストします。
 
 ```ts
 // 型引数で結果に型を付ける
-const restored = generator.deserializeGreft<User>('./mocks/user.bin')
+const restored = generator.deserialize<User>('./mocks/user.bin')
 
 // バイト列から
-const restored = generator.deserializeGreft<User>(generator.serializeGreft(data))
+const restored = generator.deserialize<User>(generator.serializeBinary(data))
 
 // JSON から取り出した base64 文字列から（どの JS ランタイムでも動く）
-const { $greft } = JSON.parse(fixture)
-const restored = generator.deserializeGreft<User>($greft, { base64: true })
+const { $mock } = JSON.parse(fixture)
+const restored = generator.deserialize<User>($mock, { base64: true })
 ```
 
 ## serializePortable / serializePortableAsync
@@ -120,7 +90,7 @@ serializePortable(data: unknown, options?: PortableOptions): string
 serializePortableAsync(data: unknown, options?: PortableOptions): Promise<string>
 ```
 
-[seroval](https://github.com/lxsmnsyc/seroval) を使ってデータを**可搬な文字列**にシリアライズします。`serializeGreft` と同様に**あらゆる JS ランタイム**間で往復できますが、バイナリではなくプレーンテキストなので、JSON・環境変数・HTTP ヘッダーの中に埋め込みたいときに便利です。`Date`・`RegExp`・`Map`・`Set`・`BigInt`・`TypedArray`・`undefined`・`NaN`/`Infinity`・循環/共有参照、および（同梱プラグインで）`URL`・`URLSearchParams`・`Headers` を保持します。（他**言語**へ渡すペイロードには `serializeGreft` を推奨します。）
+[seroval](https://github.com/lxsmnsyc/seroval) を使ってデータを**可搬な文字列**にシリアライズします。`serializeBinary` と同様に**あらゆる JS ランタイム**間で往復できますが、バイナリではなく（JS 限定の）プレーンテキストなので、`URL`/`URLSearchParams`/`Headers` も含めつつ JSON・環境変数・HTTP ヘッダーの中に埋め込みたいときに便利です。`Date`・`RegExp`・`Map`・`Set`・`BigInt`・`TypedArray`・`undefined`・`NaN`/`Infinity`・循環/共有参照、および（同梱プラグインで）`URL`・`URLSearchParams`・`Headers` を保持します。（他**言語**へ渡す、または JS の eval を伴わないテキスト安全なペイロードには `serializeBinary`（必要なら `{ base64: true }`）を推奨します。）
 
 `File`・`Blob`・`FormData` はバイトを非同期に読み出すため、`serializePortableAsync` でのみ往復できます（同期版がこれらに遭遇した場合は、非同期版を使うよう促す明示エラーを投げます）。
 
@@ -184,21 +154,17 @@ generator.output(data, { path: './mocks/user.json' })
 generator.output(data, { path: './mocks/user.ts' })
 generator.output(data, { path: './mocks/user.js' })
 
-// `binary: true`（= `'v8'`）— ts/js 出力のときに、同名の <name>.bin（v8.serialize の
-// 生データ）を同じディレクトリに書き出し、.ts / .js 側は import 時に `.bin` を
-// `v8.deserialize` する薄い ESM ラッパーになります。Date / Map / Set / RegExp /
-// BigInt / TypedArray / undefined / 循環参照を情報損失なく保持しつつ、消費側はふつうに
-// `import { mockData } from './user'` として扱えます。エクスポート値は `unknown` 型なので、
-// 消費側でキャストするか `deserialize<T>()` を直接呼んで型付けしてください。（Node 専用）
+// `binary: true` — ts/js 出力のときに、同名の <name>.bin（greft-codec でエンコード）を
+// 同じディレクトリに書き出し、.ts / .js 側は import 時に `.bin` を `decode` する薄い ESM
+// ラッパーになります。Date / Map / Set / RegExp / BigInt / TypedArray / Symbol /
+// undefined / NaN/Infinity / 循環参照を情報損失なく保持しつつ、消費側はふつうに
+// `import { mockData } from './user'` として扱えます。.bin はクロス言語の成果物（任意の
+// JS ランタイム、さらに Python / Rust / Go などのポートでデコード可）。ラッパーは
+// `zod-v4-mocks/greft` から `decode` を import するため、消費側は zod-v4-mocks だけあれば
+// よく、greft-codec を直接入れる必要はありません。エクスポート値は `unknown` 型なので、
+// 消費側でキャストするか `deserialize<T>()` を直接呼んで型付けしてください。
 generator.output(data, { path: './mocks/user.ts', binary: true })
 generator.output(data, { path: './mocks/user.js', binary: true })
-
-// `binary: 'greft'` — 同じラッパー＋同名 .bin ですが、greft-codec で符号化されます。
-// .bin はクロス言語の成果物（任意の JS ランタイム、さらに Python / Rust / Go などの
-// ポートでデコード可）で、Symbol と NaN/Infinity も追加で保持します。ラッパーは
-// `zod-v4-mocks/greft` から `decode` を import するため、消費側は（生成に使った）
-// zod-v4-mocks だけあればよく、greft-codec を直接入れる必要はありません。
-generator.output(data, { path: './mocks/user.ts', binary: 'greft' })
 
 // エクスポート名とヘッダー/フッターをカスタマイズ
 generator.output(data, {
@@ -218,7 +184,7 @@ type OutputOptions = {
   exportName?: string              // エクスポート変数名（デフォルト: 'mockData'、ts/js のみ）
   header?: string                  // 出力内容の先頭に追加する文字列（json では無視）
   footer?: string                  // 出力内容の末尾に追加する文字列（json では無視）
-  binary?: boolean | 'v8' | 'greft' // ts/js に対し、<name>.bin ＋それを復元するラッパーを書き出す。true/'v8' = v8.serialize（Node 専用）、'greft' = greft-codec（クロス言語）。json では無視
+  binary?: boolean                 // ts/js に対し、クロス言語の <name>.bin（greft-codec）＋それを decode するラッパーを書き出す。json では無視
   portable?: boolean               // outputAsync 専用: ts/js にクロスランタイムな式をインライン。File/Blob/FormData・循環対応。Symbol 不可。json では無視
 }
 ```
@@ -228,8 +194,7 @@ type OutputOptions = {
 | 拡張子 | 形式 | 特殊型の扱い |
 |--------|------|-------------|
 | `.ts` / `.js` | `export const <exportName> = ...` | Date, BigInt, Map, Set, Symbol, File, Blob を正確にシリアライズ |
-| `.ts` / `.js` + `binary: true` / `'v8'` | ESM ラッパー + 同名 `.bin`（v8 structured clone）| Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, 循環参照を保持。エクスポートは `unknown` 型なので、消費側でキャストするか `deserialize<T>()` を直接使用。Node.js 限定、追加の実行時依存なし |
-| `.ts` / `.js` + `binary: 'greft'` | ESM ラッパー + 同名 `.bin`（greft-codec）| 上記 **＋** Symbol, `NaN`/`Infinity`, 共有参照。`.bin` はクロス言語（任意の JS ランタイム、さらに Python / Rust / Go などのポートでデコード可）。ラッパーは `zod-v4-mocks/greft` から `decode` を import するため、消費側は zod-v4-mocks だけあればよい（greft-codec を直接入れる必要なし） |
+| `.ts` / `.js` + `binary: true` | ESM ラッパー + 同名 `.bin`（greft-codec）| Date, Map, Set, RegExp, BigInt, TypedArray, Symbol, `undefined`, `NaN`/`Infinity`, 循環/共有参照を保持。`.bin` はクロス言語（任意の JS ランタイム、さらに Python / Rust / Go などのポートでデコード可）。ラッパーは `zod-v4-mocks/greft` から `decode` を import するため、消費側は zod-v4-mocks だけあればよい（greft-codec を直接入れる必要なし）。エクスポートは `unknown` 型なので、消費側でキャストするか `deserialize<T>()` を直接使用 |
 | `.ts` / `.js` + `portable: true`（**`outputAsync`**）| `export const <name> = <seroval 式>` をインライン | クロスランタイム（Node↔ブラウザ）、sibling ファイル・consumer 依存なし。File/Blob/FormData の**中身**、Date, Map, Set, BigInt, TypedArray, 循環/共有参照を保持。**`Symbol` 不可。** |
 | `.json` | JSON | Date は ISO文字列、BigInt は文字列化、Map/Set/Symbol は情報損失（警告あり）。`binary` は無視 |
 
@@ -237,13 +202,13 @@ type OutputOptions = {
 JSON では表現できない型（BigInt, Symbol, Map, Set, File, Blob）を含むデータを `.json` で出力すると、データの正確性が失われます。警告メッセージが出力されるので、`.ts` / `.js`（必要に応じて `binary: true`）の使用を検討してください。
 :::
 
-::: info `binary`（完全な round-trip）
-`binary: true`（`'v8'`）または `binary: 'greft'` を指定すると、`output()` は 2 つのファイルを書き出します:
+::: info `binary: true`（完全な round-trip）
+`binary: true` を指定すると、`output()` は 2 つのファイルを書き出します:
 
-- `<name>.bin` — バイナリ本体。`true`/`'v8'` は Node の `v8.serialize`（Node 専用）、`'greft'` は任意の JS ランタイム（さらに Python / Rust / Go などのポート）でデコードできる [greft-codec](https://github.com/Gityosan/greft) のバイト列です。どちらも Zod が生成するあらゆる値（循環参照を含む）を完全に保持し、`'greft'` は加えて `Symbol` と `NaN`/`Infinity` も保持します
-- `<name>.ts` / `<name>.js` — import 時に同名の `.bin` を遅延復元する薄い ESM ラッパー（`'v8'` は `v8.deserialize`、`'greft'` は `zod-v4-mocks/greft` の `decode`）。消費側は `import { mockData } from './user'` でそのまま使える
+- `<name>.bin` — [greft-codec](https://github.com/Gityosan/greft) のバイト列。任意の JS ランタイム（さらに Python / Rust / Go などのポート）でデコードでき、Zod が生成するあらゆる値（`Symbol`・`NaN`/`Infinity`・循環参照を含む）を完全に保持します
+- `<name>.ts` / `<name>.js` — import 時に同名の `.bin` を `decode` で遅延復元する薄い ESM ラッパー。消費側は `import { mockData } from './user'` でそのまま使える
 
-`'greft'` の場合、ラッパーは `zod-v4-mocks/greft`（greft-codec の再export）から `decode` を import するため、生成モジュールの消費側は（生成に使った）zod-v4-mocks だけあればよく、推移的依存の greft-codec を直接入れる必要はありません。エクスポート値は `unknown` 型なので、消費側でキャストするか、ラッパーを介さず `deserialize<T>('./user.bin')` / `deserializeGreft<T>('./user.bin')` を直接呼んで型付けしてください。`.bin` のファイル名は常にラッパーのベース名から自動導出され、個別には変更できません。ラッパーは ESM (`import.meta.dirname`) 前提で Node.js 20.11+ が必要です。
+ラッパーは `zod-v4-mocks/greft`（greft-codec の再export）から `decode` を import するため、生成モジュールの消費側は（生成に使った）zod-v4-mocks だけあればよく、推移的依存の greft-codec を直接入れる必要はありません。エクスポート値は `unknown` 型なので、消費側でキャストするか、ラッパーを介さず `deserialize<T>('./user.bin')` を直接呼んで型付けしてください。`.bin` のファイル名は常にラッパーのベース名から自動導出され、個別には変更できません。ラッパーは ESM (`import.meta.dirname`) 前提で Node.js 20.11+ が必要です。
 :::
 
 ## outputAsync

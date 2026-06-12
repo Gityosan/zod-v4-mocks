@@ -57,7 +57,7 @@ const generateCmd = defineCommand({
       type: 'string',
       alias: 'f',
       description:
-        'Output format: json | ts | js | bin (v8) | greft (cross-language) (overrides extension).',
+        'Output format: json | ts | js | bin (overrides extension).',
     },
     locale: {
       type: 'string',
@@ -166,10 +166,6 @@ async function runGenerate(args: {
       process.stdout.write(gen.serializeBinary(data));
       return;
     }
-    if (fmt === 'greft') {
-      process.stdout.write(gen.serializeGreft(data));
-      return;
-    }
     if (fmt === 'json') {
       process.stdout.write(
         JSON.stringify(data, jsonReplacer, args.pretty ? 2 : 0) + '\n',
@@ -188,8 +184,6 @@ async function runGenerate(args: {
 
   if (fmt === 'bin') {
     gen.output(data, { path: absOut, binary: true });
-  } else if (fmt === 'greft') {
-    gen.output(data, { path: absOut, binary: 'greft' });
   } else {
     gen.output(data, { path: absOut });
   }
