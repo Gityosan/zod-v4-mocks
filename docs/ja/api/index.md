@@ -9,7 +9,7 @@
 - **[生成](/ja/api/generation)** — `generate`, `multiGenerate`, `generateMany`, `factory`
 - **[カスタマイズ](/ja/api/customization)** — `supply`, `supplyRef`, `supplyPath`, `override`, `register`, `updateConfig`
 - **[シリアライズと出力](/ja/api/serialization)** — `serialize`, `serializeBinary`, `deserialize`, `serializePortable`, `deserializePortable`, `output`
-- **[型定義](/ja/api/types)** — `MockConfig`, `CustomGeneratorType`, `GeneraterOptions`, `OutputOptions`, `PortableOptions`, `PathSegment`、および re-export
+- **[型定義](/ja/api/types)** — `MockConfig`, `CustomGeneratorType`, `GeneraterOptions`, `OutputOptions`, `BinaryOptions`, `PortableOptions`, `PathSegment`、および re-export
 
 ## initGenerator
 
@@ -53,7 +53,7 @@ const generator = initGenerator({
 | `updateConfig` | `MockGenerator` | ✅ |
 | `generate` / `multiGenerate` / `generateMany` | データ | ❌ |
 | `factory` | `{ next, take }` | ❌ |
-| `serialize` / `serializeBinary` / `serializePortable*` | `string` / `Buffer` | ❌ |
+| `serialize` / `serializeBinary` / `serializePortable*` | `string` / `Uint8Array` | ❌ |
 | `deserialize` / `deserializePortable` | データ | ❌ |
 | `output` | 出力パス `string` | ❌ |
 

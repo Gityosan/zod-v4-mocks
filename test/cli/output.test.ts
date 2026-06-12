@@ -488,7 +488,7 @@ describe('serialize', () => {
   });
 });
 
-describe('serializeBinary / deserialize (v8 structured clone)', () => {
+describe('serializeBinary / deserialize (greft-codec)', () => {
   it('round-trips primitives, Date, BigInt, Map, Set, RegExp, undefined', () => {
     const generator = initGenerator();
     const data = {
@@ -508,7 +508,7 @@ describe('serializeBinary / deserialize (v8 structured clone)', () => {
     };
 
     const buf = generator.serializeBinary(data);
-    expect(Buffer.isBuffer(buf)).toBe(true);
+    expect(buf).toBeInstanceOf(Uint8Array);
 
     const restored = generator.deserialize<typeof data>(buf);
     expect(restored.str).toBe('hello');
@@ -542,7 +542,7 @@ describe('serializeBinary / deserialize (v8 structured clone)', () => {
     expect((restored.b as typeof b).a).toBe(restored);
   });
 
-  it('serializeBinary Buffer can be written manually and read back via deserialize(path)', () => {
+  it('serializeBinary bytes can be written manually and read back via deserialize(path)', () => {
     const generator = initGenerator();
     const data = { count: 7n, when: new Date('2026-04-23T00:00:00.000Z') };
     const outputPath = `${testOutputDir}/mock.bin`;
@@ -598,9 +598,9 @@ describe('output with binary flag (wrapper + .bin)', () => {
     const content = readFileSync(outputPath, 'utf-8');
     expect(content).toContain("import { readFileSync } from 'node:fs';");
     expect(content).toContain("import { join } from 'node:path';");
-    expect(content).toContain("import { deserialize } from 'node:v8';");
+    expect(content).toContain("import { decode } from 'zod-v4-mocks/greft';");
     expect(content).toContain('join(import.meta.dirname, "user.bin")');
-    expect(content).toContain('export const mockData: unknown = deserialize(');
+    expect(content).toContain('export const mockData: unknown = decode(');
   });
 
   it('writes user.js wrapper and user.bin when ext=js + binary=true, without type annotation', () => {
@@ -617,13 +617,16 @@ describe('output with binary flag (wrapper + .bin)', () => {
     const content = readFileSync(outputPath, 'utf-8');
     expect(content).toContain("import { readFileSync } from 'node:fs';");
     expect(content).toContain("import { join } from 'node:path';");
-    expect(content).toContain("import { deserialize } from 'node:v8';");
+    expect(content).toContain("import { decode } from 'zod-v4-mocks/greft';");
     expect(content).toContain('join(import.meta.dirname, "user.bin")');
-    expect(content).toContain('export const mockData = deserialize(');
+    expect(content).toContain('export const mockData = decode(');
     expect(content).not.toMatch(/:\s*unknown/);
   });
 
-  it('round-trips via the generated wrapper at runtime', async () => {
+  // The wrapper resolves `zod-v4-mocks/greft` via Node self-reference to
+  // dist/greft.js, so this needs the package built first.
+  const itIfBuilt = existsSync('./dist/greft.js') ? it : it.skip;
+  itIfBuilt('round-trips via the generated wrapper at runtime', async () => {
     const generator = initGenerator();
     const schema = z.object({
       id: z.string(),
@@ -665,7 +668,7 @@ describe('output with binary flag (wrapper + .bin)', () => {
     const content = readFileSync(outputPath, 'utf-8');
     expect(content).toMatch(/^\/\/ top/);
     expect(content).toMatch(/\/\/ end\s*$/);
-    expect(content).toContain('export const userMock: unknown = deserialize(');
+    expect(content).toContain('export const userMock: unknown = decode(');
   });
 
   it('uses default wrapper path ./__generated__/generated-mock-data.ts for ts + binary', () => {
@@ -707,6 +710,49 @@ describe('output with binary flag (wrapper + .bin)', () => {
     const generator = initGenerator();
     const result = generator.serialize({ id: 1 }, { ext: 'json', binary: true });
     expect(JSON.parse(result)).toEqual({ id: 1 });
+  });
+});
+
+describe('serializeBinary extras (Symbol, NaN/Infinity, base64)', () => {
+  it('round-trips Symbol and NaN/Infinity (which v8 could not)', () => {
+    const generator = initGenerator();
+    const sym = Symbol.for('kind');
+    const data = { sym, nan: NaN, inf: Infinity, ninf: -Infinity };
+
+    const restored = generator.deserialize<typeof data>(
+      generator.serializeBinary(data),
+    );
+    expect(restored.sym).toBe(Symbol.for('kind'));
+    expect(Number.isNaN(restored.nan)).toBe(true);
+    expect(restored.inf).toBe(Infinity);
+    expect(restored.ninf).toBe(-Infinity);
+  });
+
+  it('round-trips through a base64 string (no node:fs, embeddable in JSON)', () => {
+    const generator = initGenerator();
+    const data = {
+      id: 9n,
+      when: new Date('2026-01-02T03:04:05.000Z'),
+      tags: new Set(['a', 'b']),
+      kind: Symbol.for('k'),
+      nan: NaN,
+    };
+
+    const b64 = generator.serializeBinary(data, { base64: true });
+    expect(typeof b64).toBe('string');
+    // Plain text: survives JSON round-tripping untouched.
+    const fromJson = JSON.parse(JSON.stringify({ $bin: b64 })) as {
+      $bin: string;
+    };
+
+    const restored = generator.deserialize<typeof data>(fromJson.$bin, {
+      base64: true,
+    });
+    expect(restored.id).toBe(9n);
+    expect(restored.when.toISOString()).toBe('2026-01-02T03:04:05.000Z');
+    expect([...restored.tags]).toEqual(['a', 'b']);
+    expect(restored.kind).toBe(Symbol.for('k'));
+    expect(Number.isNaN(restored.nan)).toBe(true);
   });
 });
 

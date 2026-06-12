@@ -8,13 +8,15 @@ and the matching deserializers. None are chainable.
 | Method | Output | Runtime | Preserves | Lossless round-trip |
 |--------|--------|---------|-----------|---------------------|
 | `serialize` | `.ts` / `.js` / `.json` source string | any (string only) | Date, BigInt, Map, Set, Symbol, File, Blob in ts/js | ❌ (source text, JSON loses types) |
-| `serializeBinary` | `Buffer` (`v8.serialize`) | **Node only** | Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, circular refs | ✅ |
-| `serializePortable` | portable string (seroval) | **any** (Node ↔ browser) | the above **+** `NaN`/`Infinity`, shared refs, `Symbol`, URL/URLSearchParams/Headers | ✅ |
-| `output` | file on disk | **Node only** | depends on extension (see below) | ✅ with `binary: true` |
+| `serializeBinary` | `Uint8Array` (`greft-codec`) | **any** (Node ↔ browser ↔ other languages) | Date, Map, Set, RegExp, BigInt, TypedArray, Symbol, `undefined`, `NaN`/`Infinity`, circular/shared refs | ✅ |
+| `serializePortable` | portable string (seroval) | **any** (Node ↔ browser) | the above **+** URL/URLSearchParams/Headers | ✅ |
+| `output` | file on disk | **Node only** | depends on extension (see below) | ✅ with `binary` |
 
 Rule of thumb: **`serialize`** for human-readable fixtures, **`serializeBinary`**
-for a lossless Node-only blob, **`serializePortable`** when the data must cross
-runtimes (e.g. generated in Node, hydrated in the browser).
+for a compact lossless blob that decodes in any JS runtime — or even in Python /
+Rust / Go via a [greft-codec](https://github.com/Gityosan/greft) port (pass
+`{ base64: true }` for a text-safe string), **`serializePortable`** when you want
+a plain-text payload that round-trips JS↔JS with `URL`/`Headers`/etc.
 
 ## serialize
 
@@ -42,30 +44,41 @@ const content = generator.serialize(data, {
 ## serializeBinary
 
 ```ts
-serializeBinary(data: unknown): Buffer
+serializeBinary(data: unknown): Uint8Array
+serializeBinary(data: unknown, options: { base64: true }): string
 ```
 
-Serializes data to a binary `Buffer` using Node.js's structured clone algorithm (`v8.serialize`). Preserves `Date`, `Map`, `Set`, `RegExp`, `BigInt`, `TypedArray`, `undefined`, and circular references with no information loss. The result is only readable in a Node.js environment via `deserialize` (or `v8.deserialize`).
+Serializes data to a binary `Uint8Array` using [greft-codec](https://github.com/Gityosan/greft)'s language-agnostic lossless format. Preserves `Date`, `Map`, `Set`, `RegExp`, `BigInt`, `TypedArray`, `Symbol`, `undefined`, `NaN`/`Infinity`, and circular/shared references with no information loss. The bytes round-trip across **any JS runtime** and can also be decoded in other languages (Python / Rust / Go / …) via a greft-codec port — ideal for reusing mock data as a cross-language test fixture.
+
+Pass `{ base64: true }` to get a text-safe **string** instead of raw bytes. The string is pure data — no `node:fs` dependency — so you can embed it directly in JSON, an env var, or any transport that rejects binary, while it stays cross-language (any greft port can base64-decode then `decode`).
 
 ```ts
 const data = generator.generate(schema)
-const buf = generator.serializeBinary(data) // Buffer
+const bytes = generator.serializeBinary(data) // Uint8Array
+
+// Cross-language + node-free: embed the base64 string anywhere (e.g. JSON)
+const fixture = JSON.stringify({ $mock: generator.serializeBinary(data, { base64: true }) })
 ```
 
 ## deserialize
 
 ```ts
-deserialize<T = unknown>(input: Buffer | Uint8Array | string): T
+deserialize<T = unknown>(input: Uint8Array | string): T
+deserialize<T = unknown>(input: string, options: { base64: true }): T
 ```
 
-Restores a value previously serialized via `serializeBinary` or `output({ binary: true })`. Pass either a `Buffer`/`Uint8Array` or a path to a `.bin` file. Pass a generic type parameter to type the result.
+Restores a value previously serialized via `serializeBinary` or `output({ binary: true })`. Pass either a `Uint8Array`/`Buffer` or a path to a `.bin` file. Pass `{ base64: true }` to decode a base64 string from `serializeBinary(data, { base64: true })` — the string is then treated as data, not a file path. Pass a generic type parameter to type the result.
 
 ```ts
 // Type the result via a generic parameter
 const restored = generator.deserialize<User>('./mocks/user.bin')
 
-// From a Buffer
+// From bytes
 const restored = generator.deserialize<User>(generator.serializeBinary(data))
+
+// From a base64 string pulled out of JSON (works in any JS runtime)
+const { $mock } = JSON.parse(fixture)
+const restored = generator.deserialize<User>($mock, { base64: true })
 ```
 
 ## serializePortable / serializePortableAsync
@@ -77,7 +90,7 @@ serializePortable(data: unknown, options?: PortableOptions): string
 serializePortableAsync(data: unknown, options?: PortableOptions): Promise<string>
 ```
 
-Serializes data to a **portable string** via [seroval](https://github.com/lxsmnsyc/seroval). Unlike `serializeBinary` (Node-only `v8`), the result round-trips across **any JS runtime** — Node↔browser and browser↔browser. Preserves `Date`, `RegExp`, `Map`, `Set`, `BigInt`, `TypedArray`, `undefined`, `NaN`/`Infinity`, circular/shared references, and (via bundled plugins) `URL`, `URLSearchParams`, `Headers`.
+Serializes data to a **portable string** via [seroval](https://github.com/lxsmnsyc/seroval). Like `serializeBinary` the result round-trips across **any JS runtime**, but it is JS-only plain text rather than binary — handy when the payload must live inside JSON, an env var, or an HTTP header and you also need `URL`/`URLSearchParams`/`Headers`. Preserves `Date`, `RegExp`, `Map`, `Set`, `BigInt`, `TypedArray`, `undefined`, `NaN`/`Infinity`, circular/shared references, and (via bundled plugins) `URL`, `URLSearchParams`, `Headers`. (For a cross-**language** payload, or a text-safe one without a JS eval step, prefer `serializeBinary` — optionally with `{ base64: true }`.)
 
 `File`, `Blob`, and `FormData` read their bytes asynchronously, so they only round-trip through `serializePortableAsync` — the sync form throws a clear error pointing to the async variant when it meets them.
 
@@ -142,11 +155,14 @@ generator.output(data, { path: './mocks/user.ts' })
 generator.output(data, { path: './mocks/user.js' })
 
 // `binary: true` — for ts/js output, writes a thin ESM wrapper plus a sibling
-// <name>.bin produced by v8.serialize. The wrapper lazily deserializes the
-// .bin on import, so the module behaves like normal `import { mockData }`
-// but preserves Date / Map / Set / RegExp / BigInt / TypedArray / undefined /
-// circular refs losslessly. The exported value is typed as `unknown`; cast on
-// the consumer side or use `deserialize<T>()` directly when you need typing.
+// <name>.bin encoded with greft-codec. The wrapper lazily `decode`s the .bin on
+// import, so the module behaves like normal `import { mockData }` but preserves
+// Date / Map / Set / RegExp / BigInt / TypedArray / Symbol / undefined /
+// NaN/Infinity / circular refs losslessly. The .bin is a cross-language
+// artifact (decodable in any JS runtime, or in Python / Rust / Go via a
+// greft-codec port). The wrapper imports `decode` from `zod-v4-mocks/greft`, so
+// consumers only need zod-v4-mocks installed — not greft-codec directly. The
+// exported value is typed as `unknown`; cast or use `deserialize<T>()`.
 generator.output(data, { path: './mocks/user.ts', binary: true })
 generator.output(data, { path: './mocks/user.js', binary: true })
 
@@ -168,7 +184,7 @@ type OutputOptions = {
   exportName?: string              // custom export variable name (default: 'mockData', ts/js only)
   header?: string                  // string prepended to the output content (ignored for json)
   footer?: string                  // string appended to the output content (ignored for json)
-  binary?: boolean                 // for ts/js, write a <name>.bin and a wrapper that deserializes it; ignored for json
+  binary?: boolean                 // for ts/js, write a cross-language <name>.bin (greft-codec) + a wrapper that `decode`s it; ignored for json
   portable?: boolean               // outputAsync only: inline cross-runtime expr (ts/js); File/Blob/FormData + circular; no Symbol; ignored for json
 }
 ```
@@ -178,7 +194,7 @@ type OutputOptions = {
 | Extension | Format | Special Type Handling |
 |--------|------|-------------|
 | `.ts` / `.js` | `export const <exportName> = ...` | Accurately serializes Date, BigInt, Map, Set, Symbol, File, Blob |
-| `.ts` / `.js` + `binary: true` | ESM wrapper + sibling `.bin` (v8 structured clone) | Preserves Date, Map, Set, RegExp, BigInt, TypedArray, `undefined`, circular refs. The wrapper exports the value as `unknown`; cast on the consumer side or use `deserialize<T>()` for typing. Node.js only. |
+| `.ts` / `.js` + `binary: true` | ESM wrapper + sibling `.bin` (greft-codec) | Preserves Date, Map, Set, RegExp, BigInt, TypedArray, Symbol, `undefined`, `NaN`/`Infinity`, circular/shared refs. The `.bin` is cross-language (decodable in any JS runtime, or in Python / Rust / Go via a greft-codec port). The wrapper imports `decode` from `zod-v4-mocks/greft`, so consumers only need `zod-v4-mocks` installed (not greft-codec directly). Exports the value as `unknown`; cast or use `deserialize<T>()`. |
 | `.ts` / `.js` + `portable: true` (**`outputAsync`**) | inline `export const <name> = <seroval expr>` | Cross-runtime (Node↔browser), no sibling file and no consumer dependency. Preserves File/Blob/FormData **contents**, Date, Map, Set, BigInt, TypedArray, circular/shared refs. **No `Symbol`.** |
 | `.json` | JSON | Date as ISO string, BigInt as string, Map/Set/Symbol lose information (with warnings). `binary` is ignored. |
 
@@ -189,10 +205,10 @@ When outputting data containing types that cannot be represented in JSON (BigInt
 ::: info `binary: true` (lossless round-trip)
 With `binary: true`, `output()` writes two files:
 
-- `<name>.bin` — raw `v8.serialize` Buffer. Perfectly preserves every value Zod can generate, including circular references.
-- `<name>.ts` / `<name>.js` — a thin ESM wrapper that lazily `v8.deserialize`s the sibling `.bin` at import time, so consumers just do `import { mockData } from './user'` with no awareness of the binary representation.
+- `<name>.bin` — a [greft-codec](https://github.com/Gityosan/greft) byte stream, decodable in any JS runtime (or in Python / Rust / Go via a port). Perfectly preserves every value Zod can generate — including `Symbol`, `NaN`/`Infinity`, and circular references.
+- `<name>.ts` / `<name>.js` — a thin ESM wrapper that lazily `decode`s the sibling `.bin` at import time, so consumers just do `import { mockData } from './user'` with no awareness of the binary representation.
 
-The wrapper exports the value as `unknown`; cast on the consumer side, or call `deserialize<T>('./user.bin')` directly when you want a typed value without going through the wrapper. The `.bin` filename is always derived from the wrapper's basename and cannot be customized separately. The wrapper targets ESM (`import.meta.dirname`) and requires Node.js 20.11+.
+The wrapper imports `decode` from `zod-v4-mocks/greft` (a re-export of greft-codec), so consumers only need `zod-v4-mocks` installed — the same package they generated the file with — and never the transitive greft-codec dependency directly. The wrapper exports the value as `unknown`; cast on the consumer side, or call `deserialize<T>('./user.bin')` directly when you want a typed value without going through the wrapper. The `.bin` filename is always derived from the wrapper's basename and cannot be customized separately. The wrapper targets ESM (`import.meta.dirname`) and requires Node.js 20.11+.
 :::
 
 ## outputAsync
@@ -203,7 +219,7 @@ outputAsync(data: unknown, options?: OutputOptions): Promise<string>
 
 Async counterpart of `output`. Required for `{ portable: true }`, which reads `File`/`Blob`/`FormData` bytes asynchronously. Non-portable modes (`json` / `ts` / `js` / `binary`) behave like `output` but write with async fs. Returns the output path.
 
-With `portable: true` (ts/js) it inlines a self-contained, cross-runtime expression — `export const <name> = <seroval expr>` — that reconstructs on a plain `import` in **any JS runtime** (Node↔browser). Unlike `binary: true` (Node-only v8 + sibling `.bin`), there is **no sibling file and no runtime dependency for consumers**, and `File`/`Blob`/`FormData` round-trip **with their contents**, alongside Date, Map, Set, BigInt, TypedArray, and circular/shared references.
+With `portable: true` (ts/js) it inlines a self-contained, cross-runtime expression — `export const <name> = <seroval expr>` — that reconstructs on a plain `import` in **any JS runtime** (Node↔browser). Unlike `binary` (which writes a sibling `.bin`), there is **no sibling file**, and `File`/`Blob`/`FormData` round-trip **with their contents**, alongside Date, Map, Set, BigInt, TypedArray, and circular/shared references.
 
 ```ts
 const data = generator.generate(schema)

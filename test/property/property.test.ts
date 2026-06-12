@@ -187,8 +187,8 @@ describe('portable round-trip: deserializePortable(serializePortable(x)) deep-eq
 });
 
 /**
- * The v8 binary path (Node-only) must round-trip the same value space —
- * hardening `serializeBinary` / `deserialize`, previously only example-tested.
+ * The greft-codec binary path (cross-runtime / cross-language) must round-trip
+ * the same value space — hardening `serializeBinary` / `deserialize`.
  */
 describe('binary round-trip: deserialize(serializeBinary(x)) deep-equals x', () => {
   it('round-trips arbitrary generated mocks', () => {

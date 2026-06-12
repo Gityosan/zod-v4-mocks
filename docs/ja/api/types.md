@@ -98,6 +98,16 @@ type OutputOptions = {
 
 [`serialize`](/ja/api/serialization#serialize) と [`output`](/ja/api/serialization#output) で使用します。各フィールドの説明は [シリアライズと出力](/ja/api/serialization#outputoptions) ページにあります。
 
+## BinaryOptions
+
+```ts
+type BinaryOptions = {
+  base64?: boolean // 生バイトの代わりに base64 文字列を返す/受け取る（テキスト安全・node 非依存・クロス言語）
+}
+```
+
+[`serializeBinary`](/ja/api/serialization#serializebinary) と [`deserialize`](/ja/api/serialization#deserialize) で使用します。両側に同じフラグを渡してください。
+
 ## PortableOptions
 
 ```ts

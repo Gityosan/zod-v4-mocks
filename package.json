@@ -1,6 +1,6 @@
 {
   "name": "zod-v4-mocks",
-  "version": "3.3.1",
+  "version": "4.0.0",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -35,6 +35,10 @@
     "./config": {
       "types": "./dist/config.d.ts",
       "default": "./dist/config.js"
+    },
+    "./greft": {
+      "types": "./dist/greft.d.ts",
+      "default": "./dist/greft.js"
     }
   },
   "bin": {
@@ -68,6 +72,7 @@
     "citty": "0.2.2",
     "consola": "3.4.2",
     "es-toolkit": "1.45.1",
+    "greft-codec": "0.1.0",
     "jiti": "2.7.0",
     "log-update": "7.2.0",
     "randexp": "0.5.3",

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { generateMocks } from './generate-from-schema';
 import type { CustomGeneratorType, GeneraterOptions, MockConfig } from './type';
 import {
+  type BinaryOptions,
   createGeneraterOptions,
   deserializeBinary,
   deserializePortable,
@@ -262,24 +263,48 @@ class MockGenerator {
   }
 
   /**
-   * Serialize data to a binary Buffer using Node.js's structured clone
-   * algorithm (`v8.serialize`). Preserves Date, Map, Set, RegExp, BigInt,
-   * TypedArray, `undefined`, and circular references with no information loss.
-   * The result is only readable in a Node.js environment.
+   * Serialize data to a binary `Uint8Array` using
+   * [`greft-codec`](https://github.com/Gityosan/greft)'s language-agnostic
+   * lossless format. Preserves Date, Map, Set, RegExp, BigInt, TypedArray,
+   * Symbol, `undefined`, `NaN`/`Infinity`, and circular/shared references with
+   * no information loss.
+   *
+   * The result round-trips across any JS runtime and can also be decoded in
+   * other languages (Python / Rust / Go / …) via a greft-codec port — handy for
+   * reusing mock data as a cross-language test fixture. Decode it back with
+   * `deserialize`.
+   *
+   * Pass `{ base64: true }` to get a text-safe `string` instead — pure data
+   * with no `node:fs` dependency, embeddable in JSON / env vars, still
+   * cross-language.
    */
-  serializeBinary(data: unknown): Buffer {
-    return serializeBinary(data);
+  serializeBinary(data: unknown, options?: { base64?: false }): Uint8Array;
+  serializeBinary(data: unknown, options: { base64: true }): string;
+  serializeBinary(data: unknown, options?: BinaryOptions): Uint8Array | string {
+    return options?.base64
+      ? serializeBinary(data, { base64: true })
+      : serializeBinary(data);
   }
 
   /**
-   * Deserialize a Buffer (or `.bin` file path) produced by `serializeBinary`
-   * or `output({ binary: true })` back into the original JavaScript value.
+   * Deserialize bytes (`Uint8Array`/`Buffer`, or a `.bin` file path) produced
+   * by `serializeBinary` or `output({ binary: true })` back into the original
+   * JavaScript value. Pass `{ base64: true }` to decode a base64 string from
+   * `serializeBinary(data, { base64: true })` (treated as data, not a file
+   * path).
    *
    * Pass a generic type parameter to cast the result, e.g.
    * `generator.deserialize<User>('./user.bin')`.
    */
-  deserialize<T = unknown>(input: Buffer | Uint8Array | string): T {
-    return deserializeBinary<T>(input);
+  deserialize<T = unknown>(input: Uint8Array | string): T;
+  deserialize<T = unknown>(input: string, options: { base64: true }): T;
+  deserialize<T = unknown>(
+    input: Uint8Array | string,
+    options?: BinaryOptions,
+  ): T {
+    return options?.base64
+      ? deserializeBinary<T>(input as string, { base64: true })
+      : deserializeBinary<T>(input);
   }
 
   /**

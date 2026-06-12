@@ -13,10 +13,10 @@ import {
   isSymbol,
   isUndefined,
 } from 'es-toolkit';
+import { decode, encode } from 'greft-codec';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
-import { deserialize as v8Deserialize, serialize as v8Serialize } from 'node:v8';
 import { z } from 'zod';
 import { serializePortableSourceAsync } from './portable';
 
@@ -44,14 +44,22 @@ export type OutputOptions = {
    */
   footer?: string;
   /**
-   * When combined with `ext: 'ts'` or `'js'`, writes a v8.serialize binary
-   * (`.bin`) alongside the script file. The script itself becomes a thin
-   * ESM wrapper that lazily `v8.deserialize`s the sibling `.bin` at import
-   * time, preserving `Date`, `Map`, `Set`, `RegExp`, `BigInt`, `TypedArray`,
-   * `undefined`, and circular references with no information loss.
+   * When combined with `ext: 'ts'` or `'js'`, writes a binary (`.bin`)
+   * alongside the script file using [`greft-codec`](https://github.com/Gityosan/greft)'s
+   * language-agnostic lossless format. The script itself becomes a thin ESM
+   * wrapper that lazily `decode`s the sibling `.bin` at import time, preserving
+   * `Date`, `Map`, `Set`, `RegExp`, `BigInt`, `TypedArray`, `Symbol`,
+   * `undefined`, `NaN`/`Infinity`, and circular/shared references with no
+   * information loss.
    *
-   * The wrapper exports the deserialized value as `unknown`. Cast on the
-   * consumer side or use `deserialize<T>()` directly if you need typing.
+   * The `.bin` round-trips across any JS runtime and can also be decoded in
+   * other languages (Python / Rust / Go / …) via a greft-codec port. The
+   * generated wrapper imports `decode` from `'zod-v4-mocks/greft'` (a re-export
+   * of greft-codec), so consumers only need `zod-v4-mocks` installed — the same
+   * package they generated the file with — not greft-codec directly.
+   *
+   * The wrapper exports the value as `unknown`. Cast on the consumer side or
+   * use `deserialize<T>()` directly if you need typing.
    *
    * Ignored for `ext: 'json'`.
    */
@@ -60,7 +68,7 @@ export type OutputOptions = {
    * Honored by `outputAsync` only (it requires async byte access). For
    * `ext: 'ts'`/`'js'`, inlines a self-contained, cross-runtime expression
    * (`export const <name> = <expr>`) produced by seroval — no sibling file and
-   * no runtime dependency for consumers, unlike `binary` (Node-only v8).
+   * no runtime dependency for consumers, unlike `binary` (a sibling `.bin`).
    * Losslessly preserves File/Blob/FormData (incl. contents), Date, Map, Set,
    * BigInt, TypedArray, circular/shared refs, and URL/URLSearchParams/Headers.
    *
@@ -275,20 +283,21 @@ function buildBinWrapper(
   const footer = options.footer ?? '';
   const binRef = wrapperBinRelativeName(outputPath);
 
+  // The wrapper reconstructs the sibling `.bin` via the `decode` re-exported
+  // from 'zod-v4-mocks/greft'. We import through zod-v4-mocks (which the
+  // consumer already has) rather than 'greft-codec' directly, so the generated
+  // file never depends on our transitive dependency.
   const imports = [
     "import { readFileSync } from 'node:fs';",
     "import { join } from 'node:path';",
-    "import { deserialize } from 'node:v8';",
+    "import { decode } from 'zod-v4-mocks/greft';",
   ].join('\n');
 
+  const typeAnnotation = ext === 'ts' ? ': unknown' : '';
   const body =
-    ext === 'ts'
-      ? `export const ${exportName}: unknown = deserialize(\n` +
-        `  readFileSync(join(import.meta.dirname, ${JSON.stringify(binRef)})),\n` +
-        `);\n`
-      : `export const ${exportName} = deserialize(\n` +
-        `  readFileSync(join(import.meta.dirname, ${JSON.stringify(binRef)})),\n` +
-        `);\n`;
+    `export const ${exportName}${typeAnnotation} = decode(\n` +
+    `  readFileSync(join(import.meta.dirname, ${JSON.stringify(binRef)})),\n` +
+    `);\n`;
 
   const parts: string[] = [];
   if (header) parts.push(header);
@@ -357,31 +366,90 @@ export function serializeOutput(data: unknown, options?: OutputOptions): string 
 }
 
 /**
- * Serialize data to a binary Buffer using Node.js's structured clone algorithm
- * (`v8.serialize`). Preserves Date, Map, Set, RegExp, BigInt, TypedArray,
- * `undefined`, and circular references with no information loss.
- *
- * The resulting Buffer is only readable in a Node.js environment via
- * `deserializeBinary` (or `v8.deserialize` directly).
+ * Options for `serializeBinary` / `deserializeBinary`.
  */
-export function serializeBinary(data: unknown): Buffer {
-  return v8Serialize(data);
+export type BinaryOptions = {
+  /**
+   * Return / accept a base64 **string** instead of raw `Uint8Array` bytes.
+   * The string is pure text — embed it in JSON, an env var, or anywhere binary
+   * is unwelcome. It stays language-agnostic (any greft-codec port can
+   * base64-decode then `decode`) and carries no `node:fs` dependency. Pass the
+   * same flag to `deserializeBinary`.
+   * @default false
+   */
+  base64?: boolean;
+};
+
+/** Cross-runtime base64 for raw bytes (Buffer in Node, btoa elsewhere). */
+function bytesToBase64(bytes: Uint8Array): string {
+  if (typeof Buffer !== 'undefined') return Buffer.from(bytes).toString('base64');
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function base64ToBytes(input: string): Uint8Array {
+  if (typeof Buffer !== 'undefined') return new Uint8Array(Buffer.from(input, 'base64'));
+  const binary = atob(input);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 /**
- * Deserialize a binary Buffer produced by `serializeBinary` (or `v8.serialize`)
- * back into the original JavaScript value.
+ * Serialize data to a binary `Uint8Array` using
+ * [`greft-codec`](https://github.com/Gityosan/greft)'s language-agnostic
+ * lossless format. Preserves Date, Map, Set, RegExp, BigInt, TypedArray,
+ * Symbol, `undefined`, `NaN`/`Infinity`, and circular/shared references with
+ * no information loss.
  *
- * Accepts either a Buffer or a path to a `.bin` file written by `outputToFile`.
+ * The result round-trips across any JS runtime and can also be decoded in other
+ * languages (Python / Rust / Go / …) via a greft-codec port — handy for reusing
+ * mock data as a cross-language test fixture. Decode it back with
+ * `deserializeBinary`.
+ *
+ * Pass `{ base64: true }` to get a text-safe `string` instead: pure data with
+ * no `node:fs` dependency that you can embed directly in JSON / env vars, while
+ * staying cross-language.
+ */
+export function serializeBinary(data: unknown, options?: { base64?: false }): Uint8Array;
+export function serializeBinary(data: unknown, options: { base64: true }): string;
+export function serializeBinary(
+  data: unknown,
+  options?: BinaryOptions,
+): Uint8Array | string {
+  const bytes = encode(data);
+  return options?.base64 ? bytesToBase64(bytes) : bytes;
+}
+
+/**
+ * Deserialize bytes produced by `serializeBinary` (or any `greft-codec`
+ * `encode`) back into the original JavaScript value.
+ *
+ * Accepts a `Uint8Array`/`Buffer`, or a path to a `.bin` file written by
+ * `outputToFile` with `binary: true`. Pass `{ base64: true }` to decode a
+ * base64 string produced by `serializeBinary(data, { base64: true })` (the
+ * string is then treated as data, not a file path).
  *
  * Pass a generic type parameter to cast the result, e.g.
  * `deserializeBinary<User>('./user.bin')`.
  */
+export function deserializeBinary<T = unknown>(input: Uint8Array | string): T;
 export function deserializeBinary<T = unknown>(
-  input: Buffer | Uint8Array | string,
+  input: string,
+  options: { base64: true },
+): T;
+export function deserializeBinary<T = unknown>(
+  input: Uint8Array | string,
+  options?: BinaryOptions,
 ): T {
-  const buffer = typeof input === 'string' ? readFileSync(input) : input;
-  return v8Deserialize(buffer) as T;
+  let bytes: Uint8Array;
+  if (typeof input === 'string') {
+    bytes = options?.base64 ? base64ToBytes(input) : readFileSync(input);
+  } else {
+    bytes = input;
+  }
+  return decode(bytes) as T;
 }
 
 export function outputToFile(data: unknown, options?: OutputOptions) {
@@ -404,8 +472,8 @@ export function outputToFile(data: unknown, options?: OutputOptions) {
   if (options?.binary && (ext === 'ts' || ext === 'js')) {
     const binName = wrapperBinRelativeName(outputPath);
     const binPath = join(dir, binName);
-    writeFileSync(binPath, serializeBinary(data));
-    const wrapper = buildBinWrapper(outputPath, options, ext);
+    writeFileSync(binPath, encode(data));
+    const wrapper = buildBinWrapper(outputPath, options ?? {}, ext);
     writeFileSync(outputPath, wrapper, 'utf-8');
     return outputPath;
   }
@@ -443,7 +511,7 @@ export async function outputToFileAsync(
   if (options?.binary && (ext === 'ts' || ext === 'js')) {
     const binName = wrapperBinRelativeName(outputPath);
     const binPath = join(dir, binName);
-    await writeFile(binPath, serializeBinary(data));
+    await writeFile(binPath, encode(data));
     const wrapper = buildBinWrapper(outputPath, options ?? {}, ext);
     await writeFile(outputPath, wrapper, 'utf-8');
     return outputPath;

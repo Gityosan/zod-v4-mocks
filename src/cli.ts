@@ -56,7 +56,8 @@ const generateCmd = defineCommand({
     format: {
       type: 'string',
       alias: 'f',
-      description: 'Output format: json | ts | js | bin (overrides extension).',
+      description:
+        'Output format: json | ts | js | bin (overrides extension).',
     },
     locale: {
       type: 'string',

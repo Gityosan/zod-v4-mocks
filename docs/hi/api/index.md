@@ -54,7 +54,7 @@ const generator = initGenerator({
 | `updateConfig` | `MockGenerator` | ✅ |
 | `generate` / `multiGenerate` / `generateMany` | data | ❌ |
 | `factory` | `{ next, take }` | ❌ |
-| `serialize` / `serializeBinary` / `serializePortable*` | `string` / `Buffer` | ❌ |
+| `serialize` / `serializeBinary` / `serializePortable*` | `string` / `Uint8Array` | ❌ |
 | `deserialize` / `deserializePortable` | data | ❌ |
 | `output` | आउटपुट पथ `string` | ❌ |
 
