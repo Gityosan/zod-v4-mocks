@@ -547,6 +547,37 @@ describe('initGenerator (functional base API)', () => {
           expect(typeof item).toBe('string');
         }
       });
+
+      it('treats an empty union as never and omits the key (Zod 4.4.0+)', () => {
+        // z.union([]) is constructible since Zod 4.4.0 and matches nothing —
+        // it is `never` in disguise. Generation must omit it, not throw the
+        // internal "Cannot get value from empty dataset" faker error.
+        const schema = z.object({ a: z.string(), u: z.union([]) });
+        const gen = initGenerator({ seed: 1 });
+        const result = gen.generate(schema);
+        expect('u' in result).toBe(false);
+        expect(typeof result.a).toBe('string');
+      });
+
+      it('treats an empty xor / discriminatedUnion as never', () => {
+        const gen = initGenerator({ seed: 1 });
+        const xorSchema = z.object({ a: z.string(), u: z.xor([]) });
+        const duSchema = z.object({
+          a: z.string(),
+          u: z.discriminatedUnion('k', []),
+        });
+        expect('u' in gen.generate(xorSchema)).toBe(false);
+        expect('u' in gen.generate(duSchema)).toBe(false);
+      });
+
+      it('returns undefined for a top-level empty union (like z.never())', () => {
+        // At the top level there is no key to omit, so the omitted value
+        // surfaces as undefined — identical to generating a top-level
+        // z.never(). It must not throw the faker empty-dataset error.
+        const gen = initGenerator({ seed: 1 });
+        expect(gen.generate(z.union([]))).toBeUndefined();
+        expect(gen.generate(z.xor([]))).toBeUndefined();
+      });
     });
   });
 });
