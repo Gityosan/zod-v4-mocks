@@ -1,0 +1,29 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "zod-v4-mocks",
+  "description": "Type-safe mock data generator for Zod v4 schemas. Generates deterministic, seedable mock data from Zod schema definitions, with CLI, config file, and MCP server support.",
+  "folders": ["docs/guide", "docs/api"],
+  "excludeFolders": [
+    "node_modules",
+    "dist",
+    "src",
+    "test",
+    "docs/.vitepress",
+    "docs/components",
+    "docs/composables",
+    "docs/scripts",
+    "docs/public",
+    "docs/playground"
+  ],
+  "excludeFiles": ["CHANGELOG.md"],
+  "rules": [
+    "Requires Zod v4.0.0+. For Zod v4.0.0-v4.3.4 use zod-v4-mocks v2.1.0+. For Zod v3.25.76 (v4 preview) use the separate zod-v4-preview-mocks package.",
+    "The entry point is initGenerator(config). Call .generate(schema) to produce a single mock, or .generateMany(schema, count) / .factory(schema) for many.",
+    "Pass a fixed `seed` to initGenerator for deterministic output across runs. Inside custom generators use options.faker instead of Math.random()/Date.now() to preserve determinism.",
+    "Customize values with .supply(ZodType, value) (all nodes of a type), .supplyRef(schemaNode, value) (one specific node by reference), .supplyPath(path, value) (by structural path, with $item/$value wildcards), or .override(customGenerator).",
+    "z.custom() and z.instanceof() must define meta({ mock: ... }) or be targeted with supplyRef; otherwise the slot is dropped from arrays/objects.",
+    "A shared zod-v4-mocks.config.{ts,js,mjs} file (via defineMockConfig) is auto-discovered by the CLI and loadConfig(), exposing base/cli/test profiles.",
+    "An MCP server is available via `npx zod-v4-mocks mcp` (stdio), exposing usage, list_schemas, preflight, and generate_mock tools; schemas are referenced by compiled .js/.mjs file path."
+  ],
+  "previousVersions": []
+}
