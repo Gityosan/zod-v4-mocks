@@ -1,10 +1,26 @@
 import { build } from 'esbuild'
-import { mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, statSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const outdir = resolve(__dirname, '../public/browser-bundles')
+const repoRoot = resolve(__dirname, '../..')
+
+// The Playground runs the *shipped* browser build (the package's `"browser"`
+// export condition), not an ad-hoc bundle of `src`. So node:* stubbing now
+// lives once in the root `tsdown.config.ts`; here we just re-bundle that
+// artifact for the browser, inlining the npm deps (faker/randexp/seroval/…)
+// that a bare browser import can't resolve while keeping zod external so the
+// user code and the mocks bundle share a single zod instance.
+const browserEntry = resolve(repoRoot, 'dist/index.browser.js')
+if (!existsSync(browserEntry)) {
+  throw new Error(
+    `Missing ${browserEntry}.\n` +
+      `Build the package first: \`pnpm run build\` in the repo root ` +
+      `(the root \`doc:dev\` script does this for you).`,
+  )
+}
 
 mkdirSync(outdir, { recursive: true })
 
@@ -12,7 +28,7 @@ mkdirSync(outdir, { recursive: true })
 await build({
   stdin: {
     contents: `export * from 'zod'; export { z } from 'zod';`,
-    resolveDir: resolve(__dirname, '../..'),
+    resolveDir: repoRoot,
     loader: 'ts',
   },
   bundle: true,
@@ -25,13 +41,11 @@ await build({
 
 console.log('Built zod.esm.js')
 
-// Bundle 2: zod-v4-mocks + dependencies (excluding zod)
+// Bundle 2: the official browser build + its deps (excluding zod).
+// `dist/index.browser.js` already has node:* replaced with browser-safe stubs,
+// so no node stubbing is needed here.
 await build({
-  stdin: {
-    contents: `export * from '../../src/index.ts';`,
-    resolveDir: resolve(__dirname),
-    loader: 'ts',
-  },
+  entryPoints: [browserEntry],
   bundle: true,
   format: 'esm',
   outfile: resolve(outdir, 'zod-v4-mocks.esm.js'),
@@ -39,42 +53,11 @@ await build({
   target: 'es2022',
   minify: true,
   external: ['zod'],
-  // Replace Node.js modules used in output.ts with stubs
-  plugins: [
-    {
-      name: 'node-stub',
-      setup(build) {
-        build.onResolve({ filter: /^node:/ }, (args) => ({
-          path: args.path,
-          namespace: 'node-stub',
-        }))
-        build.onLoad({ filter: /.*/, namespace: 'node-stub' }, () => ({
-          contents: `
-            export const existsSync = () => false;
-            export const mkdirSync = () => {};
-            export const writeFileSync = () => {};
-            export const readFileSync = () => '';
-            export const mkdir = async () => {};
-            export const writeFile = async () => {};
-            export const dirname = (p) => p;
-            export const basename = (p) => p;
-            export const extname = () => '';
-            export const join = (...parts) => parts.join('/');
-            export const serialize = (v) => v;
-            export const deserialize = (v) => v;
-            export default {};
-          `,
-          loader: 'js',
-        }))
-      },
-    },
-  ],
 })
 
 console.log('Built zod-v4-mocks.esm.js')
 
 // Report sizes
-import { statSync } from 'node:fs'
 for (const file of ['zod.esm.js', 'zod-v4-mocks.esm.js']) {
   const size = statSync(resolve(outdir, file)).size
   console.log(`  ${file}: ${(size / 1024).toFixed(1)} KB`)

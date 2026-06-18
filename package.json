@@ -30,6 +30,7 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "browser": "./dist/index.browser.js",
       "default": "./dist/index.js"
     },
     "./config": {
@@ -50,7 +51,7 @@
     "lint:fix": "eslint . --fix",
     "check:publish": "pnpm run build && publint",
     "prepare": "pnpm run build",
-    "doc:dev": "pnpm -C docs run dev"
+    "doc:dev": "pnpm run build && pnpm -C docs run dev"
   },
   "files": [
     "dist"

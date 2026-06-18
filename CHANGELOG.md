@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added a **browser build**, published via the `"browser"` export condition (`dist/index.browser.js`). CDNs (esm.sh / jsdelivr) and bundlers now resolve `zod-v4-mocks` to a browser-safe ESM build automatically — `import { initGenerator } from 'zod-v4-mocks'` works in the browser with no extra configuration. `generate()` / `multiGenerate()`, `serializeOutput()`, and the seroval-based `serializePortable()` / `deserializePortable()` all run client-side. Node-only features that have no browser equivalent — file output (`output()` / `outputAsync()`) and the v8 binary helpers (`serializeBinary()` / `deserializeBinary()`) — throw a clear error in this build instead of failing silently
 - `z.record()` now accepts a transformed key type — e.g. `z.record(z.string().transform((k) => k.toUpperCase()), z.number())` or `z.record(z.preprocess(..., z.string()), ...)`. Since Zod 4.4.0 record keys run their transforms, so the key is generated from the concrete (keyable) side, the transform is applied, and the result is validated. Previously preflight rejected any such key with a `key type 'pipe' cannot be a record key` error. If a key transform returns a non-keyable value (e.g. an object), generation now throws a clear message explaining the transform must return a string, number, or symbol
 
 ## [3.3.1] - 2026-06-08
