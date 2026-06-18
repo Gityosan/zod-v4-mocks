@@ -394,7 +394,12 @@ export const generateUtils = {
         typeof k !== 'number' &&
         typeof k !== 'symbol'
       ) {
-        throw new Error('Invalid record key type');
+        throw new Error(
+          `A record key was generated as '${typeof k}', which cannot be an ` +
+            'object key. When the key type carries a transform ' +
+            '(e.g. z.record(z.string().transform(...), ...)), the transform ' +
+            'must return a string, number, or symbol.',
+        );
       }
       addEntry(k);
     }
