@@ -156,9 +156,7 @@ class MockGenerator {
     }
     const errors = diagnostics.filter((d) => d.level === 'error');
     if (errors.length > 0) {
-      const lines = errors
-        .map((e) => `  - ${e.path}: ${e.message}`)
-        .join('\n');
+      const lines = errors.map((e) => `  - ${e.path}: ${e.message}`).join('\n');
       throw new Error(
         `Preflight check found ${errors.length} issue(s):\n${lines}\n` +
           'Disable with initGenerator({ preflightCheck: false }).',
@@ -314,7 +312,10 @@ class MockGenerator {
    *
    * Only feed it data you produced yourself — the string path is evaluated.
    */
-  deserializePortable<T = unknown>(input: string, options?: PortableOptions): T {
+  deserializePortable<T = unknown>(
+    input: string,
+    options?: PortableOptions,
+  ): T {
     return deserializePortable<T>(input, options);
   }
 

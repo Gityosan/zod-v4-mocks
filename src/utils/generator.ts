@@ -539,7 +539,10 @@ export const generateUtils = {
       return generator(right, options);
     }
 
-    if (safeInstanceof(right, z.ZodAny) || safeInstanceof(right, z.ZodUnknown)) {
+    if (
+      safeInstanceof(right, z.ZodAny) ||
+      safeInstanceof(right, z.ZodUnknown)
+    ) {
       return generator(left, options);
     }
 
@@ -556,7 +559,10 @@ export const generateUtils = {
       throw new Error('Incompatible Map types in intersection');
     }
 
-    if (safeInstanceof(left, z.ZodLiteral) && safeInstanceof(right, z.ZodLiteral)) {
+    if (
+      safeInstanceof(left, z.ZodLiteral) &&
+      safeInstanceof(right, z.ZodLiteral)
+    ) {
       const intersection = intersectionES([...left.values], [...right.values]);
       const mergedSchema = z.literal(intersection);
       return generator(mergedSchema, options);
@@ -572,7 +578,10 @@ export const generateUtils = {
       throw new Error('Incompatible Set types in intersection');
     }
 
-    if (safeInstanceof(left, z.ZodString) && safeInstanceof(right, z.ZodString)) {
+    if (
+      safeInstanceof(left, z.ZodString) &&
+      safeInstanceof(right, z.ZodString)
+    ) {
       const min = compareMin(left.minLength, right.minLength);
       const max = compareMax(left.maxLength, right.maxLength);
       if (min === null) {
@@ -584,7 +593,10 @@ export const generateUtils = {
       return generator(z.string().min(min).max(max), options);
     }
 
-    if (safeInstanceof(left, z.ZodNumber) && safeInstanceof(right, z.ZodNumber)) {
+    if (
+      safeInstanceof(left, z.ZodNumber) &&
+      safeInstanceof(right, z.ZodNumber)
+    ) {
       const min = Math.max(
         left.minValue ?? Number.MIN_SAFE_INTEGER,
         right.minValue ?? Number.MIN_SAFE_INTEGER,
@@ -596,7 +608,10 @@ export const generateUtils = {
       return generator(z.number().min(min).max(max), options);
     }
 
-    if (safeInstanceof(left, z.ZodBoolean) && safeInstanceof(right, z.ZodBoolean)) {
+    if (
+      safeInstanceof(left, z.ZodBoolean) &&
+      safeInstanceof(right, z.ZodBoolean)
+    ) {
       return generator(right, options);
     }
 
@@ -604,7 +619,10 @@ export const generateUtils = {
       return generator(right, options);
     }
 
-    if (safeInstanceof(left, z.ZodBigInt) && safeInstanceof(right, z.ZodBigInt)) {
+    if (
+      safeInstanceof(left, z.ZodBigInt) &&
+      safeInstanceof(right, z.ZodBigInt)
+    ) {
       const leftMin = left.minValue ?? BigInt(Number.MIN_SAFE_INTEGER);
       const rightMin = right.minValue ?? BigInt(Number.MIN_SAFE_INTEGER);
       const leftMax = left.maxValue ?? BigInt(Number.MAX_SAFE_INTEGER);

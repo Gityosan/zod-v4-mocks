@@ -14,7 +14,8 @@ export function regenerateIfOmitted(
   // If result is omit symbol, unwrap and regenerate the actual value
   if (
     value === OMIT_SYMBOL &&
-    (schema instanceof z.ZodOptional || safeInstanceof(schema, z.ZodExactOptional))
+    (schema instanceof z.ZodOptional ||
+      safeInstanceof(schema, z.ZodExactOptional))
   ) {
     return generator(schema.unwrap(), options);
   }

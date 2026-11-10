@@ -53,6 +53,5 @@ describe('initGenerator (functional base API)', () => {
 
       expect(result).toBe('test');
     });
-
   });
 });

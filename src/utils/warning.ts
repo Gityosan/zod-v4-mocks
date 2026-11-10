@@ -7,10 +7,7 @@ const seenWarnings = new WeakSet<object>();
  * @package
  * Emit a warning at most once per (schema, key) pair within a process.
  */
-export function warnOnceForSchema(
-  schema: object,
-  message: string,
-): void {
+export function warnOnceForSchema(schema: object, message: string): void {
   if (seenWarnings.has(schema)) return;
   seenWarnings.add(schema);
   console.warn(message);

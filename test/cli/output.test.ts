@@ -1,4 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { initGenerator } from '../../src';
@@ -155,7 +161,9 @@ describe('initGenerator (functional base API)', () => {
       expect(typeof content.count).toBe('string');
       expect(content.count).toMatch(/^\d+$/);
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Some data types cannot be accurately represented in JSON'),
+        expect.stringContaining(
+          'Some data types cannot be accurately represented in JSON',
+        ),
       );
 
       warnSpy.mockRestore();
@@ -239,7 +247,9 @@ describe('initGenerator (functional base API)', () => {
 
       expect(warnSpy).toHaveBeenCalledTimes(1);
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Some data types cannot be accurately represented in JSON'),
+        expect.stringContaining(
+          'Some data types cannot be accurately represented in JSON',
+        ),
       );
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('count'));
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('amount'));
@@ -316,7 +326,10 @@ describe('output - exportName option', () => {
     const data = { name: 'test' };
     const outputPath = `${testOutputDir}/custom-name.ts`;
 
-    generator.output(data, { path: outputPath, exportName: 'generatedMockData' });
+    generator.output(data, {
+      path: outputPath,
+      exportName: 'generatedMockData',
+    });
 
     const content = readFileSync(outputPath, 'utf-8');
     expect(content).toContain('export const generatedMockData =');
@@ -339,7 +352,10 @@ describe('output - exportName option', () => {
     const data = { name: 'test' };
     const outputPath = `${testOutputDir}/custom-name.json`;
 
-    generator.output(data, { path: outputPath, exportName: 'generatedMockData' });
+    generator.output(data, {
+      path: outputPath,
+      exportName: 'generatedMockData',
+    });
 
     const content = readFileSync(outputPath, 'utf-8');
     expect(content).not.toContain('export const');
@@ -430,7 +446,9 @@ describe('serialize', () => {
     const generator = initGenerator();
     const data = { id: 1 };
 
-    const result = generator.serialize(data, { exportName: 'generatedMockData' });
+    const result = generator.serialize(data, {
+      exportName: 'generatedMockData',
+    });
 
     expect(result).toContain('export const generatedMockData =');
     expect(result).not.toContain('export const mockData');
@@ -520,7 +538,9 @@ describe('serializeBinary / deserialize (v8 structured clone)', () => {
     expect(restored.d.toISOString()).toBe('2025-01-01T00:00:00.000Z');
     expect(restored.m).toBeInstanceOf(Map);
     expect(restored.m.get('a')).toBe(1);
-    expect((restored.m.get('b') as Date).toISOString()).toBe(new Date(0).toISOString());
+    expect((restored.m.get('b') as Date).toISOString()).toBe(
+      new Date(0).toISOString(),
+    );
     expect(restored.s).toBeInstanceOf(Set);
     expect([...restored.s]).toEqual([1, 2, 3]);
     expect(restored.re).toBeInstanceOf(RegExp);
@@ -536,7 +556,9 @@ describe('serializeBinary / deserialize (v8 structured clone)', () => {
     const b: Record<string, unknown> = { name: 'b', a };
     a.b = b;
 
-    const restored = generator.deserialize<typeof a>(generator.serializeBinary(a));
+    const restored = generator.deserialize<typeof a>(
+      generator.serializeBinary(a),
+    );
     expect(restored.name).toBe('a');
     expect((restored.b as typeof b).name).toBe('b');
     expect((restored.b as typeof b).a).toBe(restored);
@@ -565,7 +587,9 @@ describe('serializeBinary / deserialize (v8 structured clone)', () => {
     });
     const data = generator.generate(schema);
 
-    const restored = generator.deserialize<typeof data>(generator.serializeBinary(data));
+    const restored = generator.deserialize<typeof data>(
+      generator.serializeBinary(data),
+    );
     expect(typeof restored.id).toBe('bigint');
     expect(restored.tags).toBeInstanceOf(Set);
     expect(restored.meta).toBeInstanceOf(Map);
@@ -690,22 +714,27 @@ describe('output with binary flag (wrapper + .bin)', () => {
     expect(result).toBe(outputPath);
     expect(existsSync(outputPath)).toBe(true);
     expect(existsSync(`${testOutputDir}/plain.bin`)).toBe(false);
-    expect(JSON.parse(readFileSync(outputPath, 'utf-8'))).toEqual({ id: 'abc' });
+    expect(JSON.parse(readFileSync(outputPath, 'utf-8'))).toEqual({
+      id: 'abc',
+    });
   });
 
   it('serialize() throws when binary is true with ts/js', () => {
     const generator = initGenerator();
-    expect(() =>
-      generator.serialize({}, { ext: 'ts', binary: true }),
-    ).toThrow(/output\(\)/);
-    expect(() =>
-      generator.serialize({}, { ext: 'js', binary: true }),
-    ).toThrow(/output\(\)/);
+    expect(() => generator.serialize({}, { ext: 'ts', binary: true })).toThrow(
+      /output\(\)/,
+    );
+    expect(() => generator.serialize({}, { ext: 'js', binary: true })).toThrow(
+      /output\(\)/,
+    );
   });
 
   it('serialize() ignores binary flag for json (no throw)', () => {
     const generator = initGenerator();
-    const result = generator.serialize({ id: 1 }, { ext: 'json', binary: true });
+    const result = generator.serialize(
+      { id: 1 },
+      { ext: 'json', binary: true },
+    );
     expect(JSON.parse(result)).toEqual({ id: 1 });
   });
 });
@@ -871,7 +900,10 @@ describe('outputAsync (portable, cross-runtime)', () => {
     };
     const outputPath = `${testOutputDir}/portable-file.js`;
 
-    const result = await generator.outputAsync(data, { path: outputPath, portable: true });
+    const result = await generator.outputAsync(data, {
+      path: outputPath,
+      portable: true,
+    });
     expect(result).toBe(outputPath);
     expect(existsSync(outputPath)).toBe(true);
 
@@ -903,7 +935,9 @@ describe('outputAsync (portable, cross-runtime)', () => {
     await generator.outputAsync(data, { path: outputPath, portable: true });
     const mod = (await importFresh(outputPath)) as { mockData: typeof data };
 
-    expect((mod.mockData.createdAt as Date).toISOString()).toBe('2025-01-01T00:00:00.000Z');
+    expect((mod.mockData.createdAt as Date).toISOString()).toBe(
+      '2025-01-01T00:00:00.000Z',
+    );
     expect(mod.mockData.tags).toBeInstanceOf(Set);
     expect(mod.mockData.meta).toBeInstanceOf(Map);
     expect((mod.mockData.meta as Map<string, unknown>).get('n')).toBe(1n);
@@ -944,7 +978,10 @@ describe('outputAsync (portable, cross-runtime)', () => {
   it('sync output() throws when portable is requested for ts/js', () => {
     const generator = initGenerator();
     expect(() =>
-      generator.output({ id: 1 }, { path: `${testOutputDir}/x.ts`, portable: true }),
+      generator.output(
+        { id: 1 },
+        { path: `${testOutputDir}/x.ts`, portable: true },
+      ),
     ).toThrow(/outputAsync/);
   });
 
@@ -952,8 +989,13 @@ describe('outputAsync (portable, cross-runtime)', () => {
     const generator = initGenerator();
     const outputPath = `${testOutputDir}/async-plain.json`;
 
-    const result = await generator.outputAsync({ name: 'test' }, { path: outputPath });
+    const result = await generator.outputAsync(
+      { name: 'test' },
+      { path: outputPath },
+    );
     expect(result).toBe(outputPath);
-    expect(JSON.parse(readFileSync(outputPath, 'utf-8'))).toEqual({ name: 'test' });
+    expect(JSON.parse(readFileSync(outputPath, 'utf-8'))).toEqual({
+      name: 'test',
+    });
   });
 });

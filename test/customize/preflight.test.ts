@@ -27,9 +27,7 @@ describe('preflight - z.custom at a tuple position', () => {
     const Custom = FileCustom();
     const Schema = z.tuple([z.string(), Custom]);
     expect(() =>
-      initGenerator()
-        .supplyRef(Custom, new File([], 'a.txt'))
-        .generate(Schema),
+      initGenerator().supplyRef(Custom, new File([], 'a.txt')).generate(Schema),
     ).not.toThrow();
   });
 
@@ -51,10 +49,7 @@ describe('preflight - z.custom at a tuple position', () => {
 
   it('does not flag a z.custom nested in an object inside a tuple', () => {
     // the object absorbs the omission, so the tuple slot stays valid
-    const Schema = z.tuple([
-      z.string(),
-      z.object({ file: FileCustom() }),
-    ]);
+    const Schema = z.tuple([z.string(), z.object({ file: FileCustom() })]);
     expect(() => initGenerator().generate(Schema)).not.toThrow();
   });
 
@@ -213,9 +208,7 @@ describe('preflight - ignored .refine() / .superRefine()', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const Schema = z.object({ name: z.string().min(3) });
     initGenerator().generate(Schema);
-    const w = warn.mock.calls.find((a) =>
-      String(a[0]).includes('.refine()'),
-    );
+    const w = warn.mock.calls.find((a) => String(a[0]).includes('.refine()'));
     expect(w).toBeUndefined();
     warn.mockRestore();
   });
@@ -226,9 +219,7 @@ describe('preflight - ignored .refine() / .superRefine()', () => {
       .object({ a: z.string(), b: z.string() })
       .refine((o) => o.a === o.b);
     initGenerator().generate(Schema);
-    const w = warn.mock.calls.find((a) =>
-      String(a[0]).includes('.refine()'),
-    );
+    const w = warn.mock.calls.find((a) => String(a[0]).includes('.refine()'));
     expect(w).toBeDefined();
     warn.mockRestore();
   });
@@ -385,7 +376,12 @@ describe('preflight - unsatisfiable min > max range', () => {
 describe('preflight - conflicting string checks', () => {
   it('warns when a z.string() has multiple regex checks', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    initGenerator().generate(z.string().regex(/^[A-Z]/).regex(/\d$/));
+    initGenerator().generate(
+      z
+        .string()
+        .regex(/^[A-Z]/)
+        .regex(/\d$/),
+    );
     const w = warn.mock.calls.find(
       (a) =>
         String(a[0]).includes('[preflight]') &&
@@ -398,9 +394,7 @@ describe('preflight - conflicting string checks', () => {
   it('warns for multiple startsWith checks', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     initGenerator().generate(z.string().startsWith('a').startsWith('ab'));
-    const w = warn.mock.calls.find((a) =>
-      String(a[0]).includes('startsWith'),
-    );
+    const w = warn.mock.calls.find((a) => String(a[0]).includes('startsWith'));
     expect(w).toBeDefined();
     warn.mockRestore();
   });
@@ -408,9 +402,7 @@ describe('preflight - conflicting string checks', () => {
   it('does not warn for a single regex check', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     initGenerator().generate(z.string().regex(/^[A-Z]+$/));
-    const w = warn.mock.calls.find((a) =>
-      String(a[0]).includes('multiple'),
-    );
+    const w = warn.mock.calls.find((a) => String(a[0]).includes('multiple'));
     expect(w).toBeUndefined();
     warn.mockRestore();
   });
@@ -554,8 +546,8 @@ describe('preflight() - public diagnostics API', () => {
 
   it('returns an empty array when preflightCheck is disabled', () => {
     const Schema = z.object({ score: z.number().min(100).max(10) });
-    expect(
-      initGenerator({ preflightCheck: false }).preflight(Schema),
-    ).toEqual([]);
+    expect(initGenerator({ preflightCheck: false }).preflight(Schema)).toEqual(
+      [],
+    );
   });
-})
+});

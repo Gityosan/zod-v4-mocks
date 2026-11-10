@@ -33,7 +33,7 @@ const generateCmd = defineCommand({
     export: {
       type: 'positional',
       description:
-        'Named export to use. Defaults to the module\'s default export.',
+        "Named export to use. Defaults to the module's default export.",
       required: false,
     },
     count: {

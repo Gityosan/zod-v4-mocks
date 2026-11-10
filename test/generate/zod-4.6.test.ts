@@ -62,7 +62,9 @@ describe('zod 4.5 / 4.6 support', () => {
 
   describe('object helpers', () => {
     it('.exactPartial()', () =>
-      expectAllValid(z.object({ a: z.string(), b: z.number() }).exactPartial()));
+      expectAllValid(
+        z.object({ a: z.string(), b: z.number() }).exactPartial(),
+      ));
   });
 
   describe('number formats', () => {

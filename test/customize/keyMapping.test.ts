@@ -260,16 +260,43 @@ describe('keyMapping: auto - built-in table coverage', () => {
     const r = initGenerator({ keyMapping: 'auto' }).generate(Schema);
 
     const stringKeys = [
-      'firstName', 'lastName', 'username', 'phone', 'avatar', 'url', 'uuid',
-      'slug', 'street', 'city', 'state', 'country', 'zipCode', 'company',
-      'jobTitle', 'department', 'product', 'description', 'title', 'content',
-      'color', 'currency', 'timezone', 'gender', 'filename',
+      'firstName',
+      'lastName',
+      'username',
+      'phone',
+      'avatar',
+      'url',
+      'uuid',
+      'slug',
+      'street',
+      'city',
+      'state',
+      'country',
+      'zipCode',
+      'company',
+      'jobTitle',
+      'department',
+      'product',
+      'description',
+      'title',
+      'content',
+      'color',
+      'currency',
+      'timezone',
+      'gender',
+      'filename',
     ] as const;
     for (const k of stringKeys) {
       expect(typeof r[k], k).toBe('string');
       expect((r[k] as string).length, k).toBeGreaterThan(0);
     }
-    for (const k of ['price', 'quantity', 'rating', 'latitude', 'year'] as const) {
+    for (const k of [
+      'price',
+      'quantity',
+      'rating',
+      'latitude',
+      'year',
+    ] as const) {
       expect(typeof r[k], k).toBe('number');
     }
     expect(r.year).toBeGreaterThanOrEqual(1970);

@@ -40,7 +40,9 @@ describe('serializePortable / deserializePortable (seroval, cross-runtime)', () 
     expect(restored.d.toISOString()).toBe('2025-01-01T00:00:00.000Z');
     expect(restored.m).toBeInstanceOf(Map);
     expect(restored.m.get('a')).toBe(1);
-    expect((restored.m.get('b') as Date).toISOString()).toBe(new Date(0).toISOString());
+    expect((restored.m.get('b') as Date).toISOString()).toBe(
+      new Date(0).toISOString(),
+    );
     expect(restored.s).toBeInstanceOf(Set);
     expect([...restored.s]).toEqual([1, 2, 3]);
     expect(restored.re).toBeInstanceOf(RegExp);
@@ -126,7 +128,9 @@ describe('serializePortable / deserializePortable (seroval, cross-runtime)', () 
     expect((mk as symbol).description).toBe('key');
     expect(mv).toBe(1);
     expect(restored.set).toBeInstanceOf(Set);
-    expect([...restored.set].map((s) => (s as symbol).description).sort()).toEqual(['a', 'b']);
+    expect(
+      [...restored.set].map((s) => (s as symbol).description).sort(),
+    ).toEqual(['a', 'b']);
   });
 
   it('round-trips a Symbol generated from z.symbol() and re-parses', () => {
@@ -138,7 +142,9 @@ describe('serializePortable / deserializePortable (seroval, cross-runtime)', () 
       generator.serializePortable(data),
     );
     expect(typeof restored.id).toBe('symbol');
-    expect((restored.id as symbol).description).toBe((data.id as symbol).description);
+    expect((restored.id as symbol).description).toBe(
+      (data.id as symbol).description,
+    );
     expect(schema.parse(restored)).toBeDefined();
   });
 
@@ -151,7 +157,10 @@ describe('serializePortable / deserializePortable (seroval, cross-runtime)', () 
 
   it('round-trips through base64 encoding (incl. multi-byte UTF-8)', () => {
     const generator = initGenerator();
-    const data = { msg: 'こんにちは🎉', when: new Date('2026-05-25T00:00:00.000Z') };
+    const data = {
+      msg: 'こんにちは🎉',
+      when: new Date('2026-05-25T00:00:00.000Z'),
+    };
 
     const encoded = generator.serializePortable(data, { base64: true });
     // base64 alphabet only
@@ -240,10 +249,15 @@ describe('serializePortable — web types, async combos & symbol corners', () =>
 
   it('round-trips a Symbol through base64', () => {
     const generator = initGenerator();
-    const encoded = generator.serializePortable({ s: Symbol('b64') }, { base64: true });
+    const encoded = generator.serializePortable(
+      { s: Symbol('b64') },
+      { base64: true },
+    );
     expect(encoded).toMatch(/^[A-Za-z0-9+/]+={0,2}$/);
 
-    const r = generator.deserializePortable<{ s: symbol }>(encoded, { base64: true });
+    const r = generator.deserializePortable<{ s: symbol }>(encoded, {
+      base64: true,
+    });
     expect(r.s.description).toBe('b64');
   });
 
@@ -356,7 +370,9 @@ describe('serializePortable — web types, async combos & symbol corners', () =>
     const generator = initGenerator();
     const lookAlike = { '$$zod-v4-mocks/symbol$$': ['desc', 'collision'] };
 
-    const r = generator.deserializePortable(generator.serializePortable(lookAlike));
+    const r = generator.deserializePortable(
+      generator.serializePortable(lookAlike),
+    );
     expect(typeof r).toBe('symbol');
     expect((r as symbol).description).toBe('collision');
   });

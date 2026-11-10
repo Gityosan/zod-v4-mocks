@@ -11,10 +11,7 @@ import { z } from 'zod';
 export function safeInstanceof<
   V extends z.core.$ZodType | z.core.$ZodCheck<never>,
   T extends abstract new (...args: never[]) => V,
->(
-  value: V,
-  ctor: T | undefined,
-): value is InstanceType<T> & V {
+>(value: V, ctor: T | undefined): value is InstanceType<T> & V {
   return typeof ctor === 'function' && value instanceof ctor;
 }
 

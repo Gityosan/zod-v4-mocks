@@ -108,10 +108,14 @@ function generateFromSchema(
     const cidrv6Schema = checks.find((v) => safeInstanceof(v, z.ZodCIDRv6));
     if (cidrv6Schema) return u.cidrv6(f);
 
-    const base64urlSchema = checks.find((v) => safeInstanceof(v, z.ZodBase64URL));
+    const base64urlSchema = checks.find((v) =>
+      safeInstanceof(v, z.ZodBase64URL),
+    );
     if (base64urlSchema) return u.base64url(f);
 
-    const isoDateTimeSchema = checks.find((v) => safeInstanceof(v, z.ZodISODateTime));
+    const isoDateTimeSchema = checks.find((v) =>
+      safeInstanceof(v, z.ZodISODateTime),
+    );
     if (isoDateTimeSchema) return u.isoDateTime(f);
 
     const isoDateSchema = checks.find((v) => safeInstanceof(v, z.ZodISODate));
@@ -120,7 +124,9 @@ function generateFromSchema(
     const isoTimeSchema = checks.find((v) => safeInstanceof(v, z.ZodISOTime));
     if (isoTimeSchema) return u.isoTime(f);
 
-    const isoDurationSchema = checks.find((v) => safeInstanceof(v, z.ZodISODuration));
+    const isoDurationSchema = checks.find((v) =>
+      safeInstanceof(v, z.ZodISODuration),
+    );
     if (isoDurationSchema) return u.isoDuration(f);
 
     const cuidSchema = checks.find((v) => safeInstanceof(v, z.ZodCUID));
@@ -141,7 +147,9 @@ function generateFromSchema(
     const base64Schema = checks.find((v) => safeInstanceof(v, z.ZodBase64));
     if (base64Schema) return u.base64(f);
 
-    const creditCardSchema = checks.find((v) => safeInstanceof(v, z.ZodCreditCard));
+    const creditCardSchema = checks.find((v) =>
+      safeInstanceof(v, z.ZodCreditCard),
+    );
     if (creditCardSchema) return u.creditCard(f);
 
     const ibanSchema = checks.find((v) => safeInstanceof(v, z.ZodIBAN));
@@ -176,7 +184,8 @@ function generateFromSchema(
 
   if (safeInstanceof(s, z.ZodLiteral)) return u.literal(s, o);
   if (safeInstanceof(s, z.ZodEnum)) return u.enum(s, o);
-  if (safeInstanceof(s, z.ZodTemplateLiteral)) return u.templateLiteral(s, o, g);
+  if (safeInstanceof(s, z.ZodTemplateLiteral))
+    return u.templateLiteral(s, o, g);
   if (safeInstanceof(s, z.ZodArray)) return u.array(s, o, g);
   if (safeInstanceof(s, z.ZodTuple)) return u.tuple(s, o, g);
   if (safeInstanceof(s, z.ZodObject)) return u.object(s, o, g);
@@ -220,10 +229,9 @@ function generateFromSchema(
       'meta' in s && typeof s.meta === 'function' ? s.meta() : undefined;
     const candidate = meta?.[key];
     if (typeof candidate === 'function') {
-      return (candidate as (faker: typeof f, opts: GeneraterOptions) => unknown)(
-        f,
-        o,
-      );
+      return (
+        candidate as (faker: typeof f, opts: GeneraterOptions) => unknown
+      )(f, o);
     }
     if (candidate !== undefined) return candidate;
     warnOnceForSchema(
@@ -313,7 +321,10 @@ export function generateMocks(
     }
     const newCircularRefs = new Map(circularRefs);
     newCircularRefs.set(schema, depth + 1);
-    return generateFromSchema(schema, { ...options, circularRefs: newCircularRefs });
+    return generateFromSchema(schema, {
+      ...options,
+      circularRefs: newCircularRefs,
+    });
   }
 
   return generateFromSchema(schema, options);

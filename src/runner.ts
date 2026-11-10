@@ -70,7 +70,9 @@ function resolveModulePath(modulePath: string): string {
   return abs;
 }
 
-async function importModule(modulePath: string): Promise<Record<string, unknown>> {
+async function importModule(
+  modulePath: string,
+): Promise<Record<string, unknown>> {
   const abs = resolveModulePath(modulePath);
   const url = pathToFileURL(abs).href;
   return (await import(url)) as Record<string, unknown>;
@@ -100,9 +102,7 @@ export async function loadSchema(
  * MCP `list_schemas` tool so an agent can discover what's available before
  * calling `generate_mock`.
  */
-export async function loadSchemaExports(
-  modulePath: string,
-): Promise<string[]> {
+export async function loadSchemaExports(modulePath: string): Promise<string[]> {
   const mod = await importModule(modulePath);
   return Object.keys(mod).filter((key) => isZodSchema(mod[key]));
 }
