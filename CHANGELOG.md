@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Development and tests now run against Zod 4.6.7 (peer range unchanged: `zod@^4.0.0`)
+- Tooling: linting moved from ESLint + typescript-eslint to **oxlint** (type-aware via `oxlint-tsgolint`) and formatting from Prettier to **oxfmt**. The same rule set is kept; `@typescript-eslint/naming-convention` (which oxlint cannot load because it always requires type information) is reproduced by a small local JS plugin in `tools/oxlint-naming-convention.js`. CI now also runs `pnpm run format:check`. Lint goes from ~4.7s to ~1s and formatting from ~1.7s to ~0.1s locally
 
 ## [3.4.0] - 2026-06-19
 
