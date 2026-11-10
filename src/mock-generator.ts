@@ -115,7 +115,7 @@ class MockGenerator {
     return this;
   }
 
-  register(schemas: z.ZodType[]) {
+  register(schemas: z.ZodType[]): this {
     const { config, registry, valueStore } = this.options;
     const length = config.array?.max ?? 10;
     for (const schema of schemas) {

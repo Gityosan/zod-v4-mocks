@@ -23,7 +23,11 @@ import {
 import { z } from 'zod';
 import { serializePortableSourceAsync } from './portable';
 
-const outputExtSchema = z.literal(['json', 'js', 'ts']);
+const outputExtSchema: z.ZodLiteral<'json' | 'ts' | 'js'> = z.literal([
+  'json',
+  'js',
+  'ts',
+]);
 type OutputExt = z.infer<typeof outputExtSchema>;
 
 export type OutputOptions = {
@@ -390,7 +394,7 @@ export function deserializeBinary<T = unknown>(
   return v8Deserialize(buffer) as T;
 }
 
-export function outputToFile(data: unknown, options?: OutputOptions) {
+export function outputToFile(data: unknown, options?: OutputOptions): string {
   const ext = options?.ext ?? getExtFromPath(options?.path) ?? 'ts';
   const outputPath =
     options?.path ?? `${DEFAULT_OUTPUT_DIR}/${DEFAULT_OUTPUT_FILENAME}.${ext}`;

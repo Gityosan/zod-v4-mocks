@@ -18,7 +18,7 @@ export function safeInstanceof<
 /**
  * @package
  */
-export function unwrapSchema(schema: z.core.$ZodType) {
+export function unwrapSchema(schema: z.core.$ZodType): z.core.$ZodType {
   if (safeInstanceof(schema, z.ZodOptional)) return schema.unwrap();
   if (safeInstanceof(schema, z.ZodNullable)) return schema.unwrap();
   if (safeInstanceof(schema, z.ZodDefault)) return schema.unwrap();

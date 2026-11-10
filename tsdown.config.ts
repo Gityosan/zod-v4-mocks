@@ -77,7 +77,7 @@ export default defineConfig([
   {
     ...shared,
     entry: { index: 'src/index.ts', config: 'src/config.ts' },
-    dts: true,
+    dts: { oxc: true },
     clean: true,
   },
   {

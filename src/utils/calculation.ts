@@ -9,7 +9,19 @@ export function calcMinMaxString(
   minLength: number | null,
   maxLength: number | null,
   length?: number,
-) {
+):
+  | {
+      length: number;
+    }
+  | {
+      length: {
+        min: number;
+        max: number;
+      };
+    }
+  | {
+      length: undefined;
+    } {
   if (typeof length === 'number') return { length };
   if (typeof minLength === 'number') {
     if (maxLength === null) return { length: minLength };
@@ -25,7 +37,10 @@ export function calcMinMaxString(
 /**
  * @package
  */
-export function compareMin(leftMin: number | null, rightMin: number | null) {
+export function compareMin(
+  leftMin: number | null,
+  rightMin: number | null,
+): number | null {
   if (typeof leftMin === 'number' && typeof rightMin === 'number')
     return Math.max(leftMin, rightMin);
   if (typeof leftMin === 'number') return leftMin;
@@ -36,7 +51,10 @@ export function compareMin(leftMin: number | null, rightMin: number | null) {
 /**
  * @package
  */
-export function compareMax(leftMax: number | null, rightMax: number | null) {
+export function compareMax(
+  leftMax: number | null,
+  rightMax: number | null,
+): number | null {
   if (typeof leftMax === 'number' && typeof rightMax === 'number')
     return Math.min(leftMax, rightMax);
   if (typeof leftMax === 'number') return leftMax;
@@ -50,7 +68,10 @@ export function compareMax(leftMax: number | null, rightMax: number | null) {
 export function calcMinMaxNumber(
   minValue: number | null,
   maxValue: number | null,
-) {
+): {
+  min: number | undefined;
+  max: number | undefined;
+} {
   let min = minValue === null ? undefined : minValue;
   let max = maxValue === null ? undefined : maxValue;
   if (min !== undefined && min < Number.MIN_SAFE_INTEGER) {
@@ -73,7 +94,10 @@ export function calcMinMaxNumber(
 export function calcMinMaxBigInt(
   minValue: bigint | null,
   maxValue: bigint | null,
-) {
+): {
+  min: bigint | undefined;
+  max: bigint | undefined;
+} {
   const min = minValue === null ? undefined : minValue;
   let max = maxValue === null ? undefined : maxValue;
   if (min !== undefined && max !== undefined && min > max) {
