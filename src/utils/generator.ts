@@ -135,7 +135,24 @@ export const generateUtils = {
   },
   url: (faker: Faker) => faker.internet.url(),
   jwt: (faker: Faker) => faker.internet.jwt(),
-  emoji: (faker: Faker) => faker.internet.emoji(),
+  emoji: (
+    faker: Faker,
+    bounds?: { minLength: number | null; maxLength: number | null },
+  ) => {
+    const minLength = bounds?.minLength ?? null;
+    const maxLength = bounds?.maxLength ?? null;
+    if (minLength === null && maxLength === null) return faker.internet.emoji();
+    // zod >= 4.5 measures string length in code points, while faker's emoji
+    // may be multi-code-point sequences (ZWJ, skin tones, flags). Build the
+    // value from single-code-point emoji (U+1F600..U+1F64F) so the length is
+    // exactly the number of characters we emit.
+    const min = Math.max(1, minLength ?? 1);
+    const max = Math.max(min, maxLength ?? min + 4);
+    const length = faker.number.int({ min, max });
+    return Array.from({ length }, () =>
+      String.fromCodePoint(faker.number.int({ min: 0x1f600, max: 0x1f64f })),
+    ).join('');
+  },
   uuidv4: (faker: Faker) => faker.string.uuid(),
   nanoid: (faker: Faker) => faker.string.nanoid(),
   ulid: (faker: Faker) => faker.string.ulid(),
@@ -152,6 +169,17 @@ export const generateUtils = {
     return randexp.gen();
   },
   base64url: (faker: Faker) => faker.string.alphanumeric(22),
+  // Encode random bytes rather than sampling the format regex: zod >= 4.6
+  // validates padding/length in code, which a regex sampler cannot honour.
+  base64: (faker: Faker) => {
+    const length = faker.number.int({ min: 1, max: 48 });
+    const bytes = Array.from({ length }, () =>
+      faker.number.int({ min: 0, max: 255 }),
+    );
+    return btoa(String.fromCharCode(...bytes));
+  },
+  creditCard: (faker: Faker) => faker.finance.creditCardNumber(),
+  iban: (faker: Faker) => faker.finance.iban(),
   isoDateTime: (faker: Faker) => faker.date.anytime().toISOString(),
   isoDate: (faker: Faker) => faker.date.anytime().toISOString().split('T')[0],
   isoTime: (faker: Faker) => faker.date.anytime().toISOString().slice(11, 19),
@@ -284,6 +312,33 @@ export const generateUtils = {
       return generator(item, childOpts);
     });
 
+    // Optional items (e.g. `.partial()` tuples, zod >= 4.5) may come back
+    // as OMIT_SYMBOL. Trailing omitted items are dropped (a shorter tuple is
+    // valid when the rest is optional). An omitted item in the middle becomes
+    // `undefined` for z.optional(), or is regenerated for z.exactOptional(),
+    // which does not accept `undefined`.
+    while (result.length > 0 && result.at(-1) === OMIT_SYMBOL) {
+      const item = items[result.length - 1];
+      if (
+        !safeInstanceof(item, z.ZodOptional) &&
+        !safeInstanceof(item, z.ZodExactOptional)
+      )
+        break;
+      result.pop();
+    }
+    result.forEach((value, i) => {
+      if (value !== OMIT_SYMBOL) return;
+      const item = items[i];
+      if (safeInstanceof(item, z.ZodOptional)) result[i] = undefined;
+      else {
+        const childOpts = pushPathSegment(options, {
+          kind: 'tupleIndex',
+          index: i,
+        });
+        result[i] = regenerateIfOmitted(value, item, childOpts, generator);
+      }
+    });
+
     // Handle case where ZodNever returns OMIT_SYMBOL
     // However, since tuples have fixed length, warn if OMIT_SYMBOL is present
     if (result.includes(OMIT_SYMBOL)) {
@@ -349,13 +404,16 @@ export const generateUtils = {
     generator: CustomGeneratorType,
   ) => {
     const { shape } = schema;
-    const result: { [key: string]: unknown } = {};
+    const result: { [key: string | symbol]: unknown } = {};
 
-    for (const [key, value] of Object.entries(shape)) {
+    // zod >= 4.5 allows (and validates) symbol keys in object shapes, so
+    // walk every own key instead of only the string-keyed entries.
+    for (const key of Reflect.ownKeys(shape)) {
+      const value = shape[key as keyof typeof shape] as z.core.$ZodType;
       const childOpts = pushPathSegment(
         options,
         { kind: 'objectKey', key },
-        key,
+        typeof key === 'string' ? key : undefined,
       );
       const generated = generator(value, childOpts);
       if (generated !== OMIT_SYMBOL) {

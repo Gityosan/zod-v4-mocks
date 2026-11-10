@@ -28,7 +28,11 @@ function generateFromSchema(
   if (safeInstanceof(s, z.ZodEmail)) return u.email(f, s);
   if (safeInstanceof(s, z.ZodURL)) return u.url(f);
   if (safeInstanceof(s, z.ZodJWT)) return u.jwt(f);
-  if (safeInstanceof(s, z.ZodEmoji)) return u.emoji(f);
+  if (safeInstanceof(s, z.ZodEmoji)) return u.emoji(f, s);
+  // z.creditCard() (zod >= 4.5) / z.iban() (zod >= 4.6). On older zod these
+  // constructors are undefined and safeInstanceof() is simply false.
+  if (safeInstanceof(s, z.ZodCreditCard)) return u.creditCard(f);
+  if (safeInstanceof(s, z.ZodIBAN)) return u.iban(f);
   if (safeInstanceof(s, z.ZodGUID)) return u.uuidv4(f);
   if (safeInstanceof(s, z.ZodNanoID)) return u.nanoid(f);
   if (safeInstanceof(s, z.ZodULID)) return u.ulid(f);
@@ -56,7 +60,7 @@ function generateFromSchema(
   if (safeInstanceof(s, z.ZodXID)) return u.regex(f, s);
   if (safeInstanceof(s, z.ZodKSUID)) return u.regex(f, s);
   if (safeInstanceof(s, z.ZodCIDRv4)) return u.regex(f, s);
-  if (safeInstanceof(s, z.ZodBase64)) return u.regex(f, s);
+  if (safeInstanceof(s, z.ZodBase64)) return u.base64(f);
   if (safeInstanceof(s, z.ZodE164)) return u.regex(f, s);
 
   if (safeInstanceof(s, z.ZodCustomStringFormat)) {
@@ -77,7 +81,7 @@ function generateFromSchema(
     if (jwtSchema) return u.jwt(f);
 
     const emojiSchema = checks.find((v) => safeInstanceof(v, z.ZodEmoji));
-    if (emojiSchema) return u.emoji(f);
+    if (emojiSchema) return u.emoji(f, s);
 
     const guidSchema = checks.find((v) => safeInstanceof(v, z.ZodGUID));
     if (guidSchema) return u.uuidv4(f);
@@ -135,7 +139,13 @@ function generateFromSchema(
     if (cidrv4Schema) return u.regex(f, cidrv4Schema);
 
     const base64Schema = checks.find((v) => safeInstanceof(v, z.ZodBase64));
-    if (base64Schema) return u.regex(f, base64Schema);
+    if (base64Schema) return u.base64(f);
+
+    const creditCardSchema = checks.find((v) => safeInstanceof(v, z.ZodCreditCard));
+    if (creditCardSchema) return u.creditCard(f);
+
+    const ibanSchema = checks.find((v) => safeInstanceof(v, z.ZodIBAN));
+    if (ibanSchema) return u.iban(f);
 
     const e164Schema = checks.find((v) => safeInstanceof(v, z.ZodE164));
     if (e164Schema) return u.regex(f, e164Schema);
@@ -145,9 +155,12 @@ function generateFromSchema(
   if (safeInstanceof(s, z.ZodBigInt)) return u.bigInt(f, s);
   if (safeInstanceof(s, z.ZodNumber)) {
     if (safeInstanceof(s, z.ZodNumberFormat)) {
+      // zod >= 4.6 exposes `format` as a prototype getter, which no longer
+      // narrows `s` to ZodFloat32 | ZodFloat64; narrow explicitly.
       const { format } = s;
-      if (format === 'float32') return u.float(f, s);
-      if (format === 'float64') return u.float(f, s);
+      if (format === 'float32' || format === 'float64') {
+        return u.float(f, s as z.ZodFloat32 | z.ZodFloat64);
+      }
     }
     return u.int(f, s);
   }

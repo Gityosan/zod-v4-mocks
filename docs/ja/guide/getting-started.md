@@ -163,7 +163,7 @@ const mock = initGenerator().generate(complexSchema)
 | カテゴリ | スキーマ |
 |---------|---------|
 | **プリミティブ** | string, number, boolean, bigint, date, null, undefined, void, any, unknown, NaN, symbol |
-| **文字列フォーマット** | email, URL, UUID (v1〜v8), GUID, NanoID, ULID, CUID, CUID2, XID, KSUID, JWT, emoji, IPv4, IPv6, CIDRv4, CIDRv6, Base64, Base64URL, E164, hostname, datetime, isodate, isotime, isoduration |
+| **文字列フォーマット** | email, URL, UUID (v1〜v8), GUID, NanoID, ULID, CUID, CUID2, XID, KSUID, JWT, emoji, IPv4, IPv6, CIDRv4, CIDRv6, Base64, Base64URL, E164, hostname, creditCard, IBAN, currencyCode, datetime, isodate, isotime, isoduration |
 | **コレクション** | object, array, tuple, record, map, set |
 | **複合型** | union, discriminatedUnion, intersection (同型), xor |
 | **修飾子** | optional, exactOptional, nullable, nonoptional, readonly, default, prefault |

@@ -442,8 +442,11 @@ function walk(
   ancestors.add(schema);
   try {
     if (safeInstanceof(schema, z.ZodObject)) {
-      for (const [key, child] of Object.entries(schema.shape)) {
-        walk(child, path ? `${path}.${key}` : key, false, ancestors, state);
+      const { shape } = schema;
+      for (const key of Reflect.ownKeys(shape)) {
+        const child = shape[key as keyof typeof shape] as z.core.$ZodType;
+        const name = String(key);
+        walk(child, path ? `${path}.${name}` : name, false, ancestors, state);
       }
       return;
     }
