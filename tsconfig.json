@@ -7,6 +7,9 @@
     // Node globals (process, Buffer, URL, import.meta.url), so name them explicitly.
     "types": ["node"],
     "declaration": true,
+    // Required by tsdown's oxc-based .d.ts emit (dts: { oxc: true }); surfaces
+    // missing annotations in the editor instead of only at build time.
+    "isolatedDeclarations": true,
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
