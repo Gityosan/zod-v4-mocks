@@ -57,9 +57,7 @@ export function createGeneraterOptions(
   return {
     faker: new Faker({ locale: getLocales(locale), randomizer, seed }),
     config: mergedConfig,
-    registry: consistentKey
-      ? z.registry<{ [consistentKey]: string }>()
-      : null,
+    registry: consistentKey ? z.registry<{ [consistentKey]: string }>() : null,
     valueStore: new Map(),
     arrayIndexes: [],
     pinnedHierarchy: new Map(),

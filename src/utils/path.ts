@@ -78,7 +78,7 @@ export function descendPathSupplies(
   return out;
 }
 
-const NO_MATCH = Symbol.for('zod-v4-mocks:path-no-match');
+const NO_MATCH: unique symbol = Symbol.for('zod-v4-mocks:path-no-match');
 export const PATH_NO_MATCH: typeof NO_MATCH = NO_MATCH;
 
 export function findMatchedValue(supplies: PathSupply[]): unknown {

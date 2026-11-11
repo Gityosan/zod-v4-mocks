@@ -111,6 +111,9 @@ const mock = generator.generate(schema);
 | `base64()` / `base64url()` | ✅ 完全支持           |
 | `e164()`                   | ✅ 完全支持           |
 | `hostname()`               | ✅ 完全支持           |
+| `creditCard()`             | ✅ 完全支持 (zod 4.5+) |
+| `iban()`                   | ✅ 完全支持 (zod 4.6+) |
+| `currencyCode()`           | ✅ 完全支持 (zod 4.6+) |
 
 ## 字符串约束支持
 

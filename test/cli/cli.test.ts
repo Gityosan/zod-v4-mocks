@@ -92,13 +92,16 @@ describe.runIf(HAS_BUILD)('CLI', () => {
       expect(data).toHaveLength(2);
     });
 
-    itIfBuild('rejects negative count with a clean error and exit code 1', () => {
-      const r = run(['generate', schemasPath, 'User', '-c', '-1']);
-      expect(r.status).toBe(1);
-      // No raw stack trace — citty's default error path is bypassed.
-      expect(r.stderr).not.toMatch(/at runCommand/);
-      expect(r.stderr.toLowerCase()).toMatch(/count/);
-    });
+    itIfBuild(
+      'rejects negative count with a clean error and exit code 1',
+      () => {
+        const r = run(['generate', schemasPath, 'User', '-c', '-1']);
+        expect(r.status).toBe(1);
+        // No raw stack trace — citty's default error path is bypassed.
+        expect(r.stderr).not.toMatch(/at runCommand/);
+        expect(r.stderr.toLowerCase()).toMatch(/count/);
+      },
+    );
 
     itIfBuild('rejects an unknown profile', () => {
       const r = run(['generate', schemasPath, 'User', '--profile', 'xyz']);

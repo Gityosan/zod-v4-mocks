@@ -53,20 +53,22 @@ function driveServer(
   requests: { id: number; method: string; params?: unknown }[],
 ): Promise<Map<number, JsonRpcResponse>> {
   return new Promise((resolvePromise, reject) => {
-    const child: ChildProcessWithoutNullStreams = spawn(
-      'node',
-      [CLI, 'mcp'],
-      { cwd: tmp, env: { ...process.env, NO_COLOR: '1' } },
-    ) as ChildProcessWithoutNullStreams;
+    const child: ChildProcessWithoutNullStreams = spawn('node', [CLI, 'mcp'], {
+      cwd: tmp,
+      env: { ...process.env, NO_COLOR: '1' },
+    }) as ChildProcessWithoutNullStreams;
 
     const responses = new Map<number, JsonRpcResponse>();
     const expected = new Set(requests.map((r) => r.id));
     let buf = '';
-    const send = (msg: unknown) => child.stdin.write(JSON.stringify(msg) + '\n');
+    const send = (msg: unknown) =>
+      child.stdin.write(JSON.stringify(msg) + '\n');
 
     const timer = setTimeout(() => {
       child.kill();
-      reject(new Error(`MCP server timed out; got ids ${[...responses.keys()]}`));
+      reject(
+        new Error(`MCP server timed out; got ids ${[...responses.keys()]}`),
+      );
     }, 15000);
 
     const finish = () => {

@@ -167,7 +167,9 @@ describe('portable round-trip: deserializePortable(serializePortable(x)) deep-eq
       fc.property(zodSchema, safeConfig, (schema, config) => {
         const g = initGenerator(config);
         const value = g.generate(schema);
-        expect(g.deserializePortable(g.serializePortable(value))).toStrictEqual(value);
+        expect(g.deserializePortable(g.serializePortable(value))).toStrictEqual(
+          value,
+        );
       }),
       { numRuns: 300 },
     );
@@ -179,7 +181,9 @@ describe('portable round-trip: deserializePortable(serializePortable(x)) deep-eq
         const g = initGenerator(config);
         const value = g.generate(schema);
         const encoded = g.serializePortable(value, { base64: true });
-        expect(g.deserializePortable(encoded, { base64: true })).toStrictEqual(value);
+        expect(g.deserializePortable(encoded, { base64: true })).toStrictEqual(
+          value,
+        );
       }),
       { numRuns: 150 },
     );
@@ -212,47 +216,54 @@ describe('binary round-trip: deserialize(serializeBinary(x)) deep-equals x', () 
  */
 const symbolSpec = fc.oneof(
   fc.string().map((d) => ({ tag: 'desc' as const, d })),
-  fc.string({ minLength: 1, maxLength: 8 }).map((k) => ({ tag: 'for' as const, k })),
+  fc
+    .string({ minLength: 1, maxLength: 8 })
+    .map((k) => ({ tag: 'for' as const, k })),
 );
 
 describe('portable Symbol round-trip (property)', () => {
   it('preserves description, registry identity, and shared identity', () => {
     fc.assert(
-      fc.property(fc.array(symbolSpec, { minLength: 1, maxLength: 6 }), (specs) => {
-        const g = initGenerator();
-        const symbols = specs.map((s, i) =>
-          s.tag === 'for' ? Symbol.for(`zv4m-prop:${i}:${s.k}`) : Symbol(`${i}:${s.d}`),
-        );
-        const payload = {
-          list: symbols,
-          dup: symbols[0],
-          nested: { again: symbols[0] },
-          set: new Set(symbols),
-          map: new Map(symbols.map((sym, i) => [sym, i] as const)),
-        };
+      fc.property(
+        fc.array(symbolSpec, { minLength: 1, maxLength: 6 }),
+        (specs) => {
+          const g = initGenerator();
+          const symbols = specs.map((s, i) =>
+            s.tag === 'for'
+              ? Symbol.for(`zv4m-prop:${i}:${s.k}`)
+              : Symbol(`${i}:${s.d}`),
+          );
+          const payload = {
+            list: symbols,
+            dup: symbols[0],
+            nested: { again: symbols[0] },
+            set: new Set(symbols),
+            map: new Map(symbols.map((sym, i) => [sym, i] as const)),
+          };
 
-        const restored = g.deserializePortable<typeof payload>(
-          g.serializePortable(payload),
-        );
+          const restored = g.deserializePortable<typeof payload>(
+            g.serializePortable(payload),
+          );
 
-        specs.forEach((spec, i) => {
-          const sym = restored.list[i];
-          expect(typeof sym).toBe('symbol');
-          if (spec.tag === 'for') {
-            expect(sym).toBe(Symbol.for(`zv4m-prop:${i}:${spec.k}`));
-          } else {
-            expect(sym.description).toBe(`${i}:${spec.d}`);
-          }
-          // The same restored symbol is reused as the Map key and Set member.
-          expect(restored.map.get(sym)).toBe(i);
-          expect(restored.set.has(sym)).toBe(true);
-        });
+          specs.forEach((spec, i) => {
+            const sym = restored.list[i];
+            expect(typeof sym).toBe('symbol');
+            if (spec.tag === 'for') {
+              expect(sym).toBe(Symbol.for(`zv4m-prop:${i}:${spec.k}`));
+            } else {
+              expect(sym.description).toBe(`${i}:${spec.d}`);
+            }
+            // The same restored symbol is reused as the Map key and Set member.
+            expect(restored.map.get(sym)).toBe(i);
+            expect(restored.set.has(sym)).toBe(true);
+          });
 
-        // Identity shared within the payload survives the round-trip.
-        expect(restored.dup).toBe(restored.list[0]);
-        expect(restored.nested.again).toBe(restored.list[0]);
-        expect(restored.set.size).toBe(symbols.length);
-      }),
+          // Identity shared within the payload survives the round-trip.
+          expect(restored.dup).toBe(restored.list[0]);
+          expect(restored.nested.again).toBe(restored.list[0]);
+          expect(restored.set.size).toBe(symbols.length);
+        },
+      ),
       { numRuns: 200 },
     );
   });

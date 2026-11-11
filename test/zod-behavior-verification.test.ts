@@ -1426,9 +1426,9 @@ describe('Zod Array and Object Behavior Verification', () => {
     });
 
     it('z.property() with nested property', () => {
-      const schema = z.string().check(
-        z.property('length', z.number().gte(5).lte(10)),
-      );
+      const schema = z
+        .string()
+        .check(z.property('length', z.number().gte(5).lte(10)));
 
       expect(schema.safeParse('hello').success).toBe(true); // 5 chars
       expect(schema.safeParse('helloworld').success).toBe(true); // 10 chars

@@ -103,10 +103,13 @@ function containsBoxableSymbol(value: unknown, seen: Set<unknown>): boolean {
   );
 }
 
-function makeSymbolMarker(sym: symbol): Record<string, [string, string | undefined]> {
+function makeSymbolMarker(
+  sym: symbol,
+): Record<string, [string, string | undefined]> {
   const key = Symbol.keyFor(sym);
   return {
-    [SYMBOL_MARKER]: key !== undefined ? ['for', key] : ['desc', sym.description],
+    [SYMBOL_MARKER]:
+      key !== undefined ? ['for', key] : ['desc', sym.description],
   };
 }
 
@@ -222,7 +225,10 @@ export type PortableOptions = {
 };
 
 /** Walk an error's `cause` chain for the value seroval rejected. */
-function findUnsupportedValue(error: unknown): { found: boolean; value: unknown } {
+function findUnsupportedValue(error: unknown): {
+  found: boolean;
+  value: unknown;
+} {
   let current: unknown = error;
   const seen = new Set<unknown>();
   while (current && typeof current === 'object' && !seen.has(current)) {
@@ -262,7 +268,8 @@ function toFriendlyError(error: unknown, context: 'sync' | 'async'): unknown {
 /** UTF-8-safe base64 that works in both Node and browsers. */
 function toBase64(input: string): string {
   const bytes = new TextEncoder().encode(input);
-  if (typeof Buffer !== 'undefined') return Buffer.from(bytes).toString('base64');
+  if (typeof Buffer !== 'undefined')
+    return Buffer.from(bytes).toString('base64');
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary);
@@ -343,7 +350,9 @@ export async function serializePortableAsync(
  * plain object. Use `ext: 'ts'`/`'js'` (which emits `Symbol(...)` literals) or
  * the `serializePortable` + `deserializePortable` pair for symbol data.
  */
-export async function serializePortableSourceAsync(data: unknown): Promise<string> {
+export async function serializePortableSourceAsync(
+  data: unknown,
+): Promise<string> {
   if (containsBoxableSymbol(data, new Set())) {
     throw new Error(
       'outputAsync({ portable: true }): cannot inline Symbol values as source ' +

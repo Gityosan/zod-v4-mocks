@@ -7,10 +7,7 @@ const seenWarnings = new WeakSet<object>();
  * @package
  * Emit a warning at most once per (schema, key) pair within a process.
  */
-export function warnOnceForSchema(
-  schema: object,
-  message: string,
-): void {
+export function warnOnceForSchema(schema: object, message: string): void {
   if (seenWarnings.has(schema)) return;
   seenWarnings.add(schema);
   console.warn(message);
@@ -23,7 +20,7 @@ export function warnFixedLengthExceedsConstraint(
   fixedLength: number,
   constraintType: 'length' | 'max',
   constraintValue: number,
-) {
+): void {
   console.warn(
     `Fixed length from startsWith/endsWith/includes (${fixedLength}) exceeds ${constraintType} constraint (${constraintValue}). Ignoring ${constraintType} constraint.`,
   );
@@ -39,7 +36,7 @@ export function warnCaseMismatch(
     | z.core.$ZodCheckStartsWith
     | z.core.$ZodCheckEndsWith
     | undefined,
-) {
+): void {
   if (!hasCaseTransform || !structuralCheck) return;
   const pattern = caseType === 'LowerCase' ? /[A-Z]/ : /[a-z]/;
   const { format } = structuralCheck._zod.def;

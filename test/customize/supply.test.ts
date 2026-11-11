@@ -6,9 +6,7 @@ describe('supplyRef', () => {
   it('replaces a specific subschema by reference', () => {
     const Name = z.string();
     const Schema = z.object({ name: Name, other: z.string() });
-    const result = initGenerator()
-      .supplyRef(Name, 'FIXED')
-      .generate(Schema);
+    const result = initGenerator().supplyRef(Name, 'FIXED').generate(Schema);
     expect(result.name).toBe('FIXED');
     expect(result.other).not.toBe('FIXED');
   });
@@ -238,27 +236,35 @@ describe('supplyPath + supplyRef interaction', () => {
 
 describe('z.custom via meta', () => {
   it('uses meta.mock function', () => {
-    const FileLike = z.custom<{ name: string }>((v) => typeof v === 'object').meta({
-      mock: () => ({ name: 'demo.txt' }),
-    });
+    const FileLike = z
+      .custom<{ name: string }>((v) => typeof v === 'object')
+      .meta({
+        mock: () => ({ name: 'demo.txt' }),
+      });
     const Schema = z.object({ file: FileLike });
     const result = initGenerator().generate(Schema);
     expect(result.file).toEqual({ name: 'demo.txt' });
   });
 
   it('uses meta.mock static value', () => {
-    const FileLike = z.custom<number>((v) => typeof v === 'number').meta({
-      mock: 42,
-    });
+    const FileLike = z
+      .custom<number>((v) => typeof v === 'number')
+      .meta({
+        mock: 42,
+      });
     const result = initGenerator().generate(FileLike);
     expect(result).toBe(42);
   });
 
   it('respects customMockKey config', () => {
-    const FileLike = z.custom<string>((v) => typeof v === 'string').meta({
-      myMock: () => 'aaa',
-    });
-    const result = initGenerator({ customMockKey: 'myMock' }).generate(FileLike);
+    const FileLike = z
+      .custom<string>((v) => typeof v === 'string')
+      .meta({
+        myMock: () => 'aaa',
+      });
+    const result = initGenerator({ customMockKey: 'myMock' }).generate(
+      FileLike,
+    );
     expect(result).toBe('aaa');
   });
 
@@ -288,9 +294,11 @@ describe('z.custom via meta', () => {
   });
 
   it('supplyRef beats meta.mock', () => {
-    const Custom = z.custom<number>((v) => typeof v === 'number').meta({
-      mock: () => 1,
-    });
+    const Custom = z
+      .custom<number>((v) => typeof v === 'number')
+      .meta({
+        mock: () => 1,
+      });
     const result = initGenerator().supplyRef(Custom, 99).generate(Custom);
     expect(result).toBe(99);
   });
@@ -412,9 +420,7 @@ describe('supplyPath - empty value', () => {
 
   it('can supply null at a nullable slot', () => {
     const Schema = z.object({ x: z.string().nullable() });
-    const result = initGenerator()
-      .supplyPath(['x'], null)
-      .generate(Schema);
+    const result = initGenerator().supplyPath(['x'], null).generate(Schema);
     expect(result.x).toBeNull();
   });
 });
@@ -433,7 +439,10 @@ describe('z.custom inside containers', () => {
 
   it('omitted z.custom triggers a tuple warning (preflight disabled)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const Schema = z.tuple([z.string(), z.custom<File>((v) => v instanceof File)]);
+    const Schema = z.tuple([
+      z.string(),
+      z.custom<File>((v) => v instanceof File),
+    ]);
     // preflight would reject this upfront — disable it to exercise the
     // runtime tuple warning path.
     initGenerator({ preflightCheck: false }).generate(Schema);
@@ -464,10 +473,13 @@ describe('z.custom inside containers', () => {
   });
 
   it('meta.mock function receives a faker instance and is seed-deterministic', () => {
-    const Schema = z.custom<string>((v) => typeof v === 'string').meta({
-      mock: (faker: { number: { int: (opts: { min: number; max: number }) => number } }) =>
-        `id-${faker.number.int({ min: 0, max: 1_000_000 })}`,
-    });
+    const Schema = z
+      .custom<string>((v) => typeof v === 'string')
+      .meta({
+        mock: (faker: {
+          number: { int: (opts: { min: number; max: number }) => number };
+        }) => `id-${faker.number.int({ min: 0, max: 1_000_000 })}`,
+      });
     const a = initGenerator({ seed: 11 }).generate(Schema);
     const b = initGenerator({ seed: 11 }).generate(Schema);
     expect(a).toBe(b);
@@ -493,18 +505,14 @@ describe('generateMany - input validation', () => {
 
   it('throws on NaN / Infinity', () => {
     expect(() => initGenerator().generateMany(z.string(), NaN)).toThrow();
-    expect(() =>
-      initGenerator().generateMany(z.string(), Infinity),
-    ).toThrow();
+    expect(() => initGenerator().generateMany(z.string(), Infinity)).toThrow();
   });
 });
 
 describe('supplyPath - array index hard limit', () => {
   it('throws when a supplied index exceeds the hard limit', () => {
     expect(() =>
-      initGenerator()
-        .supplyPath([20_000], 'x')
-        .generate(z.array(z.string())),
+      initGenerator().supplyPath([20_000], 'x').generate(z.array(z.string())),
     ).toThrow(/hard limit/);
   });
 
@@ -519,7 +527,9 @@ describe('supplyPath - array index hard limit', () => {
 describe('supply (constructor-based)', () => {
   it('sets a fixed value for all schemas of a Zod type', () => {
     const Schema = z.object({ a: z.string(), b: z.string(), n: z.number() });
-    const result = initGenerator().supply(z.ZodString, 'FIXED').generate(Schema);
+    const result = initGenerator()
+      .supply(z.ZodString, 'FIXED')
+      .generate(Schema);
     expect(result.a).toBe('FIXED');
     expect(result.b).toBe('FIXED');
     expect(typeof result.n).toBe('number');
@@ -545,7 +555,9 @@ describe('supply (constructor-based)', () => {
   it('supply registered before override takes priority', () => {
     const result = initGenerator()
       .supply(z.ZodString, 'from-supply')
-      .override((schema) => (schema instanceof z.ZodString ? 'from-override' : undefined))
+      .override((schema) =>
+        schema instanceof z.ZodString ? 'from-override' : undefined,
+      )
       .generate(z.string());
     expect(result).toBe('from-supply');
   });

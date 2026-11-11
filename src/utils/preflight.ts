@@ -344,14 +344,43 @@ const checkConflictingStringChecks: NodeCheck = (
  * formats (email/url/uuid/iso...) report `string`.
  */
 const SUPPORTED_TYPES = new Set<string>([
-  'string', 'number', 'boolean', 'bigint', 'date', 'nan', 'symbol', 'file',
-  'null', 'undefined', 'void', 'any', 'unknown',
-  'literal', 'enum', 'template_literal',
-  'array', 'tuple', 'object', 'record', 'map', 'set',
-  'union', 'intersection',
-  'optional', 'nonoptional', 'exactOptional', 'nullable',
-  'default', 'prefault', 'readonly',
-  'lazy', 'pipe', 'catch', 'success', 'custom', 'never',
+  'string',
+  'number',
+  'boolean',
+  'bigint',
+  'date',
+  'nan',
+  'symbol',
+  'file',
+  'null',
+  'undefined',
+  'void',
+  'any',
+  'unknown',
+  'literal',
+  'enum',
+  'template_literal',
+  'array',
+  'tuple',
+  'object',
+  'record',
+  'map',
+  'set',
+  'union',
+  'intersection',
+  'optional',
+  'nonoptional',
+  'exactOptional',
+  'nullable',
+  'default',
+  'prefault',
+  'readonly',
+  'lazy',
+  'pipe',
+  'catch',
+  'success',
+  'custom',
+  'never',
 ]);
 
 /** A schema type the generator does not support. */
@@ -360,7 +389,8 @@ const checkUnsupportedType: NodeCheck = (schema, path, _inTuple, state) => {
   if (SUPPORTED_TYPES.has(type)) return;
   let message: string;
   if (type === 'function') {
-    message = 'z.function() is not supported — function mocks are out of scope.';
+    message =
+      'z.function() is not supported — function mocks are out of scope.';
   } else if (type === 'promise') {
     message = 'z.promise() is deprecated in Zod v4 and is not supported.';
   } else {
@@ -442,8 +472,11 @@ function walk(
   ancestors.add(schema);
   try {
     if (safeInstanceof(schema, z.ZodObject)) {
-      for (const [key, child] of Object.entries(schema.shape)) {
-        walk(child, path ? `${path}.${key}` : key, false, ancestors, state);
+      const { shape } = schema;
+      for (const key of Reflect.ownKeys(shape)) {
+        const child = shape[key as keyof typeof shape] as z.core.$ZodType;
+        const name = String(key);
+        walk(child, path ? `${path}.${name}` : name, false, ancestors, state);
       }
       return;
     }

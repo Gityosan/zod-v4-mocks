@@ -163,7 +163,7 @@ const mock = initGenerator().generate(complexSchema)
 | कैटेगरी | स्कीमा |
 |---------|---------|
 | **प्रिमिटिव** | string, number, boolean, bigint, date, null, undefined, void, any, unknown, NaN, symbol |
-| **स्ट्रिंग फॉर्मेट** | email, URL, UUID (v1~v8), GUID, NanoID, ULID, CUID, CUID2, XID, KSUID, JWT, emoji, IPv4, IPv6, CIDRv4, CIDRv6, Base64, Base64URL, E164, hostname, datetime, isodate, isotime, isoduration |
+| **स्ट्रिंग फॉर्मेट** | email, URL, UUID (v1~v8), GUID, NanoID, ULID, CUID, CUID2, XID, KSUID, JWT, emoji, IPv4, IPv6, CIDRv4, CIDRv6, Base64, Base64URL, E164, hostname, creditCard, IBAN, currencyCode, datetime, isodate, isotime, isoduration |
 | **कलेक्शन** | object, array, tuple, record, map, set |
 | **कम्पोज़िट टाइप** | union, discriminatedUnion, intersection (समान टाइप), xor |
 | **मॉडिफायर** | optional, exactOptional, nullable, nonoptional, readonly, default, prefault |

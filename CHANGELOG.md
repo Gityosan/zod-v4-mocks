@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Support for the string formats added in Zod 4.5 / 4.6: `z.creditCard()` (Luhn-valid card numbers) and `z.iban()` (checksum-valid IBANs), both as standalone schemas and as `z.string().check(...)`. `z.currencyCode()` is generated from its ISO 4217 pattern
+- Object schemas with **symbol keys** (allowed and validated since Zod 4.5) now get a value generated for every symbol key; preflight walks them too
+
+### Fixed
+- `z.base64()` / `z.string().base64()` mocks now pass Zod 4.6's stricter padding/length validation — values are produced by encoding random bytes instead of sampling the format regex
+- `z.emoji()` with `min` / `max` / `length` now honours the bounds. Zod 4.5+ measures length in code points, so bounded emoji strings are built from single-code-point emoji
+- Tuples with optional items (e.g. `z.tuple([...]).partial()`, Zod 4.5+) no longer leak the internal omit marker: trailing omitted items are dropped, a middle `z.optional()` item becomes `undefined`, and a middle `z.exactOptional()` item is generated
+- Type-check error against Zod 4.6, where `ZodNumberFormat#format` became a prototype getter and no longer narrows to `ZodFloat32 | ZodFloat64`
+
+### Changed
+- Development and tests now run against Zod 4.6.7 (peer range unchanged: `zod@^4.0.0`)
+- Tooling: linting moved from ESLint + typescript-eslint to **oxlint** (type-aware via `oxlint-tsgolint`) and formatting from Prettier to **oxfmt**. The same rule set is kept; `@typescript-eslint/naming-convention` (which oxlint cannot load because it always requires type information) is reproduced by a small local JS plugin in `tools/oxlint-naming-convention.js`. CI now also runs `pnpm run format:check`. Lint goes from ~4.7s to ~1s and formatting from ~1.7s to ~0.1s locally
+- Build: `.d.ts` files are now emitted with oxc's isolated-declarations transform (`dts: { oxc: true }`) instead of the TypeScript compiler, cutting `pnpm run build` from ~2.9s to ~1.0s. Internal functions gained explicit return-type annotations to satisfy `isolatedDeclarations`; the published declarations are unchanged apart from quote style
+
 ## [3.4.0] - 2026-06-19
 
 ### Added

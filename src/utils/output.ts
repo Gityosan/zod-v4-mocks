@@ -16,11 +16,18 @@ import {
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
-import { deserialize as v8Deserialize, serialize as v8Serialize } from 'node:v8';
+import {
+  deserialize as v8Deserialize,
+  serialize as v8Serialize,
+} from 'node:v8';
 import { z } from 'zod';
 import { serializePortableSourceAsync } from './portable';
 
-const outputExtSchema = z.literal(['json', 'js', 'ts']);
+const outputExtSchema: z.ZodLiteral<'json' | 'ts' | 'js'> = z.literal([
+  'json',
+  'js',
+  'ts',
+]);
 type OutputExt = z.infer<typeof outputExtSchema>;
 
 export type OutputOptions = {
@@ -346,7 +353,10 @@ function buildPortableContent(expr: string, options: OutputOptions): string {
  * Throws if `binary` is true with `ext: 'ts'` or `'js'` — that combination
  * inherently requires writing a sibling `.bin`; use `output()` instead.
  */
-export function serializeOutput(data: unknown, options?: OutputOptions): string {
+export function serializeOutput(
+  data: unknown,
+  options?: OutputOptions,
+): string {
   const ext = options?.ext ?? getExtFromPath(options?.path) ?? 'ts';
   if (options?.binary && ext !== 'json') {
     throw new Error(
@@ -384,7 +394,7 @@ export function deserializeBinary<T = unknown>(
   return v8Deserialize(buffer) as T;
 }
 
-export function outputToFile(data: unknown, options?: OutputOptions) {
+export function outputToFile(data: unknown, options?: OutputOptions): string {
   const ext = options?.ext ?? getExtFromPath(options?.path) ?? 'ts';
   const outputPath =
     options?.path ?? `${DEFAULT_OUTPUT_DIR}/${DEFAULT_OUTPUT_FILENAME}.${ext}`;

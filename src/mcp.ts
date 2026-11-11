@@ -76,14 +76,16 @@ export function createMcpServer(): McpServer {
           .string()
           .optional()
           .describe(
-            'Named export to use. Defaults to the module\'s default export.',
+            "Named export to use. Defaults to the module's default export.",
           ),
         count: z
           .number()
           .int()
           .min(0)
           .default(1)
-          .describe('Number of items. count>1 yields an array; count=1 a single value.'),
+          .describe(
+            'Number of items. count>1 yields an array; count=1 a single value.',
+          ),
         seed: z
           .number()
           .optional()
@@ -96,10 +98,7 @@ export function createMcpServer(): McpServer {
           .enum(TEXT_FORMATS)
           .default('json')
           .describe('Output serialisation format.'),
-        pretty: z
-          .boolean()
-          .default(true)
-          .describe('Pretty-print JSON output.'),
+        pretty: z.boolean().default(true).describe('Pretty-print JSON output.'),
         config: z
           .string()
           .optional()
@@ -181,7 +180,7 @@ export function createMcpServer(): McpServer {
           .string()
           .optional()
           .describe(
-            'Named export to check. Defaults to the module\'s default export.',
+            "Named export to check. Defaults to the module's default export.",
           ),
         config: z
           .string()

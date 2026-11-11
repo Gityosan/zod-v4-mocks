@@ -123,8 +123,8 @@ export type StringLengthOptions = {
 };
 
 export const generateUtils = {
-  file: () => new File([], 'test.txt'),
-  email: (faker: Faker, schema?: z.ZodEmail) => {
+  file: (): File => new File([], 'test.txt'),
+  email: (faker: Faker, schema?: z.ZodEmail): string => {
     const email = faker.internet.email();
     const pattern = schema?._zod.def.pattern;
     if (!pattern || pattern.test(email)) return email;
@@ -133,17 +133,34 @@ export const generateUtils = {
       faker.number.int({ min: a, max: b });
     return randexp.gen();
   },
-  url: (faker: Faker) => faker.internet.url(),
-  jwt: (faker: Faker) => faker.internet.jwt(),
-  emoji: (faker: Faker) => faker.internet.emoji(),
-  uuidv4: (faker: Faker) => faker.string.uuid(),
-  nanoid: (faker: Faker) => faker.string.nanoid(),
-  ulid: (faker: Faker) => faker.string.ulid(),
-  ipv4: (faker: Faker) => faker.internet.ipv4(),
-  ipv6: (faker: Faker) => faker.internet.ipv6(),
-  mac: (faker: Faker) => faker.internet.mac(),
-  date: (faker: Faker) => faker.date.anytime(),
-  cidrv6: (faker: Faker) => {
+  url: (faker: Faker): string => faker.internet.url(),
+  jwt: (faker: Faker): string => faker.internet.jwt(),
+  emoji: (
+    faker: Faker,
+    bounds?: { minLength: number | null; maxLength: number | null },
+  ): string => {
+    const minLength = bounds?.minLength ?? null;
+    const maxLength = bounds?.maxLength ?? null;
+    if (minLength === null && maxLength === null) return faker.internet.emoji();
+    // zod >= 4.5 measures string length in code points, while faker's emoji
+    // may be multi-code-point sequences (ZWJ, skin tones, flags). Build the
+    // value from single-code-point emoji (U+1F600..U+1F64F) so the length is
+    // exactly the number of characters we emit.
+    const min = Math.max(1, minLength ?? 1);
+    const max = Math.max(min, maxLength ?? min + 4);
+    const length = faker.number.int({ min, max });
+    return Array.from({ length }, () =>
+      String.fromCodePoint(faker.number.int({ min: 0x1f600, max: 0x1f64f })),
+    ).join('');
+  },
+  uuidv4: (faker: Faker): string => faker.string.uuid(),
+  nanoid: (faker: Faker): string => faker.string.nanoid(),
+  ulid: (faker: Faker): string => faker.string.ulid(),
+  ipv4: (faker: Faker): string => faker.internet.ipv4(),
+  ipv6: (faker: Faker): string => faker.internet.ipv6(),
+  mac: (faker: Faker): string => faker.internet.mac(),
+  date: (faker: Faker): Date => faker.date.anytime(),
+  cidrv6: (faker: Faker): string => {
     const randexp = new RandExp(
       /([0-9a-f]{1,4}:){7}[0-9a-f]{1,4}\/(12[0-8]|1[01][0-9]|[1-9]?[0-9])/,
     );
@@ -151,18 +168,31 @@ export const generateUtils = {
       faker.number.int({ min: a, max: b });
     return randexp.gen();
   },
-  base64url: (faker: Faker) => faker.string.alphanumeric(22),
-  isoDateTime: (faker: Faker) => faker.date.anytime().toISOString(),
-  isoDate: (faker: Faker) => faker.date.anytime().toISOString().split('T')[0],
-  isoTime: (faker: Faker) => faker.date.anytime().toISOString().slice(11, 19),
+  base64url: (faker: Faker): string => faker.string.alphanumeric(22),
+  // Encode random bytes rather than sampling the format regex: zod >= 4.6
+  // validates padding/length in code, which a regex sampler cannot honour.
+  base64: (faker: Faker): string => {
+    const length = faker.number.int({ min: 1, max: 48 });
+    const bytes = Array.from({ length }, () =>
+      faker.number.int({ min: 0, max: 255 }),
+    );
+    return btoa(String.fromCharCode(...bytes));
+  },
+  creditCard: (faker: Faker): string => faker.finance.creditCardNumber(),
+  iban: (faker: Faker): string => faker.finance.iban(),
+  isoDateTime: (faker: Faker): string => faker.date.anytime().toISOString(),
+  isoDate: (faker: Faker): string =>
+    faker.date.anytime().toISOString().split('T')[0],
+  isoTime: (faker: Faker): string =>
+    faker.date.anytime().toISOString().slice(11, 19),
   isoDuration: (faker: Faker) => {
     const hours = faker.number.int({ min: 0, max: 23 });
     const minutes = faker.number.int({ min: 0, max: 59 });
     const seconds = faker.number.int({ min: 0, max: 59 });
     return `PT${hours}H${minutes}M${seconds}S`;
   },
-  hostname: (faker: Faker) => faker.internet.domainName(),
-  regex: (faker: Faker, check: z.core.$ZodCheckStringFormat) => {
+  hostname: (faker: Faker): string => faker.internet.domainName(),
+  regex: (faker: Faker, check: z.core.$ZodCheckStringFormat): string => {
     const { pattern, format } = check._zod.def;
     if (pattern !== undefined) {
       const randexp = new RandExp(pattern);
@@ -175,14 +205,14 @@ export const generateUtils = {
     );
     return faker.lorem.word();
   },
-  string: (faker: Faker, options: StringLengthOptions) => {
+  string: (faker: Faker, options: StringLengthOptions): string => {
     try {
       return faker.lorem.word(options);
     } catch {
       return faker.string.alpha(options);
     }
   },
-  int: (faker: Faker, schema: z.ZodNumber) => {
+  int: (faker: Faker, schema: z.ZodNumber): number => {
     const { minValue, maxValue } = schema;
     const { min, max } = calcMinMaxNumber(minValue, maxValue);
 
@@ -192,7 +222,7 @@ export const generateUtils = {
 
     return faker.number.int({ min, max, multipleOf });
   },
-  bigInt: (faker: Faker, schema: z.ZodBigInt) => {
+  bigInt: (faker: Faker, schema: z.ZodBigInt): bigint => {
     const { minValue, maxValue } = schema;
     const { min, max } = calcMinMaxBigInt(minValue, maxValue);
 
@@ -202,7 +232,7 @@ export const generateUtils = {
 
     return faker.number.bigInt({ min, max, multipleOf });
   },
-  float: (faker: Faker, schema: z.ZodFloat32 | z.ZodFloat64) => {
+  float: (faker: Faker, schema: z.ZodFloat32 | z.ZodFloat64): number => {
     const { minValue, maxValue } = schema;
     const { min, max } = calcMinMaxNumber(minValue, maxValue);
 
@@ -212,11 +242,17 @@ export const generateUtils = {
 
     return faker.number.float({ min, max, multipleOf });
   },
-  literal: (schema: z.ZodLiteral, options: GeneraterOptions) => {
+  literal: (
+    schema: z.ZodLiteral,
+    options: GeneraterOptions,
+  ): z.core.util.Literal => {
     const { faker } = options;
     return faker.helpers.arrayElement([...schema.values]);
   },
-  enum: (schema: z.ZodEnum, options: GeneraterOptions) => {
+  enum: (
+    schema: z.ZodEnum,
+    options: GeneraterOptions,
+  ): z.core.util.EnumValue => {
     const { faker } = options;
     return faker.helpers.arrayElement(schema.options);
   },
@@ -224,7 +260,7 @@ export const generateUtils = {
     schema: z.ZodTemplateLiteral,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): string => {
     const parts = schema.def.parts.filter((v) => v !== undefined);
     const result = parts.map((v) => {
       if (v === null) return 'null';
@@ -247,7 +283,7 @@ export const generateUtils = {
     schema: z.ZodArray,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): unknown[] => {
     const { faker, config } = options;
     const { checks = [] } = schema.def;
 
@@ -274,7 +310,7 @@ export const generateUtils = {
     schema: z.ZodTuple,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): unknown[] => {
     const { items } = schema.def;
     const result = items.map((item, arrayIndex) => {
       const childOpts = pushPathSegment(options, {
@@ -282,6 +318,33 @@ export const generateUtils = {
         index: arrayIndex,
       });
       return generator(item, childOpts);
+    });
+
+    // Optional items (e.g. `.partial()` tuples, zod >= 4.5) may come back
+    // as OMIT_SYMBOL. Trailing omitted items are dropped (a shorter tuple is
+    // valid when the rest is optional). An omitted item in the middle becomes
+    // `undefined` for z.optional(), or is regenerated for z.exactOptional(),
+    // which does not accept `undefined`.
+    while (result.length > 0 && result.at(-1) === OMIT_SYMBOL) {
+      const item = items[result.length - 1];
+      if (
+        !safeInstanceof(item, z.ZodOptional) &&
+        !safeInstanceof(item, z.ZodExactOptional)
+      )
+        break;
+      result.pop();
+    }
+    result.forEach((value, i) => {
+      if (value !== OMIT_SYMBOL) return;
+      const item = items[i];
+      if (safeInstanceof(item, z.ZodOptional)) result[i] = undefined;
+      else {
+        const childOpts = pushPathSegment(options, {
+          kind: 'tupleIndex',
+          index: i,
+        });
+        result[i] = regenerateIfOmitted(value, item, childOpts, generator);
+      }
     });
 
     // Handle case where ZodNever returns OMIT_SYMBOL
@@ -298,7 +361,7 @@ export const generateUtils = {
     schema: z.ZodMap,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): Map<unknown, unknown> => {
     const { faker, config } = options;
     const { keyType, valueType } = schema;
     const { checks = [] } = schema.def;
@@ -332,7 +395,7 @@ export const generateUtils = {
     schema: z.ZodSet,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): Set<unknown> => {
     const { faker, config } = options;
     const { valueType, checks = [] } = schema.def;
 
@@ -347,15 +410,18 @@ export const generateUtils = {
     schema: z.ZodObject,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): Record<string | symbol, unknown> => {
     const { shape } = schema;
-    const result: { [key: string]: unknown } = {};
+    const result: { [key: string | symbol]: unknown } = {};
 
-    for (const [key, value] of Object.entries(shape)) {
+    // zod >= 4.5 allows (and validates) symbol keys in object shapes, so
+    // walk every own key instead of only the string-keyed entries.
+    for (const key of Reflect.ownKeys(shape)) {
+      const value = shape[key as keyof typeof shape] as z.core.$ZodType;
       const childOpts = pushPathSegment(
         options,
         { kind: 'objectKey', key },
-        key,
+        typeof key === 'string' ? key : undefined,
       );
       const generated = generator(value, childOpts);
       if (generated !== OMIT_SYMBOL) {
@@ -368,7 +434,7 @@ export const generateUtils = {
     schema: z.ZodRecord,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): Record<string | number | symbol, unknown> => {
     const { faker, config } = options;
     const { keyType, valueType } = schema;
     const length = faker.number.int(config.record);
@@ -417,7 +483,7 @@ export const generateUtils = {
     schema: z.ZodUnion,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): unknown => {
     // An empty union (constructible since Zod 4.4.0) matches nothing — it is
     // `never` in disguise, so there is no value to produce. Mirror z.never().
     if (schema.options.length === 0) return OMIT_SYMBOL;
@@ -430,7 +496,7 @@ export const generateUtils = {
     schema: z.ZodDiscriminatedUnion,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): unknown => {
     // Empty discriminated union — nothing to discriminate on. See `union`.
     if (schema.options.length === 0) return OMIT_SYMBOL;
     const { faker } = options;
@@ -442,7 +508,7 @@ export const generateUtils = {
     schema: z.ZodXor,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): unknown => {
     // Empty XOR matches nothing — `never` in disguise. See `union`.
     if (schema.options.length === 0) return OMIT_SYMBOL;
     for (const selectedOption of schema.options) {
@@ -462,7 +528,7 @@ export const generateUtils = {
     schema: z.ZodIntersection,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): unknown => {
     const { faker } = options;
     const { left, right } = schema.def;
 
@@ -481,7 +547,10 @@ export const generateUtils = {
       return generator(right, options);
     }
 
-    if (safeInstanceof(right, z.ZodAny) || safeInstanceof(right, z.ZodUnknown)) {
+    if (
+      safeInstanceof(right, z.ZodAny) ||
+      safeInstanceof(right, z.ZodUnknown)
+    ) {
       return generator(left, options);
     }
 
@@ -498,7 +567,10 @@ export const generateUtils = {
       throw new Error('Incompatible Map types in intersection');
     }
 
-    if (safeInstanceof(left, z.ZodLiteral) && safeInstanceof(right, z.ZodLiteral)) {
+    if (
+      safeInstanceof(left, z.ZodLiteral) &&
+      safeInstanceof(right, z.ZodLiteral)
+    ) {
       const intersection = intersectionES([...left.values], [...right.values]);
       const mergedSchema = z.literal(intersection);
       return generator(mergedSchema, options);
@@ -514,7 +586,10 @@ export const generateUtils = {
       throw new Error('Incompatible Set types in intersection');
     }
 
-    if (safeInstanceof(left, z.ZodString) && safeInstanceof(right, z.ZodString)) {
+    if (
+      safeInstanceof(left, z.ZodString) &&
+      safeInstanceof(right, z.ZodString)
+    ) {
       const min = compareMin(left.minLength, right.minLength);
       const max = compareMax(left.maxLength, right.maxLength);
       if (min === null) {
@@ -526,7 +601,10 @@ export const generateUtils = {
       return generator(z.string().min(min).max(max), options);
     }
 
-    if (safeInstanceof(left, z.ZodNumber) && safeInstanceof(right, z.ZodNumber)) {
+    if (
+      safeInstanceof(left, z.ZodNumber) &&
+      safeInstanceof(right, z.ZodNumber)
+    ) {
       const min = Math.max(
         left.minValue ?? Number.MIN_SAFE_INTEGER,
         right.minValue ?? Number.MIN_SAFE_INTEGER,
@@ -538,7 +616,10 @@ export const generateUtils = {
       return generator(z.number().min(min).max(max), options);
     }
 
-    if (safeInstanceof(left, z.ZodBoolean) && safeInstanceof(right, z.ZodBoolean)) {
+    if (
+      safeInstanceof(left, z.ZodBoolean) &&
+      safeInstanceof(right, z.ZodBoolean)
+    ) {
       return generator(right, options);
     }
 
@@ -546,7 +627,10 @@ export const generateUtils = {
       return generator(right, options);
     }
 
-    if (safeInstanceof(left, z.ZodBigInt) && safeInstanceof(right, z.ZodBigInt)) {
+    if (
+      safeInstanceof(left, z.ZodBigInt) &&
+      safeInstanceof(right, z.ZodBigInt)
+    ) {
       const leftMin = left.minValue ?? BigInt(Number.MIN_SAFE_INTEGER);
       const rightMin = right.minValue ?? BigInt(Number.MIN_SAFE_INTEGER);
       const leftMax = left.maxValue ?? BigInt(Number.MAX_SAFE_INTEGER);
@@ -617,7 +701,7 @@ export const generateUtils = {
     schema: z.ZodOptional,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): unknown => {
     const { faker, config } = options;
     const { optionalProbability: probability } = config;
     if (faker.datatype.boolean({ probability })) {
@@ -630,7 +714,7 @@ export const generateUtils = {
     schema: z.ZodExactOptional,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): unknown => {
     const { faker, config } = options;
     const { optionalProbability: probability } = config;
     if (faker.datatype.boolean({ probability })) {
@@ -642,7 +726,7 @@ export const generateUtils = {
     schema: z.ZodNonOptional,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): unknown => {
     let innerSchema = schema.unwrap();
     while (safeInstanceof(innerSchema, z.ZodOptional)) {
       innerSchema = innerSchema.unwrap();
@@ -653,7 +737,7 @@ export const generateUtils = {
     schema: z.ZodNullable,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): unknown => {
     const { faker, config } = options;
     const { nullableProbability: probability } = config;
     if (faker.datatype.boolean({ probability })) return null;
@@ -663,7 +747,7 @@ export const generateUtils = {
     schema: z.ZodDefault | z.ZodPrefault,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): unknown => {
     const { faker, config } = options;
     const { defaultProbability: probability } = config;
     if (faker.datatype.boolean({ probability })) {
@@ -675,7 +759,7 @@ export const generateUtils = {
     schema: z.ZodLazy,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): unknown => {
     const innerSchema = schema.unwrap();
     return generator(innerSchema, options);
   },
@@ -686,10 +770,10 @@ export const generateUtils = {
     schema: z.ZodCodec,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): unknown => {
     return generator(schema.def.in, options);
   },
-  stringbool: (schema: z.ZodCodec, options: GeneraterOptions) => {
+  stringbool: (schema: z.ZodCodec, options: GeneraterOptions): unknown => {
     const { reverseTransform } = schema.def;
     if (reverseTransform) {
       const boolValue = options.faker.datatype.boolean();
@@ -702,7 +786,7 @@ export const generateUtils = {
     schema: z.ZodPipe,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): unknown => {
     const { in: input, out } = schema;
     if (safeInstanceof(input, z.ZodTransform)) {
       const inputValue = generator(out, options);
@@ -720,20 +804,20 @@ export const generateUtils = {
     schema: z.ZodSuccess,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): unknown => {
     return generator(schema.unwrap(), options);
   },
   catch: (
     schema: z.ZodCatch,
     options: GeneraterOptions,
     generator: CustomGeneratorType,
-  ) => {
+  ): unknown => {
     const innerType = schema.unwrap();
     const value = generator(innerType, options);
     const parsedValue = schema.safeParse(value);
     return parsedValue.data;
   },
-  never: () => {
+  never: (): typeof OMIT_SYMBOL => {
     return OMIT_SYMBOL;
   },
 };
